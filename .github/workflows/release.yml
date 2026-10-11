@@ -67,15 +67,18 @@ jobs:
             exit 1
           fi
 
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft)" = "true" ]; then
-              echo "A draft release for $TAG is left over from an earlier run. Deleting it to start clean."
-              gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
-            else
-              echo "::error::Release $TAG is already published. To redo it, delete it on the Releases page first (keep the tag)."
-              exit 1
-            fi
+          # Every release (draft or not) already made for this tag. There can be
+          # more than one draft left over from an earlier run.
+          EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"$TAG\") | \"\(.id) \(.draft)\"")
+          if echo "$EXISTING" | grep -q ' false$'; then
+            echo "::error::Release $TAG is already published. To redo it, delete it on the Releases page first (keep the tag)."
+            exit 1
           fi
+          for id in $(echo "$EXISTING" | awk 'NF {print $1}'); do
+            echo "Deleting draft release $id for $TAG, left over from an earlier run."
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+          done
 
           git fetch --depth 1 origin "refs/tags/$TAG:refs/tags/$TAG"
           TAGGED=$(git show "$TAG:package.json" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).version))")
@@ -97,6 +100,16 @@ jobs:
         with:
           name: release-notes
           path: release-notes.md
+
+      # Made here, once, so the build uploads every file into this one draft.
+      # Without it, the installer and blockmap uploads start together, each
+      # finds no release, and each creates its own.
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "v$version" --repo "$GITHUB_REPOSITORY"
+          --draft --verify-tag --title "Orfeo $version" --notes-file release-notes.md
 
   build:
     name: 2. Build
