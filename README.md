@@ -3,7 +3,7 @@
 **From MIDI to mastery.** Turn any MIDI file into an interactive piano-learning
 experience.
 
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue)](https://github.com/Squarebow/Orfeo/releases) [![License](https://img.shields.io/badge/License-GPLv3-blue)](LICENSE.md) [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)](https://github.com/Squarebow/Orfeo/releases)
+[![Version](https://img.shields.io/badge/Version-1.4.0-blue)](https://github.com/Squarebow/Orfeo/releases) [![License](https://img.shields.io/badge/License-GPLv3-blue)](LICENSE.md) [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)](https://github.com/Squarebow/Orfeo/releases)
 
 ---
 
