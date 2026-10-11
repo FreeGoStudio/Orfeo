@@ -116,6 +116,8 @@ const out = [
   '',
   '</details>',
   '',
+  `Every version since 1.0, in full: [CHANGELOG](https://github.com/${REPO}/blob/main/docs/CHANGELOG.md)`,
+  '',
 ]
   .join('\n')
   .replace(/\n{3,}/g, '\n\n')

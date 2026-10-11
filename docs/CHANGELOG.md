@@ -5,13 +5,20 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
-## [1.4] — 4. 10. 2026 — Settings window
+## [1.4.1] — 11. 10. 2026 — Smaller download
 
 **In short**
 - Smarter chord reading: chord names now appear when you hear the chord, follow the instruments actually playing the harmony, and there's a new Progressive mode.
 - Tap Tempo: fix songs whose bar lines and metronome don't match the music — tap along and Orfeo lines up the beat, with optional warnings for songs that need it.
 - Count-in of 1–4 bars before the music starts, a metronome volume control, and clicks that follow time-signature changes.
 - A new Settings window with search and links to the online manual, the everyday switches kept in Setup, and zoom for the whole app with Ctrl + / Ctrl −.
+
+### Changed
+- **Smaller download.** The installer no longer carries website screenshots, duplicate copies of the demo songs and PDF fonts, or developer-only map files.
+- **The user manual now lives at [orfeo.cc/docs](https://orfeo.cc/docs)** and is linked from the top of the README; it's no longer kept in this repository.
+- **The installer is now called `Orfeo-Setup-<version>.exe`**, without spaces, matching the portable `Orfeo-<version>-portable.exe`.
+
+## [1.4] — 4. 10. 2026 — Settings window
 
 ### New
 - **A full Settings window.** Every setting now has a proper home with room to explain itself: the eight groups are listed down the left, and each group opens with a sentence on what it's for, then its settings as cards — three across, or two or one on a small window or at a high App Zoom — each with its full description written out, no hovering needed. Options that only matter once a setting is on (Tap Tempo counting, count-in bars, max fingers per hand, the visual-effect pattern and glow, the instrument to follow) sit inside that setting's card and appear when it's on. Open it from the **Open settings** button, from any group in Setup, or with **`Ctrl` `,`** from anywhere; `Esc`, the `X` or a click outside closes it, and the music keeps playing. Drag it by its header like the Mixer.
@@ -25,8 +32,6 @@
 - The first time you pick **Samples** in Setup, the Settings window opens on Audio so you can see the sounds load. Picking **Follow** before choosing what to follow opens it on Notation & Chords so you can choose.
 - **Output delay** now shows its number in amber, and the Settings window explains what it means.
 - **Tooltips in the top bar and the Tracks panel** break into two shorter lines instead of one very wide one, and the tooltips on each track's mute, solo, show-in-roll and keyboard-light buttons use the same quieter text as the rest. The update icon's tooltip now simply says "Check for updates".
-- **Smaller download.** The installer no longer carries website screenshots, duplicate copies of the demo songs and PDF fonts, or developer-only map files.
-- **The user manual now lives at [orfeo.cc/docs](https://orfeo.cc/docs)** and is linked from the top of the README; it's no longer kept in this repository.
 
 ## [1.3.2] — 4. 10. 2026 — Settings polish
 
