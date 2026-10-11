@@ -36,10 +36,10 @@ data.*
 | **Good for** | Everyday use on your own PC | Testing, USB-stick use, locked-down machines, running versions side by side |
 
 <details>
-<summary><b>Current release file names (v1.0.0)</b></summary>
+<summary><b>Current release file names (v1.4.0)</b></summary>
 
-- `Orfeo Setup 1.0.0.exe`
-- `Orfeo-1.0.0-portable.exe`
+- `Orfeo Setup 1.4.0.exe`
+- `Orfeo-1.4.0-portable.exe`
 
 Both are on the [Releases](https://github.com/Squarebow/Orfeo/releases) page.
 
