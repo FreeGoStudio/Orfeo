@@ -22,8 +22,9 @@ assets/CLAUDE.md
 CLAUDE.md
 
 # ── Internal/planning docs — repo stays clean for public visitors ───────────
-# Only docs describing the shipped app itself are tracked (ARCHITECTURE.md,
-# HOW_TO_USE.md). Everything else here is local-only working material.
+# Only docs describing the shipped app itself or how to build it are tracked
+# (ARCHITECTURE, SHORTCUTS, INSTALLATION, CHANGELOG, CONTRIBUTING). Everything
+# else here is local-only working material.
 docs/superpowers/
 docs/LR Hand rework/
 docs/CSS_FINAL_SCAN.md
@@ -90,3 +91,8 @@ docs/Chord Engine Dual-Mode Plan.md
 # but hosted on orfeo.cc, not committed (this folder also ships inside the
 # packaged app, so it stays empty of heavy assets) ─────────────────────────
 public/images/
+
+# ── User manual — now lives on the website (orfeo.cc/docs); the local copy
+# and its icons are kept here only as the source for the site ──────────────
+docs/HOW_TO_USE.md
+docs/how-to-use-icons/

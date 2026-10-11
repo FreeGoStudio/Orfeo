@@ -14,7 +14,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "dist": "npm run copyworklet && npm run check:hand-engine && electron-vite build && electron-builder",
-    "dist:portable": "npm run copyworklet && npm run check:hand-engine && electron-vite build && electron-builder --win portable"
+    "dist:portable": "npm run copyworklet && npm run check:hand-engine && electron-vite build && electron-builder --win portable",
+    "release:notes": "node scripts/release-notes.mjs"
   },
   "build": {
     "appId": "com.squarebow.orfeo",
@@ -29,7 +30,10 @@
     },
     "files": [
       "out/**/*",
-      "public/spessasynth_processor.min.js",
+      "!out/renderer/images/**/*",
+      "!out/renderer/fonts/**/*",
+      "!out/renderer/Demo/**/*",
+      "!out/renderer/icon.ico",
       "!node_modules/**/*",
       "node_modules/pdfkit/**/*",
       "node_modules/@noble/**/*",
@@ -49,7 +53,11 @@
       "node_modules/base64-js/**/*",
       "node_modules/browserify-zlib/**/*",
       "node_modules/pako/**/*",
-      "node_modules/tslib/**/*"
+      "node_modules/tslib/**/*",
+      "!**/*.map",
+      "!**/*.d.ts",
+      "!**/*.d.mts",
+      "!**/*.d.cts"
     ],
     "extraResources": [
       {
@@ -82,6 +90,7 @@
       "icon": "public/icon.ico"
     },
     "nsis": {
+      "artifactName": "Orfeo-Setup-${version}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,

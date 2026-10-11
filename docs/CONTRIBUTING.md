@@ -143,18 +143,38 @@ never enters a checking/downloading state.
 
 </details>
 
-### Cutting a Windows release (maintainers)
+### Releasing a new version (maintainers)
 
-| Step | Command / action |
-|---|---|
-| 1. Bump the version | Edit `version` in `package.json`, then `git commit -am "Release vX.Y.Z"` and `git tag vX.Y.Z` |
-| 2. Build and publish | `GH_TOKEN=<token-with-repo-scope> npm run dist` — uploads the installer, the portable `.exe`, **and** `latest.yml` to the matching GitHub release |
-| 3. Publish the release | Flip the draft GitHub release to published once the upload finishes |
+Releases are built and published by GitHub Actions
+(`.github/workflows/release.yml`), never from a local machine. A tag on its own
+publishes nothing: a version becomes a release only when the workflow is run for
+it.
+
+| Step | Where | What |
+|---|---|---|
+| 1. Changelog | `docs/CHANGELOG.md` | A section `## [X.Y.Z] — D. M. YYYY — Title` at the top, optionally starting with an **In short** list of 2–4 lines, then `### New` / `### Changed` / `### Fixed`. Preview the notes with `npm run release:notes -- X.Y.Z`. |
+| 2. Version and tag | Git | `version` in `package.json` set to `X.Y.Z`, committed, tagged `vX.Y.Z`; the commit, the tag and `main` pushed to GitHub. |
+| 3. Run the workflow | GitHub → Actions → **Release** → **Run workflow** | Branch `main`, version `X.Y.Z`. Optional: *Pre-release* (installed copies don't update to it) or *Test run* (keeps the release as a draft). |
+
+The workflow checks that the tag, `package.json` and the changelog agree,
+builds the installer (`Orfeo-Setup-X.Y.Z.exe`) and the portable app
+(`Orfeo-X.Y.Z-portable.exe`) on Windows from the tag, uploads them with
+`latest.yml` and the blockmap, writes the release notes from the changelog and
+publishes the release as *Latest*.
 
 > [!IMPORTANT]
-> `latest.yml` is what makes auto-update work. Without it `electron-updater`
-> has nothing to check against, even if the executables themselves are
-> uploaded.
+> `latest.yml` is what makes auto-update work, and `electron-updater` only sees
+> **published** releases. A release left as a draft, or published without
+> `latest.yml`, updates nobody.
+
+Release notes come from the changelog on the branch the workflow runs from
+(`main`), so they can be improved after tagging, without re-tagging. Only the
+entries above `## [1.0.0]` are searched: the entries below it use the numbering
+from before the public release.
+
+Fallback, if GitHub Actions is unavailable: `GH_TOKEN=<token> npm run dist`
+on a Windows machine uploads the same files to a draft release; publish it by
+hand on the Releases page.
 
 <details>
 <summary><b>Contributing a macOS / Linux build (community)</b></summary>

@@ -3,7 +3,11 @@
 **From MIDI to mastery.** Turn any MIDI file into an interactive piano-learning
 experience.
 
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue)](https://github.com/Squarebow/Orfeo/releases) [![License](https://img.shields.io/badge/License-GPLv3-blue)](LICENSE.md) [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)](https://github.com/Squarebow/Orfeo/releases)
+[![Version](https://img.shields.io/github/v/release/Squarebow/Orfeo?label=Version&color=blue)](https://github.com/Squarebow/Orfeo/releases/latest) [![License](https://img.shields.io/badge/License-GPLv3-blue)](LICENSE.md) [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)](https://github.com/Squarebow/Orfeo/releases)
+
+📖 **User manual: [orfeo.cc/docs](https://orfeo.cc/docs)**
+
+![Orfeo mid-playback: falling notes on the keyboard, keys lit in track colours, the live chord name above](.github/images/orfeo-hero.png)
 
 ---
 
@@ -16,8 +20,6 @@ a piano roll that looks like it was built this decade.
 
 It's not a game — no scoring, no streaks, no subscription. No account, no
 telemetry; MIDI files are processed entirely on your device.
-
-> **Image ·** `readme/hero.png` · **1600×1000** · _Orfeo mid-playback: falling notes on the 88-key keyboard, keys lit in track colours, the live chord name above._
 
 ## Contents
 
@@ -118,7 +120,7 @@ telemetry; MIDI files are processed entirely on your device.
   descriptions, a search box, and a link to the matching page of the online
   manual
 
-Full walkthrough of every feature: **[docs/HOW_TO_USE.md](docs/HOW_TO_USE.md)**.
+Full walkthrough of every feature: **[orfeo.cc/docs](https://orfeo.cc/docs)**.
 
 ---
 
@@ -131,7 +133,7 @@ page:
 <colgroup><col width="34%"><col width="66%"></colgroup>
 <thead><tr><th>File</th><th>Use</th></tr></thead>
 <tbody>
-<tr><td><code>Orfeo Setup &lt;version&gt;.exe</code></td><td>Standard Windows installer — Start Menu shortcut, automatic updates</td></tr>
+<tr><td><code>Orfeo-Setup-&lt;version&gt;.exe</code></td><td>Standard Windows installer — Start Menu shortcut, automatic updates</td></tr>
 <tr><td><code>Orfeo-&lt;version&gt;-portable.exe</code></td><td>Portable — no installation, runs from anywhere, manual updates</td></tr>
 </tbody>
 </table>
@@ -147,7 +149,7 @@ live)? See **[docs/INSTALLATION.md](docs/INSTALLATION.md)**.
 <colgroup><col width="20%"><col width="80%"></colgroup>
 <thead><tr><th>Document</th><th>What's in it</th></tr></thead>
 <tbody>
-<tr><td><a href="docs/HOW_TO_USE.md">How to Use</a></td><td>The complete guide — Play, Edit, Practice, Manage files, Extras</td></tr>
+<tr><td><a href="https://orfeo.cc/docs">User manual</a></td><td>The complete guide — Play, Edit, Practice, Manage files, Extras (online at orfeo.cc)</td></tr>
 <tr><td><a href="docs/SHORTCUTS.md">Shortcuts</a></td><td>Every keyboard and mouse gesture</td></tr>
 <tr><td><a href="docs/INSTALLATION.md">Installation</a></td><td>Installer vs. portable, updates, where data lives</td></tr>
 <tr><td><a href="docs/ARCHITECTURE.md">Architecture</a></td><td>How Orfeo is built and why</td></tr>

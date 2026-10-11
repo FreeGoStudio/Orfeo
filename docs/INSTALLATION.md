@@ -26,7 +26,7 @@ data.*
 
 | | Setup (installer) | Portable (standalone) |
 |---|---|---|
-| **File name** | `Orfeo Setup <version>.exe` | `Orfeo-<version>-portable.exe` |
+| **File name** | `Orfeo-Setup-<version>.exe` | `Orfeo-<version>-portable.exe` |
 | **Install step** | Yes — a normal Windows installer | None — the `.exe` *is* the app |
 | **Admin rights** | No — installs just for your Windows account, no UAC prompt | No |
 | **Where it installs** | `%LOCALAPPDATA%\Programs\Orfeo` by default (you can pick another folder during setup) | Wherever you put the `.exe` — USB stick, any folder |
@@ -36,10 +36,10 @@ data.*
 | **Good for** | Everyday use on your own PC | Testing, USB-stick use, locked-down machines, running versions side by side |
 
 <details>
-<summary><b>Current release file names (v1.0.0)</b></summary>
+<summary><b>Example file names (v1.4.0)</b></summary>
 
-- `Orfeo Setup 1.0.0.exe`
-- `Orfeo-1.0.0-portable.exe`
+- `Orfeo-Setup-1.4.0.exe`
+- `Orfeo-1.4.0-portable.exe`
 
 Both are on the [Releases](https://github.com/Squarebow/Orfeo/releases) page.
 
@@ -90,7 +90,7 @@ travel with it. A portable build never touches `%APPDATA%`.
 
 | Build | How updates work |
 |---|---|
-| **Setup** | Orfeo checks GitHub Releases about 5 seconds after startup. A found update downloads in the background; when it is ready, the update control in **Settings → Appearance** changes to *"click to restart and install"*. You can also re-check manually there any time. |
+| **Setup** | Orfeo checks GitHub Releases about 5 seconds after startup. A found update downloads in the background; when it is ready, the update button at the bottom of the left panel changes to *"click to restart and install"*. You can also re-check manually there any time. |
 | **Portable** | No auto-update — even on Windows. Watch the [Releases](https://github.com/Squarebow/Orfeo/releases) page and download the new `Orfeo-<version>-portable.exe` when you want to update. Replace the old file; your settings and library are untouched because they live in `Orfeo-Data\`, not inside the `.exe`. |
 
 ---
