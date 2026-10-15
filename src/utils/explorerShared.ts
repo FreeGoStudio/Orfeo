@@ -6,8 +6,8 @@
 // import from here so a change to any of it lands in both at once.
 
 import { Music2, TrendingUp, Spline } from 'lucide-react'
-import { getGenreVoicing, type Genre } from './genreVoicing'
-import { ALL_CHORDS, type ChordInfo } from './chordVocabulary'
+import { getGenreVoicing, isTritoneSub, TRITONE_SUB_CHORD, type Genre } from './genreVoicing'
+import { ALL_CHORDS, resolveChord, type ChordInfo } from './chordVocabulary'
 import { humanizeChord, type ProgressionVoicing, type VoicingRange } from './voiceLeading'
 
 // ── Explorer keyboard range — both explorers play on the 61-key layout ──────
@@ -107,19 +107,24 @@ export const ALL_PROGRESSIONS = buildAllProgressions()
 // its quality comes from the numeral exactly as written — uppercase major,
 // lowercase minor, ° diminished — so I–bVII–IV plays C–B♭–F in C, and a
 // major progression stays major whichever scale is selected. A style other
-// than Classic swaps in its own richer chord for that numeral.
+// than Classic swaps in its own richer chord for that numeral; Ipanema also
+// swaps a V resolving down a fifth for its tritone substitute (♭II7♯11).
 export function resolveProgressionStep(
   prog: Progression,
   step: number,
   keyRoot: number,
   genre: Genre = 'classic',
-  baseKey: string = 'major',
 ): { rootPc: number; label: string; info: ChordInfo } | null {
   const label = prog.labels[step]
-  const offset = prog.offsets[step]
+  let offset = prog.offsets[step]
   if (label === undefined || offset === undefined) return null
-  const typeKey = getGenreVoicing(genre, label, baseKey)
-  const info = ALL_CHORDS.find(c => c.key === typeKey) ?? ALL_CHORDS.find(c => c.key === baseKey)
+  let typeKey = getGenreVoicing(genre, label)
+  if (isTritoneSub(genre, label, offset, prog.offsets[(step + 1) % prog.offsets.length])) {
+    offset += 6
+    typeKey = TRITONE_SUB_CHORD
+  }
+  // Curated tile chords first; a style's rarer chord (7♭9♭13) from the full dictionary.
+  const info = ALL_CHORDS.find(c => c.key === typeKey) ?? resolveChord(typeKey)
   if (!info) return null
   return { rootPc: (((keyRoot + offset) % 12) + 12) % 12, label, info }
 }

@@ -15,7 +15,7 @@ import { getPianoRollCenterX, getKeyboardHeaderTop } from '../utils/modalAnchors
 import { useAnchorBottomOnResize } from '../hooks/useAnchorBottomOnResize'
 import { useClampPositionOnZoom } from '../hooks/useClampPositionOnZoom'
 import { modalCloseButtonStyle, modalCloseButtonHoverColor, modalCloseButtonIdleColor } from '../utils/modalCloseButtonStyle'
-import { buildChordMidi, formatChordSuffix } from '../utils/chordDetection'
+import { buildChordMidi, formatChordSuffix, formatInversionDisplay, ordinalSuffix } from '../utils/chordDetection'
 import {
   nextVoicing, intervalsToSemis, rootPositionFrom,
   PROGRESSION_VOICINGS, PROGRESSION_VOICING_LABEL, PROGRESSION_VOICING_HINT,
@@ -45,10 +45,20 @@ const GENRE_DESCRIPTIONS: Record<Genre, string> = {
   coltrane:  'Adds 9ths and 13ths for sophisticated jazz harmony',
   cinematic: 'Open, clean voicings — add9 and suspended chords',
   roadhouse: 'Dominant 7ths on the I and IV chords — classic blues sound',
-  ipanema:   'Smooth 9ths and 11ths with a tritone-substitution lean — bossa nova character',
+  gospel:    t`Church harmony — 6/9 and maj9 chords, minor 9ths and 11ths, a 13th on V`,
+  ipanema:   t`Smooth 9ths and 11ths, and a tritone substitution on V (D♭7♯11 for G7) — bossa nova character`,
   carnival:  'Bright, festive 7th chords — samba character',
+  flamenco:  t`Phrygian fire — a 7♭9 on V and open maj7♯11 chords, flamenco guitar colours`,
   velvet:    'Deep 11ths and 13ths, mellow and laid-back — neo-soul character',
 }
+
+// ── Easter egg — the "Rite of Spring" chord (Stravinsky, 1913): an E♭7
+// stacked on an F♭ major triad, struck as a pounding pulse. ────────────────
+const RITE_LOW = [40, 47, 52, 56]    // F♭ major — F♭2 C♭3 F♭3 A♭3
+const RITE_HIGH = [63, 67, 70, 73]   // E♭7 — E♭4 G4 B♭4 D♭5
+const RITE_PULSES = 8
+const RITE_PULSE_MS = 300
+const RITE_VELOCITY = 0.9
 
 // ── Shared row label style — dim uppercase, used across all control rows ──────
 const ROW_LABEL: React.CSSProperties = {
@@ -56,6 +66,9 @@ const ROW_LABEL: React.CSSProperties = {
   color: 'var(--text-dimmest)', letterSpacing: '0.10em',
   textTransform: 'uppercase', flexShrink: 0, userSelect: 'none',
 }
+
+// ── Footer labels — Show as, Inversion, Accent Root (Octave's own matches) ──
+const FOOTER_LABEL: React.CSSProperties = { ...ROW_LABEL, fontSize: 10 }
 
 // ── Shared row container — flex row with separator ────────────────────────────
 const ROW: React.CSSProperties = {
@@ -122,9 +135,10 @@ export default function ChordExplorer() {
   const [progStep, setProgStep] = useState(0)
   const [progSpeed, setProgSpeed] = useState<ProgSpeed>('med')
   const [progGenre, setProgGenre] = useState<Genre>('classic')
-  // ── Currently-sounding notes, in real ascending sounding order — drives the
-  // fixed-width note-names slot in the style row's right corner. ────────────
-  const [playingNotes, setPlayingNotes] = useState<number[]>([])
+  // ── Easter egg card open + the timers of its pounding pulse ──────────────
+  const [riteOpen, setRiteOpen] = useState(false)
+  const riteTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const explorerChordDisplay = useStore(s => s.explorerChordDisplay)
   const [styleDropdownOpen, setStyleDropdownOpen] = useState(false)
   const [styleDropdownRect, setStyleDropdownRect] = useState<{ top: number; left: number } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -174,7 +188,8 @@ export default function ChordExplorer() {
     if (progTimerRef.current) { clearTimeout(progTimerRef.current); progTimerRef.current = null }
     setProgPlaying(false)
     setProgStep(0)
-    setPlayingNotes([])
+    riteTimersRef.current.forEach(clearTimeout)
+    riteTimersRef.current = []
   }, [])
 
   // Reset transient state on open; no keyboard size change (61 is for ScaleExplorer only).
@@ -194,6 +209,7 @@ export default function ChordExplorer() {
       setProgDropdownOpen(false)
       setDropdownRect(null)
       setSelectedPowerRoot(null)
+      setRiteOpen(false)
     } else {
       stopProgression()
     }
@@ -222,12 +238,13 @@ export default function ChordExplorer() {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (progDropdownOpen) { setProgDropdownOpen(false); setDropdownRect(null); return }
+        if (riteOpen) { setRiteOpen(false); return }
         close()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [chordExplorerOpen, close, progDropdownOpen])
+  }, [chordExplorerOpen, close, progDropdownOpen, riteOpen])
 
   // Outside-click to close progression dropdown
   useEffect(() => {
@@ -380,7 +397,6 @@ export default function ChordExplorer() {
   const playProgStepAt = useCallback((
     step: number,
     progIndex: number,
-    chordKey: string,
     root: number,
     speed: ProgSpeed,
     genre: Genre,
@@ -391,7 +407,7 @@ export default function ChordExplorer() {
     if (!prog) return
     // ── Same step → chord rule as the Scales Explorer (explorerShared.ts):
     // the numeral as written, re-voiced for the selected style. ────────────
-    const resolved = resolveProgressionStep(prog, step, root, genre, chordKey)
+    const resolved = resolveProgressionStep(prog, step, root, genre)
     if (!resolved) return
     const { rootPc: actualRoot, info } = resolved
     const durationMs = SPEED_MS[speed]
@@ -408,27 +424,24 @@ export default function ChordExplorer() {
       const rootLbl = rootLabels.find(r => r.pitchClass === actualRoot)?.label ?? ''
       const chordSuffix = formatChordSuffix(info.suffix, chordNamingStyle)
       setExplorerChordDisplay({ name: `${rootLbl}${chordSuffix}`, invCount: inversionOf(actualRoot, semis, midiNotes), noteCount: midiNotes.length })
-      // ── Real sounding order (ascending) for the style row's note-names slot ─
-      setPlayingNotes([...midiNotes].sort((a, b) => a - b))
       strikeStep(midiNotes, Math.round(durationMs * 1.12), () => progRunningRef.current)
     }
     setProgStep(step)
 
     const nextStep = (step + 1) % prog.offsets.length
     progTimerRef.current = setTimeout(() => {
-      playProgStepAt(nextStep, progIndex, chordKey, root, speed, genre, midiNotes)
+      playProgStepAt(nextStep, progIndex, root, speed, genre, midiNotes)
     }, durationMs)
   }, [lightKeys, setExplorerChordDisplay, rootLabels, chordNamingStyle])
 
   const startProgression = useCallback(() => {
     if (selectedProg === null) return
-    const chordKey = selectedKey ?? 'major'
     stopProgression()
     progRunningRef.current = true
     setProgPlaying(true)
     setProgStep(0)
-    playProgStepAt(0, selectedProg, chordKey, selectedRoot, progSpeed, progGenre, null)
-  }, [selectedProg, selectedKey, selectedRoot, progSpeed, progGenre, stopProgression, playProgStepAt])
+    playProgStepAt(0, selectedProg, selectedRoot, progSpeed, progGenre, null)
+  }, [selectedProg, selectedRoot, progSpeed, progGenre, stopProgression, playProgStepAt])
 
   // ── Spacebar plays/pauses the progression while this modal is open ────────
   useEffect(() => {
@@ -529,6 +542,31 @@ export default function ChordExplorer() {
     ringChord(midiNotes)
   }, [stopProgression, lightKeys, rootLabels, setExplorerChordDisplay])
 
+  // ── Easter egg — light and pound the Rite of Spring chord ─────────────────
+  const playRiteChord = useCallback(() => {
+    stopProgression()
+    setSelectedKey(null)
+    setSelectedPowerRoot(null)
+    const notes = [...RITE_LOW, ...RITE_HIGH]
+    lightKeys(notes, RITE_LOW[0] % 12)
+    setExplorerChordDisplay({ name: t`E♭7 over F♭`, invCount: 0, noteCount: notes.length })
+    const playNote = (window as any).__orfeoPlayNote
+    if (!playNote) return
+    for (let i = 0; i < RITE_PULSES; i++) {
+      const last = i === RITE_PULSES - 1
+      riteTimersRef.current.push(setTimeout(() => {
+        notes.forEach(m => playNote(m, RITE_VELOCITY, last ? 2600 : RITE_PULSE_MS - 40, undefined, false))
+      }, i * RITE_PULSE_MS))
+    }
+  }, [stopProgression, lightKeys, setExplorerChordDisplay])
+
+  const clearSelection = () => {
+    stopProgression()
+    clearExplorerKeys(); clearDisplayedChord(); clearLockedKeys(); clearExplorerChordDisplay()
+    setSelectedKey(null); setSelectedPowerRoot(null)
+    struckShapeRef.current = null; setInverted(false)
+  }
+
   const handleRootChange = (pitchClass: number) => {
     stopProgression()
     setSelectedRoot(pitchClass)
@@ -585,6 +623,17 @@ export default function ChordExplorer() {
 
   const rootLabel = (pc: number) => rootLabels.find(r => r.pitchClass === pc)?.label ?? ''
 
+  // ── What's lit right now, low to high, and its name with inversion marks —
+  // the display row under the progressions. ─────────────────────────────────
+  const litNotes = useMemo(() => Array.from(explorerKeys).sort((a, b) => a - b), [explorerKeys])
+  const nowPlaying = useMemo(() => {
+    if (!explorerChordDisplay || litNotes.length === 0) return null
+    return formatInversionDisplay(
+      explorerChordDisplay.name, explorerChordDisplay.invCount, explorerChordDisplay.noteCount,
+      litNotes[0], displayNaming, accidentals, true,
+    )
+  }, [explorerChordDisplay, litNotes, displayNaming, accidentals])
+
   // ── Pill button base — active: amber text + tinted bg; inactive: dim ─────────
   const btnBase = (active: boolean): React.CSSProperties => ({
     padding: '2px 8px', borderRadius: 'var(--radius-sm)', border: 'none',
@@ -598,6 +647,7 @@ export default function ChordExplorer() {
   if (!chordExplorerOpen) return null
 
   const isPowerMode = tier === 'power'
+  const canClear = selectedKey !== null || selectedPowerRoot !== null || explorerKeys.size > 0 || progPlaying
   const activeProg = selectedProg !== null ? ALL_PROGRESSIONS[selectedProg] : null
 
   return (
@@ -630,7 +680,18 @@ export default function ChordExplorer() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <OrfeoMark height={22} />
+          {/* Easter egg — the logo is a hidden link to the Rite of Spring chord.
+              Out of the Tab order: the focus trap would otherwise land on it
+              when the window opens (outline + Space/Enter opening the card). */}
+          <Tooltip title={t`A chord that shook the world`} description={t`Click to discover`}>
+            <button
+              tabIndex={-1}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={() => { setRiteOpen(true); playRiteChord() }}
+              aria-label={t`Easter egg`}
+              style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            ><OrfeoMark height={22} /></button>
+          </Tooltip>
           <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 700, color: 'var(--text-amber)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
             Chords Explorer
           </span>
@@ -920,22 +981,24 @@ export default function ChordExplorer() {
           </div>
         </div>
 
-        {/* ── Sub-row 2: roman numerals | sequence/notes legend | note names ──── */}
-        {/* CSS grid, three real columns (1fr / auto / 1fr) — the centre column
-            is structurally centered by grid layout itself, not computed via
-            position:absolute + transform math. Row height matches the other
-            three rows exactly (same minHeight/padding/border-box model). ──── */}
+        {/* ── Sub-row 2: SEQUENCE + numerals | chord now playing | NOTES + names ─ */}
+        {/* Three equal grid tracks, so the chord name is truly centred. Each
+            label sits at a fixed spot ahead of its content (left edge / start
+            of a fixed-width notes slot), so neither moves as content changes. */}
         <div style={{
           minHeight: 'var(--row-height)', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', alignItems: 'center',
           borderTop: '1px solid var(--border)',
           padding: '5px 12px',
-          pointerEvents: selectedProg === null ? 'none' : 'auto',
         }}>
-          {/* Left: roman-numeral progression display, active step amber ──────── */}
+          {/* Left: SEQUENCE + roman-numeral progression, active step amber ────── */}
           <div style={{
-            display: 'flex', alignItems: 'baseline', gap: 6, justifySelf: 'start',
+            display: 'flex', alignItems: 'baseline', gap: 6, justifySelf: 'start', minWidth: 0,
             opacity: selectedProg === null ? 0.35 : 1, transition: 'opacity 0.15s',
           }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 4, alignSelf: 'center' }}>
+              <span style={ROW_LABEL}>{t`Sequence`}</span>
+              <ChevronRight size={12} color="var(--text-amber)" />
+            </span>
             {activeProg?.labels.map((label, i) => (
               <span key={i} style={{
                 fontFamily: 'var(--font-ui)',
@@ -947,38 +1010,34 @@ export default function ChordExplorer() {
             ))}
           </div>
 
-          {/* Centre: SEQUENCE / NOTES legend — labels what's on the left (roman
-              numeral sequence) and right (note names) of this row, amber
-              arrows pointing outward toward each. Own grid column, so it's
-              genuinely centered between the other two regardless of their
-              content width. No alignSelf override — inherits the grid's
-              alignItems:center, same as the left/right columns, so all three
-              sit on the same vertical centerline. ────────────────────────── */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifySelf: 'center', gap: 6,
-            opacity: selectedProg === null ? 0.35 : 1, transition: 'opacity 0.15s',
-          }}>
-            <ChevronLeft size={12} color="var(--text-amber)" />
-            <span style={ROW_LABEL}>Sequence</span>
-            <span style={{ color: 'var(--text-inactive)', fontSize: 10 }}>|</span>
-            <span style={ROW_LABEL}>Notes</span>
-            <ChevronRight size={12} color="var(--text-amber)" />
+          {/* Centre: the chord sounding now — same name and inversion marks as
+              the keyboard's chord display; the selected root when nothing is lit. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifySelf: 'center', gap: 5, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 700, color: 'var(--text-amber)', letterSpacing: '0.05em', userSelect: 'none' }}>
+              {nowPlaying ? nowPlaying.chordLabel : rootLabel(selectedRoot)}
+            </span>
+            {nowPlaying?.ordinal && (
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-default)', userSelect: 'none' }}>
+                {nowPlaying.ordinal}
+                <span style={{ fontSize: 8, verticalAlign: 'super' }}>{ordinalSuffix(Number(nowPlaying.ordinal))}</span>
+                {' inv'}
+              </span>
+            )}
           </div>
 
-          {/* Right: currently-sounding note names, real order, amber, sized to
-              match the roman numerals on the left. Fixed-width reserved slot
-              sized for a realistic worst case (extended chord, several notes)
-              so the centred legend never shifts. ──────────────────────────── */}
-          <div style={{
-            display: 'flex', justifyContent: 'flex-end', justifySelf: 'end',
-            opacity: selectedProg === null ? 0.35 : 1, transition: 'opacity 0.15s',
-          }}>
+          {/* Right: the lit notes, low to high, then ‹ NOTES at the right edge —
+              mirrors SEQUENCE › on the left, so both labels stay fixed. ───── */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifySelf: 'end', gap: 10, minWidth: 0 }}>
             <span style={{
-              minWidth: '11ch', textAlign: 'right',
+              minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'right',
               fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em',
               color: 'var(--text-amber)', userSelect: 'none', whiteSpace: 'nowrap',
             }}>
-              {playingNotes.map(m => getNoteName(m, displayNaming, accidentals)).join(' ')}
+              {litNotes.map(m => getNoteName(m, displayNaming, accidentals)).join(' ')}
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'center', flexShrink: 0 }}>
+              <ChevronLeft size={12} color="var(--text-amber)" />
+              <span style={ROW_LABEL}>{t`Notes`}</span>
             </span>
           </div>
         </div>
@@ -986,7 +1045,7 @@ export default function ChordExplorer() {
       </div>
 
       {/* Results grid — power chord tiles when tier === 'power', chord grid otherwise */}
-      <div style={{
+      <div className="amber-scroll" style={{
         flex: 1, overflowY: 'auto',
         padding: 'var(--space-2) var(--space-3)',
         display: 'grid',
@@ -1097,7 +1156,8 @@ export default function ChordExplorer() {
         )}
       </div>
 
-      {/* ── Footer — show-as left, play inversion centred, scale explorer right ─ */}
+      {/* ── Footer — six controls, evenly spaced edge to edge:
+          Show as | Octave | Inversion | Accent Root | Clear | Scales Explorer ── */}
       <div style={{
         ...ROW,
         minHeight: 'var(--row-height)',
@@ -1105,12 +1165,10 @@ export default function ChordExplorer() {
         borderBottom: 'none',
         background: 'var(--bg-modal-header)',
         padding: '0 var(--space-3)',
-        position: 'relative',
       }}>
-        {/* Left: accidentals + octave control */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        {/* Show as ♭ ♯ */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ ...ROW_LABEL, fontSize: 10 }}>Show as</span>
+          <span style={FOOTER_LABEL}>Show as</span>
           {(['flat', 'sharp'] as const).map(a => (
             <button key={a} onClick={() => setAccidentals(a)} style={{
               background: 'none', border: 'none', padding: '0 4px',
@@ -1123,31 +1181,14 @@ export default function ChordExplorer() {
             </button>
           ))}
         </div>
-        <ExplorerOctaveControl />
-        {/* Clear — turns the lit chord off and deselects its tile */}
-        <Tooltip oneLine title={t`Clear selection`}>
-          <button
-            onClick={() => { clearExplorerKeys(); clearDisplayedChord(); clearLockedKeys(); clearExplorerChordDisplay(); setSelectedKey(null); struckShapeRef.current = null; setInverted(false) }}
-            disabled={!selectedKey}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0,
-              fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase',
-              cursor: selectedKey ? 'pointer' : 'default',
-              color: selectedKey ? 'var(--text-inactive)' : 'var(--state-hover-bg)',
-            }}
-            onMouseEnter={e => { if (selectedKey) e.currentTarget.style.color = 'var(--text-amber)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = selectedKey ? 'var(--text-inactive)' : 'var(--state-hover-bg)' }}
-          ><RotateCcw size={12} />{t`Clear`}</button>
-        </Tooltip>
-        </div>
 
-        {/* Centre: inversion controls — absolutely positioned */}
+        <ExplorerOctaveControl />
+
+        {/* Inversion ◁ ▷ ↺ */}
         <div style={{
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', gap: 6,
           opacity: isPowerMode ? 0.35 : 1, pointerEvents: isPowerMode ? 'none' : 'auto', transition: 'opacity 0.15s',
         }}>
-          {/* Previous inversion — Play icon mirrored */}
           <Tooltip oneLine title="Previous inversion">
           <button
             onMouseDown={() => handleInversion('prev')}
@@ -1157,11 +1198,7 @@ export default function ChordExplorer() {
             onMouseLeave={e => { e.currentTarget.style.color = selectedKey ? 'var(--text-amber)' : 'var(--state-disabled)' }}
           ><ChevronPlayIcon size={14} mirrored /></button>
           </Tooltip>
-          {/* Static grey label — chord display is above the keyboard only */}
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--text-inactive)', letterSpacing: '0.12em', textTransform: 'uppercase', userSelect: 'none' }}>
-            Play Inversion
-          </span>
-          {/* Next inversion — Play icon normal */}
+          <span style={FOOTER_LABEL}>{t`Inversion`}</span>
           <Tooltip oneLine title="Next inversion">
           <button
             onMouseDown={() => handleInversion('next')}
@@ -1182,20 +1219,35 @@ export default function ChordExplorer() {
           </Tooltip>
         </div>
 
-        {/* Right: Accent root note toggle (same setting as the Scales
-            Explorer's) + Scale Explorer switch */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        {/* Accent Root (same setting as the Scales Explorer's) */}
         <Tooltip title="Accent Root Note" description="Highlights the chord's true root pitch class in pink, in any octave, instead of blending it.">
           <button
             onClick={() => setColorRootNoteEnabled(!colorRootNoteEnabled)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
           >
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--text-dimmest)', letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Accent Root</span>
+            <span style={{ ...FOOTER_LABEL, whiteSpace: 'nowrap' }}>Accent Root</span>
             <span style={{ display: 'flex', color: colorRootNoteEnabled ? 'var(--text-amber)' : 'var(--text-inactive)' }}>
               {colorRootNoteEnabled ? <ToggleRight size={16} strokeWidth={1.5} /> : <ToggleLeft size={16} strokeWidth={1.5} />}
             </span>
           </button>
         </Tooltip>
+
+        {/* Clear — stops a progression, turns the lit chord off, deselects its tile */}
+        <Tooltip oneLine title={t`Clear selection`}>
+          <button
+            onClick={clearSelection}
+            disabled={!canClear}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0,
+              fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase',
+              cursor: canClear ? 'pointer' : 'default',
+              color: canClear ? 'var(--text-inactive)' : 'var(--state-hover-bg)',
+            }}
+            onMouseEnter={e => { if (canClear) e.currentTarget.style.color = 'var(--text-amber)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = canClear ? 'var(--text-inactive)' : 'var(--state-hover-bg)' }}
+          >{t`Clear`}<RotateCcw size={12} /></button>
+        </Tooltip>
+
         <Tooltip oneLine title="Switch to Scales Explorer">
         <button
           onClick={() => { setChordExplorerOpen(false); setScaleExplorerOpen(true) }}
@@ -1204,14 +1256,49 @@ export default function ChordExplorer() {
           onMouseLeave={e => e.currentTarget.style.color = 'var(--text-inactive)'}
         >Scales Explorer <ArrowUpRight size={11} /></button>
         </Tooltip>
-        </div>
       </div>
 
-      {/* Progression dropdown — portalled to body to escape overflow:hidden */}
+      {/* Easter egg card — over the tiles, opened from the header logo */}
+      {riteOpen && (
+        <div role="note" style={{
+          position: 'absolute', left: '50%', top: 236, transform: 'translateX(-50%)', width: 440,
+          background: 'var(--bg-modal)', border: '1px solid var(--text-amber)', borderRadius: 8,
+          boxShadow: '0 8px 30px rgba(0,0,0,0.7)', padding: '14px 18px 12px', zIndex: 2,
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 700, color: 'var(--text-amber)' }}>{t`The Rite of Spring chord`}</span>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)' }}>{t`Igor Stravinsky, 1913`}</span>
+            </div>
+            <button
+              onClick={() => setRiteOpen(false)}
+              aria-label={t`Close`}
+              style={{ ...modalCloseButtonStyle, fontSize: 'var(--text-lg)', lineHeight: 1, fontFamily: 'var(--font-ui)' }}
+              onMouseEnter={e => e.currentTarget.style.color = modalCloseButtonHoverColor}
+              onMouseLeave={e => e.currentTarget.style.color = modalCloseButtonIdleColor}
+            >×</button>
+          </div>
+          <p style={{ margin: 0, fontFamily: 'var(--font-ui)', fontSize: 12, lineHeight: 1.5, color: 'var(--text-dim)', textWrap: 'pretty' } as CSSProperties}>
+            {t`He wrote an E♭ dominant 7 chord directly on top of an F♭ major triad. Played by a full orchestral string section, it makes a legendary, heavy, jarring crunch that changed modern music forever. Here's how it sounds on piano.`}
+          </p>
+          <button
+            onClick={playRiteChord}
+            style={{
+              alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 5,
+              background: 'none', border: '1.5px solid var(--text-amber)', borderRadius: 4, padding: '3px 10px',
+              color: 'var(--text-amber)', cursor: 'pointer',
+              fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+            }}
+          ><ChevronPlayIcon size={12} />{t`PLAY AGAIN`}</button>
+        </div>
+      )}
+
       {/* Progression dropdown — portalled to body to escape overflow:hidden */}
       {progDropdownOpen && dropdownRect && createPortal(
         <div
           ref={progDropRef}
+          className="amber-scroll"
           style={{
             position: 'fixed',
             top: dropdownRect.top,
@@ -1267,6 +1354,7 @@ export default function ChordExplorer() {
       {styleDropdownOpen && styleDropdownRect && createPortal(
         <div
           ref={styleDropRef}
+          className="amber-scroll"
           style={{
             position: 'fixed',
             top: styleDropdownRect.top,

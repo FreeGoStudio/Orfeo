@@ -1,12 +1,16 @@
-export type Genre = 'classic' | 'coltrane' | 'cinematic' | 'roadhouse' | 'ipanema' | 'carnival' | 'velvet'
+import { t } from './i18n'
+
+export type Genre = 'classic' | 'coltrane' | 'cinematic' | 'roadhouse' | 'gospel' | 'ipanema' | 'carnival' | 'flamenco' | 'velvet'
 
 export const GENRE_LABELS: Record<Genre, string> = {
   classic:   'Classic',
   coltrane:  'Coltrane',
   cinematic: 'Cinematic',
   roadhouse: 'Roadhouse',
+  gospel:    t`Gospel`,
   ipanema:   'Ipanema',
   carnival:  'Carnival',
+  flamenco:  t`Flamenco`,
   velvet:    'Velvet',
 }
 
@@ -65,7 +69,7 @@ const IPANEMA_MAP: DegreeMap = {
   I:   { major: 'maj9',    minor: 'm9',   diminished: 'm7b5' },
   II:  { major: 'maj9',    minor: 'm11',  diminished: 'm7b5' },
   III: { major: 'maj9',    minor: 'm9',   diminished: 'm7b5' },
-  IV:  { major: 'maj7#11', minor: 'm11',  diminished: 'm7b5' },
+  IV:  { major: 'M7#11',   minor: 'm11',  diminished: 'm7b5' },
   V:   { major: '13',      minor: 'm9',   diminished: 'm7b5' },
   VI:  { major: 'maj9',    minor: 'm9',   diminished: 'm7b5' },
   VII: { major: 'maj7',    minor: 'm7b5', diminished: 'm7b5' },
@@ -96,31 +100,57 @@ const VELVET_MAP: DegreeMap = {
   VII: { major: 'maj7',   minor: 'm9b5', diminished: 'm9b5' },
 }
 
+// ── Gospel: rich church harmony — 6/9 home chord, maj9 and minor 9ths/11ths,
+// a 13th on V, ♭VII as a dominant 9th, vii° as the full diminished 7th ──
+const GOSPEL_MAP: DegreeMap = {
+  I:   { major: '6/9',  minor: 'm9',   diminished: 'dim7' },
+  II:  { major: '9',    minor: 'm9',   diminished: 'm7b5' },
+  III: { major: 'maj7', minor: 'm7',   diminished: 'dim7' },
+  IV:  { major: 'maj9', minor: 'm9',   diminished: 'dim7' },
+  V:   { major: '13',   minor: 'm9',   diminished: 'dim7' },
+  VI:  { major: 'maj9', minor: 'm11',  diminished: 'dim7' },
+  VII: { major: '9',    minor: 'm7b5', diminished: 'dim7' },
+}
+
+// ── Flamenco: Phrygian colour — V (major or minor) becomes the 7♭9 Phrygian
+// dominant, VI and II open into maj7♯11 like the open-string guitar chord,
+// III takes a maj7. Everything else stays a plain triad. ─────────────────
+const FLAMENCO_MAP: DegreeMap = {
+  II:  { major: 'M7#11' },
+  III: { major: 'maj7' },
+  V:   { major: '7b9', minor: '7b9' },
+  VI:  { major: 'M7#11' },
+}
+
 const GENRE_MAPS: Partial<Record<Genre, DegreeMap>> = {
   coltrane:  COLTRANE_MAP,
   cinematic: CINEMATIC_MAP,
   roadhouse: ROADHOUSE_MAP,
+  gospel:    GOSPEL_MAP,
   ipanema:   IPANEMA_MAP,
   carnival:  CARNIVAL_MAP,
+  flamenco:  FLAMENCO_MAP,
   velvet:    VELVET_MAP,
 }
 
 // ── Return the genre-appropriate chord type key for a roman numeral step ─
-// Classic: derives quality purely from the Roman numeral case/suffix
-// (vi → minor, I → major, ii° → dim) — independent of baseKey. This is
-// the canonical diatonic quality system; baseKey is not consulted.
-// Other genres: look up degree + quality in their extension map, fall back
-// to baseKey when no override exists for that degree/quality combination.
-export function getGenreVoicing(genre: Genre, romanLabel: string, baseKey: string): string {
+// Classic: quality straight from the numeral (vi → minor, I → major,
+// ii° → dim). Other styles: their own chord for that degree + quality, and
+// the Classic chord wherever the style has none (Roadhouse's vi stays minor).
+export function getGenreVoicing(genre: Genre, romanLabel: string): string {
   const { degree, quality } = parseRomanLabel(romanLabel)
+  const classic = quality === 'minor' ? 'minor' : quality === 'diminished' ? 'dim' : 'major'
+  if (genre === 'classic') return classic
+  return GENRE_MAPS[genre]?.[degree]?.[quality] ?? classic
+}
 
-  if (genre === 'classic') {
-    if (quality === 'minor')      return 'minor'
-    if (quality === 'diminished') return 'dim'
-    return 'major'
-  }
+// ── Tritone substitution (Ipanema) — a V that resolves down a fifth to the
+// next chord is swapped for the dominant a tritone away: D♭7♯11 in place of
+// G7 going to C. The ♯11 of the substitute is the original V's root. ────
+const TRITONE_SUB_GENRES = new Set<Genre>(['ipanema'])
+export const TRITONE_SUB_CHORD = '7#11'
 
-  const map = GENRE_MAPS[genre]
-  if (!map) return baseKey
-  return map[degree]?.[quality] ?? baseKey
+export function isTritoneSub(genre: Genre, label: string, offset: number, nextOffset: number | undefined): boolean {
+  if (!TRITONE_SUB_GENRES.has(genre) || label !== 'V' || nextOffset === undefined) return false
+  return ((offset + 5) % 12) === (((nextOffset % 12) + 12) % 12)
 }

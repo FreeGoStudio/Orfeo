@@ -261,7 +261,7 @@ change to one rule lands in both:
 |---|---|
 | `src/utils/explorerShared.ts` | Progression list + rotations (`ALL_PROGRESSIONS`), `resolveProgressionStep` (a step's chord = key + semitone offset, quality from the numeral as written, optionally re-voiced by a Style), playback speeds, the 61-key range, the starting register (`explorerLowRoot`, roots in C3–B3 moved by the octave control), inversion stepping, `ringChord` (clicked chords, pedal-like ring), `strikeStep` (rolled sequence steps), `inversionOf`, `explorerKeyColors` (amber + chord root in pink), `captureStruckShape` / `restoreStruckShape` (the inversion ↺: back to the shape before the first arrow press, octave-shifted), the voicing-mode icons |
 | `src/utils/voiceLeading.ts` | `nextVoicing` / `voiceProgression` — the three voicing modes: **Roots** (root position, rising, wraps back to the anchor octave), **Climbing** (inversions stepping upward, restarts low past a ceiling), **Smooth** (least movement, pulled to a home position) |
-| `src/utils/genreVoicing.ts` | Chord Explorer Styles — numeral × quality → richer chord type |
+| `src/utils/genreVoicing.ts` | Chord Explorer Styles (9) — numeral × quality → richer chord type, Classic chord where a Style has none; `isTritoneSub` (Ipanema: a V resolving down a fifth → ♭II7♯11). Style chords missing from the curated tile list resolve from the full chord dictionary |
 | `src/components/ExplorerOctaveControl.tsx` | Octave ˄ ˅ ↺, writes the shared `store.explorerOctave` (session-only) and moves lit keys with it |
 
 Shared store fields: `progressionVoicing` (persisted), `colorRootNoteEnabled`

@@ -5,6 +5,24 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
+## [Unreleased]
+
+### New
+- **The Chords Explorer now shows the chord you're hearing.** The row under the progressions has the chord's name in amber in the middle, with its inversion (e.g. *Cmaj7/E 1st inv*), the same as above the keyboard. With nothing lit it shows the selected root. *Sequence ›* and the progression's numerals sit on the left; the lit notes, low to high, and *‹ Notes* on the right. The labels stay put however long the chord is.
+- **A hidden surprise in the Chords Explorer.** Hover the Orfeo logo in its title bar.
+- **Two new Styles in the Chords Explorer: Gospel and Flamenco** (nine in all).
+  - **Gospel:** church harmony. A 6/9 home chord, maj9 on IV and VI, minor 9ths and 11ths, a 13th on V, ♭VII as a dominant 9th and vii° as a full diminished 7th. Pop in C: C6/9 – G13 – Am11 – Fmaj9.
+  - **Flamenco:** Phrygian colour. V becomes a 7♭9 (also when it's a minor v), and VI opens into maj7♯11, like the open-string guitar chord. Andalusian in A minor: Am – G – Fmaj7♯11 – E7♭9.
+- **Ipanema now really uses the tritone substitution.** A V that resolves down a fifth is replaced by the dominant chord a tritone away: Jazz Standard in C plays Dm11 – D♭7♯11 – Cmaj9 instead of Dm11 – G13 – Cmaj9.
+
+### Changed
+- **Chords Explorer footer tidied up.** Six controls, evenly spaced: *Show as*, *Octave*, *Inversion* (was *Play Inversion*), *Accent Root*, *Clear* and *Scales Explorer*. *Clear* now also stops a playing progression and works for power chords.
+- **Amber scrollbars in the Chords Explorer** — the chord tiles and the progression list — the same as in the Scales Explorer.
+
+### Fixed
+- **Some Style chords never played.** Ipanema's IV (Fmaj7♯11 in C), Velvet's V (G7♭9♭13) and Velvet's vii (Hm9♭5) were silently played as the selected tile's chord, usually a plain triad. They now sound as described.
+- **Styles no longer change chord quality where they have no chord of their own.** In Roadhouse, Pop's vi played as A major instead of Am, and in Cinematic, the ii° of Minor Jazz played as a major chord. These steps now fall back to the plain chord the numeral names.
+
 ## [1.4.2] — 15. 10. 2026 — Explorers upgrade
 
 **In short**
