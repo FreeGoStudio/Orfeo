@@ -5,7 +5,13 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
-## [Unreleased]
+## [1.4.3] — 15. 10. 2026 — Chords Explorer styles
+
+**In short**
+- Two new Styles in the Chords Explorer: Gospel and Flamenco. Ipanema now plays its tritone substitution.
+- The Chords Explorer shows the chord you're hearing, with its inversion and notes, right inside the window.
+- A tidier Chords Explorer footer, and a few Style chords that never sounded now play as described.
+- A hidden surprise somewhere in the Chords Explorer.
 
 ### New
 - **The Chords Explorer now shows the chord you're hearing.** The row under the progressions has the chord's name in amber in the middle, with its inversion (e.g. *Cmaj7/E 1st inv*), the same as above the keyboard. With nothing lit it shows the selected root. *Sequence ›* and the progression's numerals sit on the left; the lit notes, low to high, and *‹ Notes* on the right. The labels stay put however long the chord is.
