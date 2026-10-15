@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react'
 import { Chord, Note } from 'tonal'
 import { RotateCcw, Play, Square, ArrowUpRight, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useStore } from '../store'
@@ -10,7 +9,7 @@ import SpeedControl from './SpeedControl'
 import OrfeoMark from './OrfeoMark'
 import ChevronPlayIcon from './ChevronPlayIcon'
 import { useFocusTrap } from '../hooks/useFocusTrap'
-import { getPianoRollCenterX, getKeyboardHeaderTop } from '../utils/modalAnchors'
+import { getKeyboardHeaderTop } from '../utils/modalAnchors'
 import { useAnchorBottomOnResize } from '../hooks/useAnchorBottomOnResize'
 import { useClampPositionOnZoom } from '../hooks/useClampPositionOnZoom'
 import { modalCloseButtonStyle, modalCloseButtonHoverColor, modalCloseButtonIdleColor } from '../utils/modalCloseButtonStyle'
@@ -22,16 +21,36 @@ import {
 import {
   EXPLORER_RANGE, explorerLowRoot, SPEED_MS, VOICING_ICON, ALL_PROGRESSIONS,
   resolveProgressionStep, nextInversionSet, prevInversionSet, ringChord, strikeStep, inversionOf,
-  explorerKeyColors, type ProgSpeed,
+  explorerKeyColors, captureStruckShape, restoreStruckShape, type ProgSpeed, type StruckShape,
 } from '../utils/explorerShared'
 import { ALL_CHORDS } from '../utils/chordVocabulary'
 import ExplorerOctaveControl from './ExplorerOctaveControl'
 import CofTitleMark from './CofTitleMark'
 import { t } from '../utils/i18n'
 
-// ── Modal dimensions for default positioning above the keyboard ───────────
-const MODAL_WIDTH = 770
-const MODAL_HEIGHT = 620
+// ── Modal dimensions — explorer area on the left, settings column on the
+// right. The modal opens centred on the window with its bottom edge just
+// above the keyboard's chord display row (MODAL_HEIGHT is only the first
+// guess; the real height is measured once the content is in). ───────────
+const LEFT_WIDTH = 770
+const SETTINGS_WIDTH = 250
+const MODAL_WIDTH = LEFT_WIDTH + SETTINGS_WIDTH
+const MODAL_HEIGHT = 700
+const ANCHOR_GAP = 6
+// ── Floor is 44, not a token-adjacent 8 — the Electron window uses a 40px
+// titleBarOverlay (electron/main.ts) where Windows draws its own native
+// minimize/maximize/close buttons ON TOP of the page regardless of DOM
+// z-index; anything higher put the × under Windows' real maximize button. ──
+const MIN_TOP = 44
+// ── Circle of Fifths drawing scale — the circle is drawn in a 380-unit
+// space and scaled up to fill the explorer area. ──────────────────────────
+const COF_SCALE = 1.12
+const COF_VIEW = { x: -8, y: -8, w: 396, h: 404 }
+
+const defaultPos = (height: number) => ({
+  x: Math.max(0, Math.round(window.innerWidth / 2 - MODAL_WIDTH / 2)),
+  y: Math.max(MIN_TOP, Math.round(getKeyboardHeaderTop() - height - ANCHOR_GAP)),
+})
 
 // ── Scale definitions ───────────────────────────────────────────────────────
 // `chords` (blues scales only): the tiles are the chords the scale is played
@@ -77,11 +96,24 @@ const ROW_LABEL: React.CSSProperties = {
   color: 'var(--text-dimmest)', letterSpacing: '0.10em',
   textTransform: 'uppercase', flexShrink: 0, userSelect: 'none',
 }
-// ── Shared row container — flex row with separator ────────────────────────────
-const ROW: React.CSSProperties = {
-  flexShrink: 0, display: 'flex', alignItems: 'center',
-  justifyContent: 'space-between', padding: '5px 12px',
-  borderBottom: '1px solid var(--border)',
+// ── Settings column — every setting is one row: its control on the left,
+// title and a one-line description right-aligned beside it. ───────────────
+const SETTING_DESC: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)', fontSize: 10, lineHeight: 1.35,
+  color: 'var(--text-dimmest)', opacity: 0.75, textAlign: 'right', userSelect: 'none',
+  textWrap: 'balance',
+} as React.CSSProperties
+
+function SettingRow({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', alignItems: 'center', columnGap: 12 }}>
+      <div style={{ justifySelf: 'start', display: 'flex', alignItems: 'center' }}>{children}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, minWidth: 0 }}>
+        <span style={{ ...ROW_LABEL, fontSize: 11, whiteSpace: 'nowrap' }}>{title}</span>
+        <span style={SETTING_DESC}>{desc}</span>
+      </div>
+    </div>
+  )
 }
 
 
@@ -317,22 +349,14 @@ export default function ScaleExplorer() {
   const setAccidentals = useStore(s => s.setAccidentals)
   const explorerOctave = useStore(s => s.explorerOctave)
 
-  // ── Window drag position — bottom edge on the keyboard header, horizontally
-  // centered on the piano roll; recomputed each time the modal opens. ───────
-  const [pos, setPos] = useState(() => ({
-    x: Math.round(getPianoRollCenterX() - MODAL_WIDTH / 2),
-    // ── Floor is 44, not a token-adjacent 8 — the Electron window uses a
-    // 40px titleBarOverlay (electron/main.ts) where Windows draws its own
-    // native minimize/maximize/close buttons ON TOP of the page regardless
-    // of DOM z-index. This modal is tall enough (600px) that its computed Y
-    // clamps to the floor often (on smaller windows); an 8px floor put the
-    // header — and its own × button — right under those native OS controls,
-    // so "close" clicks were landing on Windows' real maximize button
-    // instead. 44 clears the overlay zone with a few px to spare. ──────────
-    y: Math.max(44, Math.round(getKeyboardHeaderTop() - MODAL_HEIGHT) - 152),
-  }))
+  // ── Window drag position — centred on the window, bottom edge just above
+  // the keyboard's chord display row; recomputed each time the modal opens. ─
+  const [pos, setPos] = useState(() => defaultPos(MODAL_HEIGHT))
   const panelRef = useRef<HTMLDivElement>(null)
-  useAnchorBottomOnResize(panelRef, setPos, scaleExplorerOpen && !scaleExplorerMinimized, 44)
+  // ── Set on open; the first render after the open state has settled
+  // measures the real height and anchors the bottom edge from it. ─────────
+  const needsAnchorRef = useRef(false)
+  useAnchorBottomOnResize(panelRef, setPos, scaleExplorerOpen && !scaleExplorerMinimized, MIN_TOP)
   useFocusTrap(panelRef, scaleExplorerOpen && !scaleExplorerMinimized)
   useClampPositionOnZoom(pos, setPos, panelRef)
 
@@ -344,8 +368,6 @@ export default function ScaleExplorer() {
 
   // ── Progression state ─────────────────────────────────────────────────────
   const [selectedProg, setSelectedProg] = useState<number | null>(null)
-  const [progDropdownOpen, setProgDropdownOpen] = useState(false)
-  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number } | null>(null)
   const [progPlaying, setProgPlaying] = useState(false)
   const [progStep, setProgStep] = useState(0)
   const [progSpeed, setProgSpeed] = useState<ProgSpeed>('med')
@@ -372,8 +394,6 @@ export default function ScaleExplorer() {
   // the live speed without restarting the chain
   const speedRef = useRef<ProgSpeed>('med')
   const progRunningRef = useRef(false)
-  const progTriggerRef = useRef<HTMLButtonElement>(null)
-  const progDropRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ ox: number; oy: number; mx: number; my: number } | null>(null)
   const scalePlayTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const chordSeqTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -381,6 +401,9 @@ export default function ScaleExplorer() {
   // ── Root whose pitch class is accented on the lit keys right now — kept so
   // flipping "Accent root note" recolors what's already on the keyboard. ──
   const accentRootRef = useRef<number | null>(null)
+  // ── Shape the inversion ↺ returns to (null until an arrow is pressed) ──
+  const struckShapeRef = useRef<StruckShape | null>(null)
+  const [inverted, setInverted] = useState(false)
   // ── Scale replay trigger — incremented on every CoF click so the play ─────
   // effect fires even when the same segment is clicked twice in a row
   const playTriggerRef = useRef(0)
@@ -470,18 +493,8 @@ export default function ScaleExplorer() {
   useEffect(() => {
     if (scaleExplorerOpen) {
       // ── Recompute anchor position every time the modal opens ────────────
-      setPos({
-        x: Math.round(getPianoRollCenterX() - MODAL_WIDTH / 2),
-        // ── Floor is 44, not a token-adjacent 8 — the Electron window uses a
-    // 40px titleBarOverlay (electron/main.ts) where Windows draws its own
-    // native minimize/maximize/close buttons ON TOP of the page regardless
-    // of DOM z-index. This modal is tall enough (600px) that its computed Y
-    // clamps to the floor often (on smaller windows); an 8px floor put the
-    // header — and its own × button — right under those native OS controls,
-    // so "close" clicks were landing on Windows' real maximize button
-    // instead. 44 clears the overlay zone with a few px to spare. ──────────
-    y: Math.max(44, Math.round(getKeyboardHeaderTop() - MODAL_HEIGHT) - 152),
-      })
+      setPos(defaultPos(MODAL_HEIGHT))
+      needsAnchorRef.current = true
       if (useStore.getState().playbackState === 'playing') {
         ;(window as any).__orfeoPlayer?.pause?.()
         useStore.getState().setPlaybackState('paused')
@@ -492,8 +505,6 @@ export default function ScaleExplorer() {
       setCofPos(0); setCofRing('major'); setSelectedScaleIdx(0)
       stopProgression()
       setSelectedProg(null)
-      setProgDropdownOpen(false)
-      setDropdownRect(null)
       setProgSpeed('med'); speedRef.current = 'med'
       setSelectedDegree(null)
       setOctaveTileSelected(false)
@@ -510,19 +521,47 @@ export default function ScaleExplorer() {
     }
   }, [scaleExplorerOpen, stopProgression, clearScalePlayTimers, stopChordSequence, clearExplorerKeys, clearExplorerChordDisplay])
 
+  // ── Once the opening key (C major) is in and the tiles have rendered, put
+  // the bottom edge just above the chord display row using the real height.
+  // Later height changes are handled by useAnchorBottomOnResize. ──────────
+  useLayoutEffect(() => {
+    if (!needsAnchorRef.current || !scaleExplorerOpen || selectedRoot === null) return
+    const el = panelRef.current
+    if (!el) return
+    needsAnchorRef.current = false
+    setPos(defaultPos(el.offsetHeight))
+  })
+
   // ── Light keys on the keyboard, remembering which root is accented — the
   // shared colour rule reads the "Accent root note" toggle live, so a run
   // already playing picks up a flip on its next chord. ─────────────────────
-  const lightKeys = useCallback((notes: number[], rootPc: number | null) => {
+  // keepShape: an inversion step or a recolour, not a newly struck chord —
+  // keeps the shape the inversion ↺ returns to.
+  const lightKeys = useCallback((notes: number[], rootPc: number | null, keepShape = false) => {
     accentRootRef.current = rootPc
+    if (!keepShape) { struckShapeRef.current = null; setInverted(false) }
     setExplorerKeys(new Set(notes), explorerKeyColors(notes, rootPc, useStore.getState().colorRootNoteEnabled))
   }, [setExplorerKeys])
+
+  // ── ↺ beside the inversion arrows — back to the shape the chord had when
+  // it was struck (shared rule, utils/explorerShared.ts). ──────────────────
+  const resetInversion = useCallback(() => {
+    const shape = struckShapeRef.current
+    if (!shape) return
+    const state = useStore.getState()
+    const notes = restoreStruckShape(shape, state.explorerOctave)
+    if (!notes) return
+    lightKeys(notes, accentRootRef.current)
+    const cd = state.explorerChordDisplay
+    if (cd) state.setExplorerChordDisplay({ ...cd, invCount: shape.invCount })
+    ringChord(notes)
+  }, [lightKeys])
 
   // ── "Accent root note" flipped — recolor whatever is lit right now ────────
   useEffect(() => {
     if (!scaleExplorerOpen) return
     const lit = Array.from(useStore.getState().explorerKeys)
-    if (lit.length > 0) lightKeys(lit, accentRootRef.current)
+    if (lit.length > 0) lightKeys(lit, accentRootRef.current, true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colorRootNoteEnabled])
 
@@ -641,10 +680,12 @@ export default function ScaleExplorer() {
   const stepInversion = useCallback((dir: 'prev' | 'next') => {
     const state = useStore.getState()
     if (state.explorerKeys.size === 0) return
+    const cd = state.explorerChordDisplay
+    struckShapeRef.current = captureStruckShape(struckShapeRef.current, state.explorerKeys, cd?.invCount ?? 0, state.explorerOctave)
+    setInverted(true)
     const notes = dir === 'next' ? nextInversionSet(state.explorerKeys) : prevInversionSet(state.explorerKeys)
     const sorted = Array.from(notes).sort((a, b) => a - b)
-    lightKeys(sorted, accentRootRef.current)
-    const cd = state.explorerChordDisplay
+    lightKeys(sorted, accentRootRef.current, true)
     if (cd) state.setExplorerChordDisplay({ ...cd, invCount: cd.invCount + (dir === 'next' ? 1 : -1) })
     ringChord(sorted)
   }, [lightKeys])
@@ -717,21 +758,18 @@ export default function ScaleExplorer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoot, selectedScaleIdx])
 
-  // ── Close progression dropdown on outside click ───────────────────────────
-  useEffect(() => {
-    if (!progDropdownOpen) return
-    const handler = (e: MouseEvent) => {
-      if (
-        progDropRef.current && !progDropRef.current.contains(e.target as Node) &&
-        progTriggerRef.current && !progTriggerRef.current.contains(e.target as Node)
-      ) {
-        setProgDropdownOpen(false)
-        setDropdownRect(null)
-      }
+  // ── Pick a progression from the list — clicking the picked one again
+  // clears it. Picking another while one plays switches straight to it. ────
+  const pickProgression = useCallback((i: number) => {
+    if (selectedProg === i) { setSelectedProg(null); stopProgression(); return }
+    setSelectedProg(i)
+    if (progRunningRef.current && diatonicChords.length > 0) {
+      stopProgression()
+      progRunningRef.current = true
+      setProgPlaying(true)
+      playProgStepAt(0, i, null)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [progDropdownOpen])
+  }, [selectedProg, diatonicChords.length, stopProgression, playProgStepAt])
 
   // ── Close on Escape ────────────────────────────────────────────────────────
   const close = useCallback(() => {
@@ -744,14 +782,11 @@ export default function ScaleExplorer() {
   useEffect(() => {
     if (!scaleExplorerOpen) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (progDropdownOpen) { setProgDropdownOpen(false); setDropdownRect(null); return }
-        close()
-      }
+      if (e.key === 'Escape') close()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [scaleExplorerOpen, close, progDropdownOpen])
+  }, [scaleExplorerOpen, close])
 
   // ── Spacebar while this modal is open — controls the progression when one
   // is selected, otherwise toggles the "Chords in the Scale" auto-sequence. ─
@@ -779,10 +814,10 @@ export default function ScaleExplorer() {
       if (!dragRef.current) return
       setPos({
         x: Math.max(0, dragRef.current.ox + ev.clientX - dragRef.current.mx),
-        // 44, not 0 — same titleBarOverlay clearance as the initial position
-        // above; dragging the header up to y=0 put it under Windows' native
+        // MIN_TOP, not 0 — same titleBarOverlay clearance as the initial
+        // position; dragging the header up to y=0 put it under Windows' native
         // maximize/close buttons just as easily as the auto-computed position did.
-        y: Math.max(44, dragRef.current.oy + ev.clientY - dragRef.current.my),
+        y: Math.max(MIN_TOP, dragRef.current.oy + ev.clientY - dragRef.current.my),
       })
     }
     const onUp = () => {
@@ -845,13 +880,15 @@ export default function ScaleExplorer() {
   const R_INNER1 = 55,  R_INNER2 = 110
 
   return (
-    // ── Modal container ────────────────────────────────────────────────────
+    // ── Modal container — app-no-drag: wherever the modal sits over the top
+    // bar (Windows treats that strip as the window's own title bar), clicks
+    // on it must reach the modal, not grab and un-maximize the app window. ─
     <div
       ref={panelRef}
       role="dialog"
       aria-modal="true"
       aria-label="Scales Explorer"
-      className="orfeo-modal-glow"
+      className="orfeo-modal-glow app-no-drag"
       style={{
         position: 'fixed',
         left: pos.x,
@@ -891,48 +928,55 @@ export default function ScaleExplorer() {
         >×</button>
       </div>
 
-      {/* CoF section — scale buttons | Circle of Fifths SVG + note names, right-aligned */}
-      <div style={{
-        flexShrink: 0, display: 'flex', alignItems: 'center',
-        padding: '16px 50px 66px 12px',
-        background: 'var(--bg-modal-header)', borderBottom: '1px solid var(--border)',
-        gap: 'var(--space-2)', overflow: 'visible', position: 'relative',
-      }}>
-        {/* Guideline text — contained to its own width so it wraps naturally
-            instead of running under the CoF/note-names block on the right. ── */}
-        <div style={{
-          position: 'absolute', top: 16, left: 12, width: 200,
-          fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-dimmest)', opacity: 0.75, lineHeight: '1.6',
-          pointerEvents: 'none', zIndex: 5,
-        }}>
-          Click a key on the circle to explore its scale and diatonic chords. Select a progression and click play to hear the chords in the scale. Try chord inversions and variations!
-        </div>
-        {/* Scale type buttons — centred at CoF middle */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 116, flexShrink: 0, alignSelf: 'center', marginTop: 105 }}>
-          <span style={{ ...ROW_LABEL, fontSize: 12, marginBottom: 3, color: 'var(--text-amber)' }}>Scale</span>
-          {SCALES.map((s, i) => {
-            const sel = selectedScaleIdx === i
-            return (
-              <button key={s.name} onClick={() => selectScaleType(i)}
-                style={{
-                  fontFamily: 'var(--font-ui)', fontSize: 12, padding: '4px 6px',
-                  background: sel ? 'var(--accent-amber-medium)' : 'none',
-                  color: sel ? 'var(--text-amber)' : 'var(--text-muted)',
-                  border: `1px solid ${sel ? 'var(--text-amber)' : 'transparent'}`,
-                  borderRadius: 4, cursor: 'pointer', textAlign: 'left',
-                }}
-                onMouseEnter={e => { if (!sel) e.currentTarget.style.color = 'var(--text-list-hover)' }}
-                onMouseLeave={e => { if (!sel) e.currentTarget.style.color = 'var(--text-muted)' }}
-              >{s.name}</button>
-            )
-          })}
-        </div>
+      {/* Body — explorer area | settings column */}
+      <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `${LEFT_WIDTH}px ${SETTINGS_WIDTH}px` }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
-        {/* Right block: CoF SVG on top, note-names row below it — both right-aligned,
-            50px from the modal's right border via the container's own padding. ────── */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', overflow: 'visible' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 380, gap: 40 }}>
-          <svg width={380} height={420} viewBox="0 -40 380 420" style={{ overflow: 'visible', flexShrink: 0 }}>
+      {/* CoF section — guideline + scale list | Circle of Fifths + note names,
+          then the Chords in the Scale play button centred above the tiles */}
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        padding: '14px 12px 10px',
+        background: 'var(--bg-modal-header)', borderBottom: '1px solid var(--border)',
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', alignItems: 'start' }}>
+          {/* Left — guideline text, evenly broken lines, then the scale list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 44, minWidth: 0 }}>
+            <div style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-dimmest)', opacity: 0.75, lineHeight: '1.6',
+              textWrap: 'balance', userSelect: 'none',
+            } as CSSProperties}>
+              Click a key on the circle to explore its scale and diatonic chords. Select a progression and click play to hear the chords in the scale. Try chord inversions and variations!
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, width: 116 }}>
+              <span style={{ ...ROW_LABEL, fontSize: 12, marginBottom: 3, color: 'var(--text-amber)' }}>Scale</span>
+              {SCALES.map((s, i) => {
+                const sel = selectedScaleIdx === i
+                return (
+                  <button key={s.name} onClick={() => selectScaleType(i)}
+                    style={{
+                      fontFamily: 'var(--font-ui)', fontSize: 12, padding: '4px 6px',
+                      background: sel ? 'var(--accent-amber-medium)' : 'none',
+                      color: sel ? 'var(--text-amber)' : 'var(--text-muted)',
+                      border: `1px solid ${sel ? 'var(--text-amber)' : 'transparent'}`,
+                      borderRadius: 4, cursor: 'pointer', textAlign: 'left',
+                    }}
+                    onMouseEnter={e => { if (!sel) e.currentTarget.style.color = 'var(--text-list-hover)' }}
+                    onMouseLeave={e => { if (!sel) e.currentTarget.style.color = 'var(--text-muted)' }}
+                  >{s.name}</button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Right — CoF SVG with the note-names row under it, centred in the
+              space beside the guideline/scale column */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, minWidth: 0 }}>
+          <svg
+            width={Math.round(COF_VIEW.w * COF_SCALE)} height={Math.round(COF_VIEW.h * COF_SCALE)}
+            viewBox={`${COF_VIEW.x} ${COF_VIEW.y} ${COF_VIEW.w} ${COF_VIEW.h}`}
+            style={{ overflow: 'visible', flexShrink: 0 }}
+          >
             {Array.from({ length: 12 }, (_, i) => {
               const startDeg = -90 + i * 30
               const endDeg   = startDeg + 30
@@ -1011,13 +1055,13 @@ export default function ScaleExplorer() {
           {infoText && (
             <div style={{
               display: 'flex', alignItems: 'baseline', gap: 8,
-              background: 'var(--bg-info-overlay)', borderRadius: 6, padding: '4px 10px',
+              background: 'var(--bg-info-overlay)', borderRadius: 6, padding: '5px 12px',
             }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, lineHeight: '18px', fontWeight: 700, color: 'var(--text-amber)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, lineHeight: '22px', fontWeight: 700, color: 'var(--text-amber)' }}>
                 {infoText.rootName}
               </span>
-              <span style={{ fontSize: 12, lineHeight: '13px', color: 'var(--text-muted)' }}>{infoText.scaleName}</span>
-              <span style={{ fontSize: 12, lineHeight: '14px', letterSpacing: '0.06em', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 14, lineHeight: '16px', color: 'var(--text-muted)' }}>{infoText.scaleName}</span>
+              <span style={{ fontSize: 14, lineHeight: '16px', letterSpacing: '0.06em', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                 {infoText.noteNames.map((n, i) => (
                   <span key={i} style={{ color: i === scalePlayIndex ? 'var(--text-amber)' : 'var(--text-inactive)' }}>
                     {n}{i < infoText.noteNames.length - 1 ? ' ' : ''}
@@ -1032,60 +1076,35 @@ export default function ScaleExplorer() {
           )}
           </div>
         </div>
-        {/* Chords in the Scale row — three equal columns (see
-            .claude/rules/css-layout.md): label + play + hint | Starmap
-            placeholder | Accent root note. Absolute at bottom of CoF section. ── */}
-        <div style={{
-          position: 'absolute', bottom: 6, left: 12, right: 12,
-          display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', alignItems: 'center',
-        }}>
-          {/* Left — label + play icon on top, hint below ─────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifySelf: 'start', minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ ...ROW_LABEL, fontSize: 11 }}>Chords in the Scale</span>
-              <Tooltip title="Play Chords" description={chordSeqPlaying ? 'Stop playback.' : 'Play all chords in the scale one after another.'}>
-                <button
-                  onClick={playChordsInSequence}
-                  disabled={selectedRoot === null}
-                  style={{
-                    background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center',
-                    cursor: selectedRoot === null ? 'default' : 'pointer',
-                    color: selectedRoot === null ? 'var(--state-disabled)' : 'var(--text-amber)',
-                  }}
-                  onMouseEnter={e => { if (selectedRoot !== null) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = selectedRoot === null ? 'var(--state-disabled)' : 'var(--text-amber)' }}
-                >
-                  {chordSeqPlaying
-                    ? <Square size={12} fill="currentColor" strokeWidth={0} />
-                    : <Play size={13} fill="currentColor" strokeWidth={0} />}
-                </button>
-              </Tooltip>
-            </div>
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-dimmest)', opacity: 0.75, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
-              {t`Click tiles to hear chords`}
-            </span>
-          </div>
-          {/* Centre — Starmap switch placeholder (not wired up yet) ───────── */}
-          <div style={{ justifySelf: 'center', display: 'flex', alignItems: 'center', gap: 6, opacity: 0.75, cursor: 'default', userSelect: 'none' }}>
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-dimmest)' }}>{t`Open Starmap`}</span>
-            <span style={{ display: 'flex', color: 'var(--text-inactive)' }}><ToggleLeft size={16} strokeWidth={1.5} /></span>
-          </div>
-          {/* Right — Accent root note toggle. On by default: the chord/scale's
-              true root pitch class (any octave) highlights pink instead of
-              blending into the uniform amber. ───────────────────────────── */}
-          <div style={{ justifySelf: 'end' }}>
-            <Tooltip title="Accent Root Note" description="Highlights the scale or chord's true root pitch class in pink, in any octave, instead of blending it.">
+
+        {/* Chords in the Scale — label + play on top, hint below, centred
+            under the circle (same columns as the grid above) */}
+        <div style={{ marginTop: 'auto', paddingTop: 32, display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)' }}>
+        <div style={{ gridColumn: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ ...ROW_LABEL, fontSize: 13 }}>Chords in the Scale</span>
+            <Tooltip title="Play Chords" description={chordSeqPlaying ? 'Stop playback.' : 'Play all chords in the scale one after another.'}>
               <button
-                onClick={() => setColorRootNoteEnabled(!colorRootNoteEnabled)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                onClick={playChordsInSequence}
+                disabled={selectedRoot === null}
+                style={{
+                  background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center',
+                  cursor: selectedRoot === null ? 'default' : 'pointer',
+                  color: selectedRoot === null ? 'var(--state-disabled)' : 'var(--text-amber)',
+                }}
+                onMouseEnter={e => { if (selectedRoot !== null) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = selectedRoot === null ? 'var(--state-disabled)' : 'var(--text-amber)' }}
               >
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-dimmest)', opacity: 0.75 }}>Accent root note</span>
-                <span style={{ display: 'flex', color: colorRootNoteEnabled ? 'var(--text-amber)' : 'var(--text-inactive)' }}>
-                  {colorRootNoteEnabled ? <ToggleRight size={16} strokeWidth={1.5} /> : <ToggleLeft size={16} strokeWidth={1.5} />}
-                </span>
+                {chordSeqPlaying
+                  ? <Square size={13} fill="currentColor" strokeWidth={0} />
+                  : <Play size={15} fill="currentColor" strokeWidth={0} />}
               </button>
             </Tooltip>
           </div>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-dimmest)', opacity: 0.75, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+            {t`Click tiles to hear chords`}
+          </span>
+        </div>
         </div>
       </div>
 
@@ -1156,13 +1175,13 @@ export default function ScaleExplorer() {
                 the moment a key is picked on the circle. */}
             {infoRowChord ? (
               <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 'var(--space-1)', minWidth: 60, flexWrap: 'wrap' }}>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 9, fontWeight: 700, color: 'var(--text-dimmest)', letterSpacing: '0.10em', textTransform: 'uppercase', userSelect: 'none', flexShrink: 0 }}>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 700, color: 'var(--text-dimmest)', letterSpacing: '0.10em', textTransform: 'uppercase', userSelect: 'none', flexShrink: 0 }}>
                   Chord Quality
                 </span>
                 {infoRowChord.labels.map((label, i) => (
                   <span key={i} style={{
                     fontFamily: 'var(--font-ui)',
-                    fontSize: i === infoRowChord.step ? 12 : 11,
+                    fontSize: i === infoRowChord.step ? 14 : 13,
                     fontWeight: i === infoRowChord.step ? 700 : 400,
                     color: i === infoRowChord.step ? 'var(--text-amber)' : 'var(--text-inactive)',
                     userSelect: 'none', lineHeight: 1,
@@ -1183,10 +1202,10 @@ export default function ScaleExplorer() {
             {/* Right — fixed "KEY OF [root]" label; root sits in a fixed-width
                 slot (worst case: 3 chars, e.g. "C#m") so it never shifts. ──── */}
             <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-1)', minWidth: 60 }}>
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 9, fontWeight: 700, color: 'var(--text-dimmest)', letterSpacing: '0.10em', textTransform: 'uppercase', userSelect: 'none' }}>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 700, color: 'var(--text-dimmest)', letterSpacing: '0.10em', textTransform: 'uppercase', userSelect: 'none' }}>
                 Key Of
               </span>
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-amber)', userSelect: 'none', lineHeight: 1, minWidth: '3ch', display: 'inline-block' }}>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 700, color: 'var(--text-amber)', userSelect: 'none', lineHeight: 1, minWidth: '3ch', display: 'inline-block' }}>
                 {infoText ? `${infoText.rootName}${keyQuality}` : ''}
               </span>
             </div>
@@ -1194,101 +1213,199 @@ export default function ScaleExplorer() {
         )}
       </div>
 
-      {/* Progressions row — real 3-track grid so the centred PLAY/speed group
-          stays put no matter how wide the pattern name gets (see
-          .claude/rules/css-layout.md). */}
+      </div>
+
+      {/* Settings column — progressions list + PLAY, then one row per
+          setting (control left, title + description right) */}
       <div style={{
-        ...ROW, minHeight: 'var(--row-height)', borderTop: '1px solid var(--border)',
-        display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+        display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0, minWidth: 0,
+        padding: '14px 16px', borderLeft: '1px solid var(--border)',
       }}>
-        {/* Left column: PROGRESSIONS label + pattern dropdown ─────────────── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, justifySelf: 'start' }}>
-          <span style={ROW_LABEL}>Progressions</span>
-          {/* Pattern picker dropdown trigger */}
-          <button
-            ref={progTriggerRef}
-            onClick={() => {
-              if (progDropdownOpen) { setProgDropdownOpen(false); setDropdownRect(null); return }
-              const rect = progTriggerRef.current?.getBoundingClientRect()
-              if (rect) setDropdownRect({ top: rect.bottom + 4, left: rect.left })
-              setProgDropdownOpen(true)
-            }}
-            style={{
-              padding: '2px 8px', borderRadius: 'var(--radius-sm)', border: 'none',
-              background: 'transparent',
-              color: selectedProg !== null ? 'var(--text-amber)' : 'var(--text-inactive)',
-              fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600,
-              cursor: 'pointer', display: 'block',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
-            onMouseLeave={e => { e.currentTarget.style.color = selectedProg !== null ? 'var(--text-amber)' : 'var(--text-inactive)' }}
-          >
-            {selectedProg !== null ? ALL_PROGRESSIONS[selectedProg].name : 'Select'} ▾
-          </button>
-          {selectedProg !== null && (
-            <button onClick={() => { setSelectedProg(null); stopProgression() }}
-              style={{ background: 'none', border: 'none', color: 'var(--text-inactive)', cursor: 'pointer', fontSize: 12, padding: '0 2px' }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-inactive)'}
-            >×</button>
-          )}
+        {/* Progressions — always-open list in a fixed, scrolling box; the
+            same list as the Chord Explorer, rotations indented under each */}
+        <div style={{ flex: '1 1 0', minHeight: 150, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ ...ROW_LABEL, fontSize: 11, textAlign: 'right' }}>{t`Progressions`}</span>
+          <div className="amber-scroll" style={{
+            flex: '1 1 0', minHeight: 0, overflowY: 'auto',
+            background: 'var(--bg-tile)', border: '1px solid var(--state-hover-bg)', borderRadius: 6,
+            padding: 3,
+          }}>
+            {ALL_PROGRESSIONS.map((p, i) => {
+              const sel = selectedProg === i
+              const isRot = !!p.isRotation
+              const baseColor = sel ? 'var(--text-amber)' : (isRot ? 'var(--text-dim-control)' : 'var(--text-muted)')
+              const rotLabel = isRot ? p.name.replace(p.baseName! + ' ', '') : ''
+              return (
+                <button key={p.name}
+                  onClick={() => pickProgression(i)}
+                  style={{
+                    display: 'flex', alignItems: 'baseline', gap: 8,
+                    width: '100%', textAlign: 'left',
+                    // ── The picked one stays pinned to the top of the box while
+                    // scrolling — amber tint over the box colour so the rows
+                    // scrolling underneath never show through it. ───────────
+                    background: sel ? 'linear-gradient(var(--accent-amber-medium), var(--accent-amber-medium)) var(--bg-tile)' : 'none',
+                    position: sel ? 'sticky' : undefined, top: sel ? 0 : undefined, zIndex: sel ? 1 : undefined,
+                    border: `1px solid ${sel ? 'var(--text-amber)' : 'transparent'}`, borderRadius: 4,
+                    padding: isRot ? '2px 6px 2px 16px' : '3px 6px',
+                    color: baseColor,
+                    fontFamily: 'var(--font-ui)', fontSize: 11, cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => { if (!sel) e.currentTarget.style.color = 'var(--text-amber)' }}
+                  onMouseLeave={e => { if (!sel) e.currentTarget.style.color = baseColor }}
+                >
+                  <span style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>{isRot ? `↳ ${rotLabel}` : p.name}</span>
+                  <span style={{
+                    flex: 1, minWidth: 0, textAlign: 'right',
+                    fontFamily: 'var(--font-mono)', fontSize: 9, opacity: isRot ? 0.45 : 0.65,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>{p.labels.join(' ')}</span>
+                </button>
+              )
+            })}
+          </div>
+          {/* Clear & Reset icon (left) | PLAY / STOP (right) — PLAY always shown, greyed
+              out until a progression is picked */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+            <Tooltip oneLine title={t`Clear progression`}>
+              <button
+                onClick={() => { setSelectedProg(null); stopProgression() }}
+                disabled={selectedProg === null}
+                style={{
+                  background: 'none', border: 'none', padding: '0 1px', display: 'flex', alignItems: 'center',
+                  color: selectedProg === null ? 'var(--state-hover-bg)' : 'var(--text-inactive)',
+                  cursor: selectedProg === null ? 'default' : 'pointer',
+                }}
+                onMouseEnter={e => { if (selectedProg !== null) e.currentTarget.style.color = 'var(--text-amber)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = selectedProg === null ? 'var(--state-hover-bg)' : 'var(--text-inactive)' }}
+              ><RotateCcw size={12} /></button>
+            </Tooltip>
+            {(() => {
+              const canPlay = selectedProg !== null && diatonicChords.length > 0
+              const tone = progPlaying ? 'var(--status-error)' : canPlay ? 'var(--status-success)' : 'var(--state-disabled)'
+              return (
+                <button
+                  onClick={() => { if (progPlaying) stopProgression(); else startProgression() }}
+                  disabled={!canPlay && !progPlaying}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+                    padding: '4px 12px', borderRadius: 4, background: 'none',
+                    cursor: canPlay || progPlaying ? 'pointer' : 'default',
+                    border: `1.5px solid ${tone}`, color: tone,
+                    boxShadow: canPlay || progPlaying ? `0 0 6px ${tone}` : 'none',
+                  }}
+                >
+                  {progPlaying ? <Square size={12} /> : <ChevronPlayIcon size={12} />}
+                  {progPlaying ? 'STOP' : 'PLAY'}
+                </button>
+              )
+            })()}
+          </div>
         </div>
 
-        {/* Centre column: PLAY/STOP (only once a progression is picked — its
-            space stays reserved so the speed chevrons never jump) + speed,
-            which also sets the pace of the chords-in-the-scale run. ──────── */}
-        <div style={{ justifySelf: 'center', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={() => { if (progPlaying) stopProgression(); else startProgression() }}
-            disabled={selectedProg === null || diatonicChords.length === 0}
-            aria-hidden={selectedProg === null}
-            tabIndex={selectedProg === null ? -1 : 0}
-            style={{
-              visibility: selectedProg === null ? 'hidden' : 'visible',
-              display: 'flex', alignItems: 'center', gap: 4,
-              fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-              padding: '3px 10px', borderRadius: 4, cursor: 'pointer',
-              background: 'none',
-              border: `1.5px solid ${progPlaying ? 'var(--status-error)' : 'var(--status-success)'}`,
-              boxShadow: progPlaying ? '0 0 6px var(--status-error)' : '0 0 6px var(--status-success)',
-              color: progPlaying ? 'var(--status-error)' : 'var(--status-success)',
-            }}
-          >
-            {progPlaying ? <Square size={12} /> : <ChevronPlayIcon size={12} />}
-            {progPlaying ? 'STOP' : 'PLAY'}
-          </button>
+        <SettingRow title={t`Inversions`} desc={t`Step through inversions`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Tooltip oneLine title="Previous inversion">
+              <button onMouseDown={() => stepInversion('prev')} disabled={!hasTileSelected}
+                style={{ background: 'none', border: 'none', color: hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)', cursor: hasTileSelected ? 'pointer' : 'default', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+                onMouseEnter={e => { if (hasTileSelected) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)' }}
+              ><ChevronPlayIcon size={14} mirrored /></button>
+            </Tooltip>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--text-inactive)', letterSpacing: '0.12em', textTransform: 'uppercase', userSelect: 'none' }}>
+              {t`Play`}
+            </span>
+            <Tooltip oneLine title="Next inversion">
+              <button onMouseDown={() => stepInversion('next')} disabled={!hasTileSelected}
+                style={{ background: 'none', border: 'none', color: hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)', cursor: hasTileSelected ? 'pointer' : 'default', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+                onMouseEnter={e => { if (hasTileSelected) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)' }}
+              ><ChevronPlayIcon size={14} /></button>
+            </Tooltip>
+            <Tooltip oneLine title={t`Reset inversion`}>
+              <button
+                onClick={resetInversion}
+                disabled={!inverted}
+                style={{ background: 'none', border: 'none', cursor: inverted ? 'pointer' : 'default', color: inverted ? 'var(--text-inactive)' : 'var(--state-hover-bg)', padding: '0 1px', marginLeft: 2, display: 'flex', alignItems: 'center' }}
+                onMouseEnter={e => { if (inverted) e.currentTarget.style.color = 'var(--text-amber)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = inverted ? 'var(--text-inactive)' : 'var(--state-hover-bg)' }}
+              ><RotateCcw size={12} /></button>
+            </Tooltip>
+          </div>
+        </SettingRow>
+
+        {/* Voicing — shared with the Chord Explorer; sets how the tiles, the
+            chords-in-the-scale run and progressions are voiced */}
+        <SettingRow title={t`Chord voicing`} desc={t`Roots, climbing or smooth`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {PROGRESSION_VOICINGS.map(v => {
+              const Icon = VOICING_ICON[v]
+              const active = progressionVoicing === v
+              return (
+                <Tooltip key={v} oneLine title={`${PROGRESSION_VOICING_LABEL[v]} — ${PROGRESSION_VOICING_HINT[v]}`}>
+                  <button
+                    onClick={() => setProgressionVoicing(v)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center', color: active ? 'var(--text-amber)' : 'var(--text-inactive)' }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
+                    onMouseLeave={e => e.currentTarget.style.color = active ? 'var(--text-amber)' : 'var(--text-inactive)'}
+                  ><Icon size={15} /></button>
+                </Tooltip>
+              )
+            })}
+          </div>
+        </SettingRow>
+
+        <SettingRow title={t`Playback speed`} desc={t`How fast the chords change`}>
           <SpeedControl
             value={progSpeed}
             onChange={v => { setProgSpeed(v); speedRef.current = v }}
             size={11}
           />
-        </div>
+        </SettingRow>
 
-        {/* Right column: inversion browser — Play icons + static grey label + reset */}
-        <div style={{ justifySelf: 'end', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* Previous inversion — Play icon mirrored on vertical axis */}
-          <Tooltip oneLine title="Previous inversion">
-          <button onMouseDown={() => stepInversion('prev')} disabled={!hasTileSelected}
-            style={{ background: 'none', border: 'none', color: hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)', cursor: hasTileSelected ? 'pointer' : 'default', padding: '0 2px', display: 'flex', alignItems: 'center' }}
-            onMouseEnter={e => { if (hasTileSelected) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)' }}
-          ><ChevronPlayIcon size={14} mirrored /></button>
-          </Tooltip>
-          {/* Static grey label — chord display is above the keyboard only */}
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--text-inactive)', letterSpacing: '0.12em', textTransform: 'uppercase', userSelect: 'none', whiteSpace: 'nowrap' }}>
-            Play  Inversion
+        <SettingRow title={t`Octave`} desc={t`Move it all up or down`}>
+          <ExplorerOctaveControl showLabel={false} />
+        </SettingRow>
+
+        <SettingRow title={t`Accidentals`} desc={t`Show flats or sharps`}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {(['flat', 'sharp'] as const).map(v => (
+              <button key={v} onClick={() => setAccidentals(v)}
+                style={{
+                  fontFamily: 'var(--font-ui)', fontSize: 'var(--text-lg)', lineHeight: 1, background: 'none', border: 'none',
+                  color: accidentals === v ? 'var(--text-amber)' : 'var(--text-inactive)', cursor: 'pointer', padding: '0 4px',
+                }}
+                onMouseEnter={e => { if (accidentals !== v) e.currentTarget.style.color = 'var(--text-muted)' }}
+                onMouseLeave={e => { if (accidentals !== v) e.currentTarget.style.color = 'var(--text-inactive)' }}
+              >{v === 'flat' ? '♭' : '♯'}</button>
+            ))}
+          </div>
+        </SettingRow>
+
+        {/* Accent root note — on by default: each chord's root (any octave)
+            shows pink on the keyboard instead of blending into the amber */}
+        <SettingRow title={t`Accent root note`} desc={t`Each chord's root lights pink`}>
+          <button
+            onClick={() => setColorRootNoteEnabled(!colorRootNoteEnabled)}
+            aria-pressed={colorRootNoteEnabled}
+            style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: colorRootNoteEnabled ? 'var(--text-amber)' : 'var(--text-inactive)' }}
+          >
+            {colorRootNoteEnabled ? <ToggleRight size={20} strokeWidth={1.5} /> : <ToggleLeft size={20} strokeWidth={1.5} />}
+          </button>
+        </SettingRow>
+
+        {/* Starmap — placeholder switch, not wired up yet */}
+        <SettingRow title={t`Starmap`} desc={t`Coming soon`}>
+          <span style={{ display: 'flex', color: 'var(--state-disabled)', cursor: 'default' }}>
+            <ToggleLeft size={20} strokeWidth={1.5} />
           </span>
-          {/* Next inversion — Play icon normal */}
-          <Tooltip oneLine title="Next inversion">
-          <button onMouseDown={() => stepInversion('next')} disabled={!hasTileSelected}
-            style={{ background: 'none', border: 'none', color: hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)', cursor: hasTileSelected ? 'pointer' : 'default', padding: '0 2px', display: 'flex', alignItems: 'center' }}
-            onMouseEnter={e => { if (hasTileSelected) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)' }}
-          ><ChevronPlayIcon size={14} /></button>
-          </Tooltip>
-          {/* Reset button */}
-          <Tooltip oneLine title="Clear & Reset">
+        </SettingRow>
+
+        {/* Start over — clears the key, scale, progression and speed and
+            turns the keys off */}
+        <SettingRow title={t`Reset explorer`} desc={t`Clear key, scale and progression`}>
+          <Tooltip oneLine title={t`Clear & Reset`}>
             <button
               onClick={() => {
                 setCofPos(null); setCofRing(null); setSelectedScaleIdx(0)
@@ -1297,117 +1414,28 @@ export default function ScaleExplorer() {
                 setProgSpeed('med'); speedRef.current = 'med'
                 setInfoRowChord(null); clearExplorerChordDisplay()
                 clearExplorerKeys(); clearLockedKeys(); useStore.getState().clearDisplayedChord()
+                struckShapeRef.current = null; setInverted(false)
               }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-inactive)', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-inactive)', padding: '0 1px', display: 'flex', alignItems: 'center' }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
               onMouseLeave={e => e.currentTarget.style.color = 'var(--text-inactive)'}
-            ><RotateCcw size={13} /></button>
+            ><RotateCcw size={12} /></button>
           </Tooltip>
-        </div>
-      </div>
+        </SettingRow>
 
-      {/* Footer — SHOW AS + OCTAVE | VOICING | Chords Explorer switch, real
-          3-track grid so the voicing group sits on true centre. */}
-      <div style={{
-        ...ROW, minHeight: 'var(--row-height)',
-        borderTop: '1px solid var(--border)', borderBottom: 'none',
-        background: 'var(--bg-modal-header)', padding: '0 var(--space-3)',
-        display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
-      }}>
-        {/* Left: accidentals toggle + octave control */}
-        <div style={{ justifySelf: 'start', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-            <span style={{ ...ROW_LABEL, fontSize: 10 }}>Show As</span>
-            {(['flat', 'sharp'] as const).map(v => (
-              <button key={v} onClick={() => setAccidentals(v)}
-                style={{
-                  fontFamily: 'var(--font-ui)', fontSize: 'var(--text-lg)', background: 'none', border: 'none',
-                  color: accidentals === v ? 'var(--text-amber)' : 'var(--text-inactive)', cursor: 'pointer', padding: '0 3px',
-                }}
-                onMouseEnter={e => { if (accidentals !== v) e.currentTarget.style.color = 'var(--text-muted)' }}
-                onMouseLeave={e => { if (accidentals !== v) e.currentTarget.style.color = 'var(--text-inactive)' }}
-              >{v === 'flat' ? '♭' : '♯'}</button>
-            ))}
-          </div>
-          <ExplorerOctaveControl />
-        </div>
-
-        {/* Centre: VOICING label + mode icons (shared with Chord Explorer) —
-            sets how the tiles, the chords-in-the-scale run and progressions
-            are voiced. */}
-        <div style={{ justifySelf: 'center', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ ...ROW_LABEL, fontSize: 10 }}>Voicing</span>
-          {PROGRESSION_VOICINGS.map(v => {
-            const Icon = VOICING_ICON[v]
-            const active = progressionVoicing === v
-            return (
-              <Tooltip key={v} oneLine title={`${PROGRESSION_VOICING_LABEL[v]} — ${PROGRESSION_VOICING_HINT[v]}`}>
-                <button
-                  onClick={() => setProgressionVoicing(v)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center', color: active ? 'var(--text-amber)' : 'var(--text-inactive)' }}
-                  onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
-                  onMouseLeave={e => e.currentTarget.style.color = active ? 'var(--text-amber)' : 'var(--text-inactive)'}
-                ><Icon size={14} /></button>
-              </Tooltip>
-            )
-          })}
-        </div>
-
-        {/* Right: switch to Chord Explorer */}
-        <div style={{ justifySelf: 'end' }}>
+        {/* Switch to Chord Explorer */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Tooltip oneLine title="Switch to Chords Explorer">
             <button
               onClick={() => { setScaleExplorerOpen(false); setChordExplorerOpen(true) }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap', padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-inactive)'}
+              style={{ background: 'none', border: '1px solid var(--state-hover-bg)', borderRadius: 4, cursor: 'pointer', color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 3 }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--text-amber)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-inactive)'; e.currentTarget.style.borderColor = 'var(--state-hover-bg)' }}
             >Chords Explorer <ArrowUpRight size={11} /></button>
           </Tooltip>
         </div>
       </div>
-
-      {/* Progression dropdown — portalled to body to avoid modal clipping.
-          Same list as the Chord Explorer: base progressions with their
-          rotations indented below. */}
-      {progDropdownOpen && dropdownRect && createPortal(
-        <div ref={progDropRef} style={{
-          position: 'fixed', top: dropdownRect.top, left: dropdownRect.left,
-          background: 'var(--bg-tile)', border: '1px solid var(--state-hover-bg)',
-          borderRadius: 6, zIndex: 1000, minWidth: 300, maxHeight: 340,
-          overflowY: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.7)',
-        }}>
-          {ALL_PROGRESSIONS.map((p, i) => {
-            const isRot = !!p.isRotation
-            const baseColor = selectedProg === i ? 'var(--text-amber)' : (isRot ? 'var(--text-dim-control)' : 'var(--text-muted)')
-            const rotLabel = isRot ? p.name.replace(p.baseName! + ' ', '') : ''
-            return (
-              <button key={p.name}
-                onClick={() => { setSelectedProg(i); setProgDropdownOpen(false); setDropdownRect(null) }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  width: '100%', textAlign: 'left',
-                  background: selectedProg === i ? 'var(--state-hover-bg)' : 'none',
-                  border: 'none', padding: isRot ? '3px 10px 3px 22px' : '5px 10px',
-                  color: baseColor,
-                  fontFamily: 'var(--font-ui)', fontSize: 10, cursor: 'pointer',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'var(--state-hover-bg)'; e.currentTarget.style.color = 'var(--text-amber)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = selectedProg === i ? 'var(--state-hover-bg)' : 'none'; e.currentTarget.style.color = baseColor }}
-              >
-                {/* Left column: name — rotations show "↳ (vi start)" short form */}
-                <span style={{ minWidth: 110, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                  {isRot ? `↳ ${rotLabel}` : p.name}
-                </span>
-                {/* Right column: roman numerals — dimmer, monospace */}
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, opacity: isRot ? 0.40 : 0.65, whiteSpace: 'nowrap' }}>
-                  {p.labels.join('  ')}
-                </span>
-              </button>
-            )
-          })}
-        </div>,
-        document.body
-      )}
+      </div>
     </div>
   )
 }

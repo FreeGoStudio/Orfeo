@@ -335,7 +335,7 @@ export default function MixerConsole() {
       role="dialog"
       aria-modal="true"
       aria-label="Console Mixer"
-      className="orfeo-modal-glow"
+      className="orfeo-modal-glow app-no-drag"
       onMouseDown={() => setZIndex(bringToFront())}
       style={{
         position: 'fixed',

@@ -24,7 +24,8 @@
 - **Speed applies to the "Chords in the Scale" run too**, and changes take effect on the next chord. The speed arrows are bigger.
 - **Clicked chords ring longer**, like holding the sustain pedal, and chords sound the moment you press a tile or an inversion arrow.
 - **The pink root note is always the chord's own root**, in every voicing, in both Explorers — and switching *Accent root note* recolours the keyboard straight away, even mid-run.
-- **Scales Explorer layout.** The *Chords in the Scale* row has more room above it and is split into three: the play button with "Click tiles to hear chords", a placeholder for the upcoming Starmap view, and *Accent root note*. The selected tile is light amber. *Play Inversion* moved to the right end of the Progressions row and *Voicing* to the middle of the bottom row, next to *Show as* and *Octave*. The PLAY button appears once a progression is picked. *SCALE* is in amber and the scale list sits a little lower. Roots mode has a new note icon.
+- **New Scales Explorer layout.** The two rows of controls under the tiles are gone: every setting now sits in a column on the right — *Progressions* as an always-open, scrolling list with a reset arrow (clears the pick) and PLAY right under it (PLAY is greyed out until you pick one; pick another while one plays to switch straight to it). The picked progression stays pinned to the top of the list while you scroll, and the list's scroll handle is amber. Then *Inversions*, *Chord voicing*, *Playback speed*, *Octave*, *Accidentals*, *Accent root note*, a placeholder for the upcoming Starmap view, *Reset explorer* (starts over: clears the key, scale and progression), and the *Chords Explorer* switch — each with a one-line description. The Circle of Fifths is bigger and centred, the guide text at the top left reads in fewer, evenly broken lines, the scale name and notes under it are larger, and *Chords in the Scale* (also larger) sits centred under the circle with more room above it. The window opens centred, with its bottom edge just above the chord name row over the keyboard. The selected tile is light amber, *SCALE* is in amber, and Roots mode has a new note icon.
+- **The ↺ beside the inversion arrows now undoes the inversions**, in both Explorers: it puts the lit chord back to the shape it had when you played it, however many times you flipped it — even after moving it with *Octave*. In the Scales Explorer it used to wipe the whole explorer; that's now *Reset explorer*. In the Chords Explorer it used to turn the chord off; that's now *Clear*, next to *Octave*.
 - **Chord Explorer:** the PLAY button appears once a progression is picked, the selected tile is light amber, and sharps show as ♯.
 
 ### Fixed
@@ -33,6 +34,7 @@
 - **Looping progressions in Roots and Climbing kept rising** every time round, up to the top of the keyboard. They now come back down after about two octaves.
 - **Clicking the same chord tile quickly cut its sound short.**
 - **Turning off *Accent root note*** left the last chord's root pink and didn't affect a run already playing.
+- **Grabbing an Explorer window by its title sometimes moved or un-maximized the whole Orfeo window** instead, whenever the explorer sat over the top bar — you had to hit the very edge of the title to drag it. The same fix covers the Chords Explorer, Lock-a-Chord, the floating keyboard, the MIDI editor, the mixer and File Info.
 
 ## [1.4.1] — 11. 10. 2026 — Smaller download
 

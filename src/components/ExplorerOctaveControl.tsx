@@ -15,7 +15,9 @@ const LABEL_STYLE: React.CSSProperties = {
   textTransform: 'uppercase', userSelect: 'none',
 }
 
-export default function ExplorerOctaveControl() {
+// showLabel: false where the surrounding layout already names the control
+// (the Scales Explorer's settings column).
+export default function ExplorerOctaveControl({ showLabel = true }: { showLabel?: boolean }) {
   const octave = useStore(s => s.explorerOctave)
 
   const moveTo = (next: number) => {
@@ -43,7 +45,7 @@ export default function ExplorerOctaveControl() {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-      <span style={{ ...LABEL_STYLE, marginRight: 2 }}>{t`Octave`}</span>
+      {showLabel && <span style={{ ...LABEL_STYLE, marginRight: 2 }}>{t`Octave`}</span>}
       <Tooltip oneLine title={t`Octave up`}>
         <button onClick={() => moveTo(octave + 1)} disabled={!canUp} style={btn(canUp)}
           onMouseEnter={e => { if (canUp) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}

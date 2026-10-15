@@ -155,6 +155,20 @@ export function shiftNotesByOctaves(notes: number[], delta: number): number[] | 
   return shifted
 }
 
+// ── Inversion reset (↺ beside the inversion arrows) — the chord's shape
+// before the first arrow press, so ↺ puts it back after any number of steps,
+// even if the Octave control has moved it since. Cleared whenever a new chord
+// is struck. ──────────────────────────────────────────────────────────────
+export interface StruckShape { notes: number[]; invCount: number; octave: number }
+
+export function captureStruckShape(prev: StruckShape | null, lit: Iterable<number>, invCount: number, octave: number): StruckShape {
+  return prev ?? { notes: Array.from(lit).sort((a, b) => a - b), invCount, octave }
+}
+
+export function restoreStruckShape(shape: StruckShape, octaveNow: number): number[] | null {
+  return shiftNotesByOctaves(shape.notes, octaveNow - shape.octave)
+}
+
 // ── One step of a running sequence (progression or chords-in-the-scale) —
 // rolled bottom-up with a slight velocity spread, ringing a touch past the
 // next step for legato. Notes still queued are dropped if playback stops. ──

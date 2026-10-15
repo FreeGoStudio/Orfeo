@@ -224,7 +224,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
         role="dialog"
         aria-modal="true"
         aria-label="File info"
-        className="orfeo-modal-glow"
+        className="orfeo-modal-glow app-no-drag"
         style={{
           background: 'var(--bg-modal)', border: '1px solid var(--border2)',
           borderRadius: 'var(--radius-lg)', padding: '16px 18px', width: 360,

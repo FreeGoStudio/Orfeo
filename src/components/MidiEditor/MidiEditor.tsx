@@ -1350,7 +1350,7 @@ export default function MidiEditor() {
       role="dialog"
       aria-modal="true"
       aria-label="MIDI Playback Editor"
-      className="orfeo-modal-glow"
+      className="orfeo-modal-glow app-no-drag"
       onMouseDown={() => setZIndex(bringToFront())}
       style={{
         position: 'fixed', left: pos.x, top: pos.y,

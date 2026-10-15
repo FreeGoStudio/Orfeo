@@ -259,7 +259,7 @@ change to one rule lands in both:
 
 | File | What it owns |
 |---|---|
-| `src/utils/explorerShared.ts` | Progression list + rotations (`ALL_PROGRESSIONS`), `resolveProgressionStep` (a step's chord = key + semitone offset, quality from the numeral as written, optionally re-voiced by a Style), playback speeds, the 61-key range, the starting register (`explorerLowRoot`, roots in C3–B3 moved by the octave control), inversion stepping, `ringChord` (clicked chords, pedal-like ring), `strikeStep` (rolled sequence steps), `inversionOf`, `explorerKeyColors` (amber + chord root in pink), the voicing-mode icons |
+| `src/utils/explorerShared.ts` | Progression list + rotations (`ALL_PROGRESSIONS`), `resolveProgressionStep` (a step's chord = key + semitone offset, quality from the numeral as written, optionally re-voiced by a Style), playback speeds, the 61-key range, the starting register (`explorerLowRoot`, roots in C3–B3 moved by the octave control), inversion stepping, `ringChord` (clicked chords, pedal-like ring), `strikeStep` (rolled sequence steps), `inversionOf`, `explorerKeyColors` (amber + chord root in pink), `captureStruckShape` / `restoreStruckShape` (the inversion ↺: back to the shape before the first arrow press, octave-shifted), the voicing-mode icons |
 | `src/utils/voiceLeading.ts` | `nextVoicing` / `voiceProgression` — the three voicing modes: **Roots** (root position, rising, wraps back to the anchor octave), **Climbing** (inversions stepping upward, restarts low past a ceiling), **Smooth** (least movement, pulled to a home position) |
 | `src/utils/genreVoicing.ts` | Chord Explorer Styles — numeral × quality → richer chord type |
 | `src/components/ExplorerOctaveControl.tsx` | Octave ˄ ˅ ↺, writes the shared `store.explorerOctave` (session-only) and moves lit keys with it |
@@ -273,6 +273,14 @@ tiles, the "Chords in the Scale" run and the keyboard always agree. Blues
 scales define their tiles explicitly (`ScaleDef.chords`) as chords played over
 the scale rather than stacked from it. Progressions play as written, so a step
 can fall outside the selected scale; a step matching a tile lights that tile.
+Layout: explorer area (circle, tiles, info row) on the left, a settings
+column on the right (`SettingRow`: control left, title + description right).
+The window opens centred with its bottom edge measured onto the keyboard's
+chord header (`defaultPos` + a one-shot layout effect).
+
+Every draggable floating window carries `app-no-drag` on its root: the top
+bar is the window's drag region, and Electron gives that region the click
+even when a modal is drawn on top of it.
 
 Chord Explorer specifics: tiles are root position from the anchor octave,
 except in Smooth, where a tile clicked while a chord is lit takes the nearest

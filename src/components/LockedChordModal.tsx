@@ -140,7 +140,7 @@ export default function LockedChordModal() {
   if (!modalOpen) return null
 
   return (
-    <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Lock-a-Chord" className="orfeo-modal-glow" style={{
+    <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Lock-a-Chord" className="orfeo-modal-glow app-no-drag" style={{
       position: 'fixed',
       left: pos.x,
       top: pos.y,

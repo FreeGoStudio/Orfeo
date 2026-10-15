@@ -23,10 +23,11 @@ import {
 import {
   EXPLORER_RANGE, explorerLowRoot, SPEED_MS, VOICING_ICON, ALL_PROGRESSIONS,
   resolveProgressionStep, nextInversionSet, prevInversionSet, ringChord, strikeStep, inversionOf,
-  explorerKeyColors, type ProgSpeed,
+  explorerKeyColors, captureStruckShape, restoreStruckShape, type ProgSpeed, type StruckShape,
 } from '../utils/explorerShared'
 import ChevronPlayIcon from './ChevronPlayIcon'
 import ExplorerOctaveControl from './ExplorerOctaveControl'
+import { t } from '../utils/i18n'
 import {
   COMMON_CHORDS, ALL_CHORDS, FULL_CHORD_TYPES, type ChordInfo,
 } from '../utils/chordVocabulary'
@@ -89,6 +90,9 @@ export default function ChordExplorer() {
   // ── Root whose pitch class is accented on the lit keys right now — kept so
   // flipping "Accent root note" recolors what's already on the keyboard. ──
   const accentRootRef = useRef<number | null>(null)
+  // ── Shape the inversion ↺ returns to (null until an arrow is pressed) ──
+  const struckShapeRef = useRef<StruckShape | null>(null)
+  const [inverted, setInverted] = useState(false)
   const lowRootRef = useRef(explorerLowRoot(explorerOctave))
   lowRootRef.current = explorerLowRoot(explorerOctave)
   // ── Window drag position — bottom edge on the keyboard header, horizontally
@@ -135,16 +139,33 @@ export default function ChordExplorer() {
 
   // ── Light keys with the shared colour rule (same as the Scales Explorer):
   // amber, the chord's own root pink when "Accent root note" is on. ───────
-  const lightKeys = useCallback((notes: number[], rootPc: number | null) => {
+  // keepShape: an inversion step or a recolour, not a newly struck chord —
+  // keeps the shape the inversion ↺ returns to.
+  const lightKeys = useCallback((notes: number[], rootPc: number | null, keepShape = false) => {
     accentRootRef.current = rootPc
+    if (!keepShape) { struckShapeRef.current = null; setInverted(false) }
     setExplorerKeys(new Set(notes), explorerKeyColors(notes, rootPc, useStore.getState().colorRootNoteEnabled))
   }, [setExplorerKeys])
+
+  // ── ↺ beside the inversion arrows — back to the shape the chord had when
+  // it was struck (shared rule, utils/explorerShared.ts). ──────────────────
+  const resetInversion = useCallback(() => {
+    const shape = struckShapeRef.current
+    if (!shape) return
+    const state = useStore.getState()
+    const notes = restoreStruckShape(shape, state.explorerOctave)
+    if (!notes) return
+    lightKeys(notes, accentRootRef.current)
+    const cd = state.explorerChordDisplay
+    if (cd) state.setExplorerChordDisplay({ ...cd, invCount: shape.invCount })
+    ringChord(notes)
+  }, [lightKeys])
 
   // ── "Accent root note" flipped — recolor whatever is lit right now ────────
   useEffect(() => {
     if (!chordExplorerOpen) return
     const lit = Array.from(useStore.getState().explorerKeys)
-    if (lit.length > 0) lightKeys(lit, accentRootRef.current)
+    if (lit.length > 0) lightKeys(lit, accentRootRef.current, true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colorRootNoteEnabled])
 
@@ -523,10 +544,12 @@ export default function ChordExplorer() {
     const state = useStore.getState()
     const current = state.explorerKeys
     if (current.size === 0) return
-    const newNotes = dir === 'next' ? nextInversionSet(current) : prevInversionSet(current)
-    lightKeys(Array.from(newNotes), accentRootRef.current)
-    // ── Update inversion count in store so Keyboard.tsx label updates ─────
     const cd = state.explorerChordDisplay
+    struckShapeRef.current = captureStruckShape(struckShapeRef.current, current, cd?.invCount ?? 0, state.explorerOctave)
+    setInverted(true)
+    const newNotes = dir === 'next' ? nextInversionSet(current) : prevInversionSet(current)
+    lightKeys(Array.from(newNotes), accentRootRef.current, true)
+    // ── Update inversion count in store so Keyboard.tsx label updates ─────
     if (cd) state.setExplorerChordDisplay({ ...cd, invCount: cd.invCount + (dir === 'next' ? 1 : -1) })
     ringChord(Array.from(newNotes).sort((a, b) => a - b))
   }, [selectedKey, lightKeys])
@@ -578,7 +601,7 @@ export default function ChordExplorer() {
   const activeProg = selectedProg !== null ? ALL_PROGRESSIONS[selectedProg] : null
 
   return (
-    <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Chords Explorer" className="orfeo-modal-glow" style={{
+    <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Chords Explorer" className="orfeo-modal-glow app-no-drag" style={{
       position: 'fixed',
       left: pos.x,
       top: pos.y,
@@ -1101,6 +1124,21 @@ export default function ChordExplorer() {
           ))}
         </div>
         <ExplorerOctaveControl />
+        {/* Clear — turns the lit chord off and deselects its tile */}
+        <Tooltip oneLine title={t`Clear selection`}>
+          <button
+            onClick={() => { clearExplorerKeys(); clearDisplayedChord(); clearLockedKeys(); clearExplorerChordDisplay(); setSelectedKey(null); struckShapeRef.current = null; setInverted(false) }}
+            disabled={!selectedKey}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0,
+              fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase',
+              cursor: selectedKey ? 'pointer' : 'default',
+              color: selectedKey ? 'var(--text-inactive)' : 'var(--state-hover-bg)',
+            }}
+            onMouseEnter={e => { if (selectedKey) e.currentTarget.style.color = 'var(--text-amber)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = selectedKey ? 'var(--text-inactive)' : 'var(--state-hover-bg)' }}
+          ><RotateCcw size={12} />{t`Clear`}</button>
+        </Tooltip>
         </div>
 
         {/* Centre: inversion controls — absolutely positioned */}
@@ -1133,20 +1171,14 @@ export default function ChordExplorer() {
             onMouseLeave={e => { e.currentTarget.style.color = selectedKey ? 'var(--text-amber)' : 'var(--state-disabled)' }}
           ><ChevronPlayIcon size={14} /></button>
           </Tooltip>
-          <Tooltip oneLine title="Clear selection">
-          <button
-            onClick={() => { clearExplorerKeys(); clearDisplayedChord(); clearLockedKeys(); clearExplorerChordDisplay(); setSelectedKey(null) }}
-            disabled={!selectedKey}
-            style={{
-              background: 'none', border: 'none',
-              cursor: selectedKey ? 'pointer' : 'default',
-              color: selectedKey ? 'var(--text-inactive)' : 'var(--state-hover-bg)',
-              padding: '0 2px', display: 'flex', alignItems: 'center',
-              transition: 'color 0.1s',
-            }}
-            onMouseEnter={e => { if (selectedKey) e.currentTarget.style.color = 'var(--text-amber)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = selectedKey ? 'var(--text-inactive)' : 'var(--state-hover-bg)' }}
-          ><RotateCcw size={13} /></button>
+          <Tooltip oneLine title={t`Reset inversion`}>
+            <button
+              onClick={resetInversion}
+              disabled={!inverted}
+              style={{ background: 'none', border: 'none', cursor: inverted ? 'pointer' : 'default', color: inverted ? 'var(--text-inactive)' : 'var(--state-hover-bg)', padding: '0 1px', marginLeft: 2, display: 'flex', alignItems: 'center' }}
+              onMouseEnter={e => { if (inverted) e.currentTarget.style.color = 'var(--text-amber)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = inverted ? 'var(--text-inactive)' : 'var(--state-hover-bg)' }}
+            ><RotateCcw size={12} /></button>
           </Tooltip>
         </div>
 

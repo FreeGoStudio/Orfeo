@@ -669,6 +669,11 @@ body {
 .mixer-scroll::-webkit-scrollbar-thumb  { background: var(--border2); border-radius: 2px }
 .mixer-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-dimmest) }
 
+/* ── Amber scrollbar — lists where the handle must stand out against the
+   dark box (Scales Explorer progressions list). */
+.amber-scroll::-webkit-scrollbar-thumb       { background: var(--accent-amber-bold); border-radius: 3px }
+.amber-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-amber) }
+
 /* ── TopBar's left/right cluster overflow fallback (see TopBar.tsx's own
    comments) — same "reachable via scroll, nothing hidden" guarantee as
    .mixer-scroll above, but with the scrollbar itself invisible. That row's

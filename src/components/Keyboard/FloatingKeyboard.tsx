@@ -108,7 +108,7 @@ export default function FloatingKeyboard() {
       ref={panelRef}
       role="region"
       aria-label="Floating virtual keyboard"
-      className="orfeo-modal-glow"
+      className="orfeo-modal-glow app-no-drag"
       style={{
         position: 'fixed',
         left: pos.x,
