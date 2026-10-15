@@ -5,11 +5,17 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
-## [Unreleased] — Explorers upgrade
+## [1.4.2] — 15. 10. 2026 — Explorers upgrade
+
+**In short**
+- The Scales Explorer has a new, cleaner layout: a bigger Circle of Fifths, with every setting in one column on the right and the full progression list always open.
+- Both Explorers now follow exactly the same rules: the same 61 progressions, played exactly as written, with three clearly different voicings.
+- New Major Blues and Minor Blues scales, and an Octave control in both Explorers.
+- Dragging an Explorer by its title no longer grabs or un-maximizes the whole Orfeo window.
 
 ### New
 - **Major Blues and Minor Blues scales** in the Scales Explorer. Their tiles are the chords you play the scale over — C7, C6, A7, C7♯9 for C Major Blues; Cm7, C7, F7, G7 for C Minor Blues — because stacking every other note of a blues scale gives odd chords.
-- **Octave control in both Explorers.** *Octave* with up and down arrows and a reset, at the bottom left, moves everything the Explorers play up or down by whole octaves (from C2 to C5 roots). The chord that's lit on the keyboard moves with it, and both Explorers share the setting.
+- **Octave control in both Explorers.** *Octave* with up and down arrows and a reset (bottom left in the Chords Explorer, in the settings column in the Scales Explorer) moves everything the Explorers play up or down by whole octaves (from C2 to C5 roots). The chord that's lit on the keyboard moves with it, and both Explorers share the setting.
 - **Accent root note in the Chord Explorer.** The same switch as in the Scales Explorer, now at the bottom right of the Chord Explorer too: the chord's root shows in pink on the keyboard, in every octave.
 - **Smooth voicing for Chord Explorer tiles.** With Voicing set to Smooth, a chord tile clicked while another chord is lit plays the version closest to it — C, then Cmaj7, then C7 stay under one hand instead of each starting from the root.
 - **Hand-lettered "Circle of Fifths"** title in the middle of the circle.
