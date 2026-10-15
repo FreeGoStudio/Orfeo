@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { Chord, Note } from 'tonal'
-import { RotateCcw, Play, Square, Rows3, TrendingUp, Spline, ArrowUpRight, ToggleLeft, ToggleRight } from 'lucide-react'
+import { RotateCcw, Play, Square, ArrowUpRight, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useStore } from '../store'
 import { getNoteName } from '../utils/noteNames'
-import { formatChordSuffix } from '../utils/chordDetection'
+import { formatChordSuffix, detectChordStructured } from '../utils/chordDetection'
 import type { NoteNaming, Accidentals, ChordNamingStyle } from '../types'
 import SpeedControl from './SpeedControl'
 import OrfeoMark from './OrfeoMark'
@@ -16,29 +16,32 @@ import { useClampPositionOnZoom } from '../hooks/useClampPositionOnZoom'
 import { modalCloseButtonStyle, modalCloseButtonHoverColor, modalCloseButtonIdleColor } from '../utils/modalCloseButtonStyle'
 import Tooltip from './Tooltip'
 import {
-  nextVoicing, voiceProgression, semisFromMidi, humanizeChord,
+  nextVoicing, voiceProgression, semisFromMidi, intervalsToSemis,
   PROGRESSION_VOICINGS, PROGRESSION_VOICING_LABEL, PROGRESSION_VOICING_HINT,
 } from '../utils/voiceLeading'
-
-// ── Progression-voicing mode → toolbar icon (matches Chord Explorer) ─────
-const VOICING_ICON = { roots: Rows3, climbing: TrendingUp, smooth: Spline } as const
-
-// ── Keyboard range constants ────────────────────────────────────────────────
-const RANGES: Record<number, { min: number; max: number }> = {
-  61: { min: 36, max: 96 },
-  73: { min: 28, max: 103 },
-  88: { min: 21, max: 108 },
-}
+import {
+  EXPLORER_RANGE, explorerLowRoot, SPEED_MS, VOICING_ICON, ALL_PROGRESSIONS,
+  resolveProgressionStep, nextInversionSet, prevInversionSet, ringChord, strikeStep, inversionOf,
+  explorerKeyColors, type ProgSpeed,
+} from '../utils/explorerShared'
+import { ALL_CHORDS } from '../utils/chordVocabulary'
+import ExplorerOctaveControl from './ExplorerOctaveControl'
+import CofTitleMark from './CofTitleMark'
+import { t } from '../utils/i18n'
 
 // ── Modal dimensions for default positioning above the keyboard ───────────
 const MODAL_WIDTH = 770
-const MODAL_HEIGHT = 600
+const MODAL_HEIGHT = 620
 
 // ── Scale definitions ───────────────────────────────────────────────────────
+// `chords` (blues scales only): the tiles are the chords the scale is played
+// OVER, not chords stacked from its own notes — stacking every other note of
+// a blues scale gives odd results (C–E♭–G reads as Cm in C Major Blues).
 interface ScaleDef {
   name: string
   intervals: number[]
   romans: string[]
+  chords?: { offset: number; type: string }[]
 }
 
 const SCALES: ScaleDef[] = [
@@ -48,6 +51,10 @@ const SCALES: ScaleDef[] = [
   { name: 'Melodic Minor',    intervals: [0,2,3,5,7,9,11], romans: ['i','ii','III+','IV','V','vi°','vii°'] },
   { name: 'Major Pentatonic', intervals: [0,2,4,7,9],       romans: ['I','II','III','V','VI'] },
   { name: 'Minor Pentatonic', intervals: [0,3,5,7,10],      romans: ['i','III','IV','v','VII'] },
+  { name: 'Major Blues',      intervals: [0,2,3,4,7,9],     romans: ['I7','I6','VI7','I7♯9'],
+    chords: [{ offset: 0, type: '7' }, { offset: 0, type: '6' }, { offset: 9, type: '7' }, { offset: 0, type: '7#9' }] },
+  { name: 'Minor Blues',      intervals: [0,3,5,6,7,10],    romans: ['i7','I7','IV7','V7'],
+    chords: [{ offset: 0, type: 'm7' }, { offset: 0, type: '7' }, { offset: 5, type: '7' }, { offset: 7, type: '7' }] },
   { name: 'Dorian',           intervals: [0,2,3,5,7,9,10], romans: ['i','ii','III','IV','v','vi°','VII'] },
   { name: 'Phrygian',         intervals: [0,1,3,5,7,8,10], romans: ['i','II','III','iv','v°','VI','VII'] },
   { name: 'Lydian',           intervals: [0,2,4,6,7,9,11], romans: ['I','II','iii','#iv°','V','vi','vii'] },
@@ -55,7 +62,7 @@ const SCALES: ScaleDef[] = [
 ]
 
 // ── Minor scale names — used to append 'm' to the Key display ───────────────
-const MINOR_SCALES = new Set(['Natural Minor', 'Harmonic Minor', 'Melodic Minor', 'Minor Pentatonic', 'Phrygian'])
+const MINOR_SCALES = new Set(['Natural Minor', 'Harmonic Minor', 'Melodic Minor', 'Minor Pentatonic', 'Minor Blues', 'Phrygian'])
 
 // ── Circle of Fifths position tables ────────────────────────────────────────
 // 12 positions clockwise from top (C)
@@ -63,41 +70,6 @@ const COF_MAJOR_PC  = [0, 7, 2, 9, 4, 11, 6,  1,  8, 3, 10, 5]
 const COF_MINOR_PC  = [9, 4,11, 6, 1,  8, 3, 10,  5, 0,  7, 2]
 // Key signature: positive = sharps, negative = flats
 const COF_KEYSIG    = [0, 1, 2, 3, 4,  5, 6, -5, -4,-3,  -2,-1]
-
-// ── Progressions ────────────────────────────────────────────────────────────
-interface Progression { name: string; labels: string[]; offsets: number[] }
-
-const PROGRESSIONS: Progression[] = [
-  { name: 'Pop',               labels: ['I','V','vi','IV'],                    offsets: [0,7,9,5] },
-  { name: 'Doo-Wop',           labels: ['I','vi','IV','V'],                    offsets: [0,9,5,7] },
-  { name: 'Rock · Blues',      labels: ['I','IV','V'],                         offsets: [0,5,7] },
-  { name: 'Jazz Standard',     labels: ['ii','V','I'],                         offsets: [2,7,0] },
-  { name: 'Andalusian',        labels: ['i','VII','VI','V'],                   offsets: [0,10,8,7] },
-  { name: 'Pachelbel',         labels: ['I','V','vi','iii','IV','I','IV','V'], offsets: [0,7,9,4,5,0,5,7] },
-  { name: 'Minor Pop',         labels: ['i','VI','III','VII'],                 offsets: [0,8,3,10] },
-  { name: 'Pop/Rock Inv.',     labels: ['vi','IV','I','V'],                    offsets: [9,5,0,7] },
-  { name: 'Epic · Heroic',     labels: ['VI','VII','i'],                       offsets: [8,10,0] },
-  { name: 'Royal Road',        labels: ['IV','V','iii','vi'],                  offsets: [5,7,4,9] },
-  { name: 'Sentimental',       labels: ['IV','V','I','vi'],                    offsets: [5,7,0,9] },
-  { name: 'Sad · Hopeful',     labels: ['I','vi','iii','IV'],                  offsets: [0,9,4,5] },
-  { name: 'Mixolydian Rock',   labels: ['I','bVII','IV'],                      offsets: [0,10,5] },
-  { name: 'Plagal Turnaround', labels: ['I','IV','I','V'],                     offsets: [0,5,0,7] },
-  { name: 'Minor Jazz',        labels: ['ii°','V','i'],                        offsets: [2,7,0] },
-  { name: 'Step-Down',         labels: ['i','v','IV','bIII'],                  offsets: [0,7,5,3] },
-  { name: 'Circle of Fifths',  labels: ['vi','ii','V','I'],                    offsets: [9,2,7,0] },
-  { name: 'Energetic Pop',     labels: ['I','IV','vi','V'],                    offsets: [0,5,9,7] },
-  { name: 'Minor Blues',       labels: ['i','iv','v'],                         offsets: [0,5,7] },
-  { name: 'Grunge · Modal',    labels: ['I','bIII','IV'],                      offsets: [0,3,5] },
-]
-
-const SPEED_MS = { slow: 1500, med: 800, fast: 400 } as const
-
-// ── Roman numeral → 0-based degree index ────────────────────────────────────
-const ROMAN_TO_DEGREE: Record<string, number> = {
-  'I':0,'i':0,'II':1,'ii':1,'ii°':1,'III':2,'iii':2,'III+':2,'iii°':2,
-  'IV':3,'iv':3,'#iv°':3,'V':4,'v':4,'v°':4,'VI':5,'vi':5,'vi°':5,
-  'VII':6,'vii°':6,'vii':6,
-}
 
 // ── Shared row label style — dim uppercase, used across all control rows ──────
 const ROW_LABEL: React.CSSProperties = {
@@ -177,6 +149,18 @@ interface DiatonicChord {
   chordName: string
   suffix: string
   noteCount: number
+  // ── Name without the slash bass + which inversion the tile's voicing is
+  // (0 for every 7-note scale; pentatonic stacks are often inverted, e.g.
+  // C–E–A = Am, 1st inversion) — fed to the keyboard's chord display so the
+  // inversion buttons count from the tile's real inversion. ────────────────
+  baseName: string
+  inversion: number
+  // ── Shape the voicing engine builds from (offsets above rootPC), the
+  // chord's real root (differs from rootPC when a pentatonic stack is
+  // inverted, e.g. C–E–A = Am) and its tones in root-position order. ─────
+  semis: number[]
+  harmonicRootPC: number
+  tonePcs: number[]
 }
 
 // ── Maps tonal's quality/name WORDS to a raw suffix — formatChordSuffix
@@ -197,14 +181,13 @@ function buildDiatonicChord(
   root: number,
   scaleIntervals: number[],
   degree: number,
-  keyboardSize: number,
   naming: NoteNaming,
   accidentals: Accidentals,
   namingStyle: ChordNamingStyle,
 ): DiatonicChord {
   const n = scaleIntervals.length
   const scalePCs = scaleIntervals.map(s => (root + s) % 12)
-  const { min, max } = RANGES[keyboardSize as 61 | 73 | 88] ?? RANGES[73]
+  const { min, max } = EXPLORER_RANGE
 
   // Stack thirds within the scale (degrees: deg, deg+2, deg+4)
   const triadPCs = [
@@ -230,45 +213,87 @@ function buildDiatonicChord(
     midiNotes.push(m)
   }
 
-  // Detect chord quality via tonal
+  // Detect chord quality via tonal. Every 7-note scale stacks into a
+  // root-position triad, so tonal answers with a plain chord on the stacked
+  // root. A pentatonic stack is usually an inverted or sus chord instead
+  // (C–E–A, D–G–C) and tonal only offers slash answers, unranked — its first
+  // pick for E–A–C# is "C#m#5/E", not A/E. Those go through the app's own
+  // ranked picker (the one playback uses), then get named by that chord's
+  // real root and quality with the stacked bass after the slash — never the
+  // bass note glued to another chord's quality (was "Cm" for C–E–A).
   const noteNames = midiNotes.map(m => Note.fromMidi(m))
   const detected = Chord.detect(noteNames)
-  const best = detected.find(c => !c.includes('/')) ?? detected[0] ?? ''
+  const rootPosition = detected.find(c => !c.includes('/'))
+  const structured = rootPosition ? null : detectChordStructured(new Set(midiNotes))
+  const baseChord = rootPosition ?? structured?.rawRootName ?? detected[0]?.split('/')[0] ?? ''
   let suffix = '?'
-  if (best) {
-    const info = Chord.get(best)
+  let chordRootPC = triadPCs[0]
+  let inversion = 0
+  let tonePcs = triadPCs
+  if (baseChord) {
+    const info = Chord.get(baseChord)
     const rawSuffix = QUALITY_SUFFIX[info.quality?.toLowerCase() ?? ''] ??
              QUALITY_SUFFIX[info.name?.toLowerCase() ?? ''] ??
              (info.aliases?.[0] ?? info.quality ?? '')
     suffix = formatChordSuffix(rawSuffix, namingStyle)
+    const tonicPC = info.tonic ? Note.chroma(info.tonic) : undefined
+    if (tonicPC !== undefined && tonicPC !== null && tonicPC !== triadPCs[0]) {
+      chordRootPC = tonicPC
+      const chordPcs = info.notes.map(n => Note.chroma(n))
+      inversion = Math.max(0, chordPcs.indexOf(triadPCs[0]))
+      if (chordPcs.length === triadPCs.length) tonePcs = chordPcs
+    }
   }
 
-  const rootName = getNoteName(baseMidi, naming, accidentals)
+  const baseName = getNoteName(chordRootPC, naming, accidentals) + suffix
+  const chordName = chordRootPC !== triadPCs[0] ? `${baseName}/${getNoteName(baseMidi, naming, accidentals)}` : baseName
   return {
     degree,
     roman: SCALES.find(s => s.intervals === scaleIntervals)?.romans[degree] ?? String(degree + 1),
     rootPC: triadPCs[0],
     midiNotes,
-    chordName: rootName + suffix,
+    chordName,
     suffix,
     noteCount: midiNotes.length,
+    baseName,
+    inversion,
+    semis: semisFromMidi(midiNotes),
+    harmonicRootPC: chordRootPC,
+    tonePcs,
   }
 }
 
-// ── Inversion helpers — rotate live chord up or down one voicing ──────────────
-// Same pattern as ChordExplorer: operate on the live explorerKeys set so
-// inversions accumulate across octaves rather than wrapping at chord length.
-function nextInversionSet(notes: Set<number>): Set<number> {
-  const sorted = Array.from(notes).sort((a, b) => a - b)
-  const [lowest, ...rest] = sorted
-  return new Set([...rest, lowest + 12])
+// ── Blues tiles — a fixed chord on a fixed root per tile (see ScaleDef) ─────
+function buildScaleChord(
+  root: number,
+  scaleDef: ScaleDef,
+  degree: number,
+  naming: NoteNaming,
+  accidentals: Accidentals,
+  namingStyle: ChordNamingStyle,
+): DiatonicChord | null {
+  const spec = scaleDef.chords?.[degree]
+  const info = spec ? ALL_CHORDS.find(c => c.key === spec.type) : undefined
+  if (!spec || !info) return null
+  const rootPC = (root + spec.offset) % 12
+  const semis = intervalsToSemis(info.intervals)
+  const suffix = formatChordSuffix(info.suffix, namingStyle)
+  const baseName = getNoteName(rootPC, naming, accidentals) + suffix
+  return {
+    degree,
+    roman: scaleDef.romans[degree] ?? String(degree + 1),
+    rootPC,
+    midiNotes: semis.map(st => 48 + rootPC + st),
+    chordName: baseName,
+    suffix,
+    noteCount: semis.length,
+    baseName,
+    inversion: 0,
+    semis,
+    harmonicRootPC: rootPC,
+    tonePcs: semis.map(st => (rootPC + st) % 12),
+  }
 }
-function prevInversionSet(notes: Set<number>): Set<number> {
-  const sorted = Array.from(notes).sort((a, b) => a - b)
-  const highest = sorted[sorted.length - 1]
-  return new Set([highest - 12, ...sorted.slice(0, -1)])
-}
-
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function ScaleExplorer() {
@@ -277,7 +302,6 @@ export default function ScaleExplorer() {
   const scaleExplorerMinimized  = useStore(s => s.scaleExplorerMinimized)
   const setScaleExplorerOpen    = useStore(s => s.setScaleExplorerOpen)
   const setChordExplorerOpen    = useStore(s => s.setChordExplorerOpen)
-  const explorerKeys = useStore(s => s.explorerKeys)
   const setExplorerKeys = useStore(s => s.setExplorerKeys)
   const colorRootNoteEnabled = useStore(s => s.colorRootNoteEnabled)
   const setColorRootNoteEnabled = useStore(s => s.setColorRootNoteEnabled)
@@ -291,7 +315,7 @@ export default function ScaleExplorer() {
   const progressionVoicing = useStore(s => s.progressionVoicing)
   const setProgressionVoicing = useStore(s => s.setProgressionVoicing)
   const setAccidentals = useStore(s => s.setAccidentals)
-  const keyboardSize = useStore(s => s.keyboardSize)
+  const explorerOctave = useStore(s => s.explorerOctave)
 
   // ── Window drag position — bottom edge on the keyboard header, horizontally
   // centered on the piano roll; recomputed each time the modal opens. ───────
@@ -324,7 +348,7 @@ export default function ScaleExplorer() {
   const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number } | null>(null)
   const [progPlaying, setProgPlaying] = useState(false)
   const [progStep, setProgStep] = useState(0)
-  const [progSpeed, setProgSpeed] = useState<'slow' | 'med' | 'fast'>('med')
+  const [progSpeed, setProgSpeed] = useState<ProgSpeed>('med')
 
   // ── Info row: currently playing chord context ─────────────────────────────
   const [infoRowChord, setInfoRowChord] = useState<{ progName: string; labels: string[]; notes: string[]; step: number } | null>(null)
@@ -344,28 +368,23 @@ export default function ScaleExplorer() {
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const progTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // speedRef lets playProgStepAt read the live speed without restarting the chain
-  const speedRef = useRef<'slow' | 'med' | 'fast'>('med')
+  // speedRef lets both the progression and the chords-in-the-scale run read
+  // the live speed without restarting the chain
+  const speedRef = useRef<ProgSpeed>('med')
   const progRunningRef = useRef(false)
   const progTriggerRef = useRef<HTMLButtonElement>(null)
   const progDropRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ ox: number; oy: number; mx: number; my: number } | null>(null)
   const scalePlayTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const chordSeqTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const chordSeqRunningRef = useRef(false)
+  // ── Root whose pitch class is accented on the lit keys right now — kept so
+  // flipping "Accent root note" recolors what's already on the keyboard. ──
+  const accentRootRef = useRef<number | null>(null)
   // ── Scale replay trigger — incremented on every CoF click so the play ─────
   // effect fires even when the same segment is clicked twice in a row
   const playTriggerRef = useRef(0)
   const [playTrigger, setPlayTrigger] = useState(0)
-
-  // ── Chord/inversion audio trigger — chord tiles and the inversion step
-  // buttons used to fire on `onClick`, which the browser fires on release,
-  // not press. Fires on `onMouseDown` instead so the sound starts the
-  // instant you press; still a fixed-duration ring via `playNote`, not a
-  // held sustain — releasing early doesn't cut it short. ────────────────────
-  const ringNotes = useCallback((notes: number[], vel = 0.7, durMs = 600) => {
-    const playNote = (window as any).__orfeoPlayNote
-    if (playNote) notes.forEach(m => playNote(m, vel, durMs, undefined, false))
-  }, [])
 
   const displayNaming: NoteNaming = noteNaming === 'hidden' ? 'english' : noteNaming
 
@@ -380,10 +399,31 @@ export default function ScaleExplorer() {
   // ── Build all diatonic triads when root or scale type changes ─────────────
   const diatonicChords = useMemo<DiatonicChord[]>(() => {
     if (selectedRoot === null) return []
+    if (scale.chords) {
+      return scale.chords
+        .map((_, deg) => buildScaleChord(selectedRoot, scale, deg, displayNaming, accidentals, chordNamingStyle))
+        .filter((c): c is DiatonicChord => c !== null)
+    }
     return scale.intervals.map((_, deg) =>
-      buildDiatonicChord(selectedRoot, scale.intervals, deg, 61, displayNaming, accidentals, chordNamingStyle)
+      buildDiatonicChord(selectedRoot, scale.intervals, deg, displayNaming, accidentals, chordNamingStyle)
     )
   }, [selectedRoot, scale, displayNaming, accidentals, chordNamingStyle])
+
+  // ── Where each tile sits on the keyboard — the whole row voiced as one run
+  // from the tonic under the Voicing mode, starting in the octave the Octave
+  // control picks (C3–B3 by default), plus the tonic again at the end for
+  // the octave tile. Tiles, the chords-in-the-scale run and the keyboard all
+  // read this one list, so they always agree, in every key. ──────────────
+  const lowRoot = explorerLowRoot(explorerOctave)
+  const tileVoicings = useMemo<number[][]>(() => {
+    if (diatonicChords.length === 0) return []
+    const spec = diatonicChords.map(c => ({ rootPc: c.rootPC, semis: c.semis }))
+    return voiceProgression([...spec, spec[0]], progressionVoicing, EXPLORER_RANGE, lowRoot)
+  }, [diatonicChords, progressionVoicing, lowRoot])
+  const tileVoicingsRef = useRef(tileVoicings)
+  tileVoicingsRef.current = tileVoicings
+  const lowRootRef = useRef(lowRoot)
+  lowRootRef.current = lowRoot
 
   // ── Scale-type button — also re-syncs the Circle of Fifths highlight so the
   // lit segment always matches the chosen scale's family (minor-family scales
@@ -420,6 +460,7 @@ export default function ScaleExplorer() {
 
   // ── Cancel the chords-in-scale auto-sequence ───────────────────────────────
   const stopChordSequence = useCallback(() => {
+    chordSeqRunningRef.current = false
     chordSeqTimersRef.current.forEach(t => clearTimeout(t))
     chordSeqTimersRef.current = []
     setChordSeqPlaying(false)
@@ -469,39 +510,33 @@ export default function ScaleExplorer() {
     }
   }, [scaleExplorerOpen, stopProgression, clearScalePlayTimers, stopChordSequence, clearExplorerKeys, clearExplorerChordDisplay])
 
-  // ── Root-pitch-class-aware color — pink for the true root (any octave) when
-  // colorRootNoteEnabled, amber otherwise. Keyed on the chord/scale's actual
-  // root pitch class, not voicing position — a positional "first/bass note"
-  // scheme broke under inversion (the true root can land anywhere in the
-  // voicing once inverted, so it needs pitch-class matching to stay correct). ──
-  const noteColor = useCallback((midi: number, rootPc: number | null): string => {
-    if (colorRootNoteEnabled && rootPc !== null && ((midi % 12) + 12) % 12 === rootPc) return 'var(--hand-rh)'
-    return 'var(--text-amber)'
+  // ── Light keys on the keyboard, remembering which root is accented — the
+  // shared colour rule reads the "Accent root note" toggle live, so a run
+  // already playing picks up a flip on its next chord. ─────────────────────
+  const lightKeys = useCallback((notes: number[], rootPc: number | null) => {
+    accentRootRef.current = rootPc
+    setExplorerKeys(new Set(notes), explorerKeyColors(notes, rootPc, useStore.getState().colorRootNoteEnabled))
+  }, [setExplorerKeys])
+
+  // ── "Accent root note" flipped — recolor whatever is lit right now ────────
+  useEffect(() => {
+    if (!scaleExplorerOpen) return
+    const lit = Array.from(useStore.getState().explorerKeys)
+    if (lit.length > 0) lightKeys(lit, accentRootRef.current)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colorRootNoteEnabled])
 
   // ── Play scale notes ascending and light keys when root/scale changes ──────
+  // Starts on the tonic in the octave the Octave control picks (C3–B3 by
+  // default), same register the chords start in.
   useEffect(() => {
     if (!scaleExplorerOpen || selectedRoot === null) return
     clearScalePlayTimers()
     const playNote = (window as any).__orfeoPlayNote
-    const { min, max } = RANGES[61]
-    const noteMidis: number[] = []
-    for (const interval of scale.intervals) {
-      let m = selectedRoot + 60 + interval
-      while (m < min) m += 12
-      while (m > max) m -= 12
-      if (m >= min && m <= max) noteMidis.push(m)
-    }
-    // Append octave root
-    if (noteMidis.length > 0) {
-      const octaveUp = noteMidis[0] + 12
-      const octaveDown = noteMidis[0] - 12
-      if (octaveUp <= max) noteMidis.push(octaveUp)
-      else if (octaveDown >= min) noteMidis.push(octaveDown)
-    }
-    const keys = new Set(noteMidis)
-    const colors = new Map<number, string>(noteMidis.map(m => [m, noteColor(m, selectedRoot)] as const))
-    setExplorerKeys(keys, colors)
+    const rootMidi = lowRoot + selectedRoot
+    const noteMidis = [...scale.intervals.map(iv => rootMidi + iv), rootMidi + 12]
+      .filter(m => m >= EXPLORER_RANGE.min && m <= EXPLORER_RANGE.max)
+    lightKeys(noteMidis, selectedRoot)
     setSelectedDegree(null)
     setOctaveTileSelected(false)
 
@@ -517,184 +552,138 @@ export default function ScaleExplorer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoot, selectedScaleIdx, scaleExplorerOpen, playTrigger])
 
-  // ── Play a diatonic chord tile and light its keys ─────────────────────────
-  // `voicing` overrides the tile's own root-position notes — passed by the
-  // "Chords in the Scale" sequence so it can voice-lead the run. When given,
-  // the chord is rolled bottom-up (like the progression player) rather than
-  // struck as a flat block.
-  const playDegree = useCallback((chord: DiatonicChord, voicing?: number[]) => {
-    const notes = voicing && voicing.length > 0 ? [...voicing].sort((a, b) => a - b) : chord.midiNotes
-    setOctaveTileSelected(false)
-    setSelectedDegree(chord.degree)
-    // ── A plain tile / 'roots' run colors the SCALE's root (only chords that
-    // contain it show pink); a voice-led run is inversions territory — the
-    // chord's own root stays accented instead. ────────────────────────────
-    const rootPcForColor = voicing ? chord.rootPC : selectedRoot
-    const keys = new Set(notes)
-    const colors = new Map(notes.map(m => [m, noteColor(m, rootPcForColor)] as const))
-    setExplorerKeys(keys, colors)
-    // ── Store chord identity in Zustand so Keyboard.tsx can display it ────
-    setExplorerChordDisplay({ name: chord.chordName, invCount: 0, noteCount: notes.length })
+  // ── Tile name as voiced — slash bass when the voicing doesn't have the
+  // chord's root at the bottom. ─────────────────────────────────────────────
+  const voicedName = useCallback((chord: DiatonicChord, voicing: number[] | undefined) => {
+    if (!voicing || voicing.length === 0) return chord.chordName
+    const bassPc = Math.min(...voicing) % 12
+    return bassPc === chord.harmonicRootPC
+      ? chord.baseName
+      : `${chord.baseName}/${getNoteName(bassPc, displayNaming, accidentals)}`
+  }, [displayNaming, accidentals])
+
+  // ── Play one tile — index 0..n-1 are the scale's chords, n is the octave
+  // tile. Clicked tiles ring like a held pedal; the chords-in-the-scale run
+  // rolls each chord and lets it ring into the next. The chord's own root is
+  // the accented note, in every voicing mode. ───────────────────────────────
+  const playTile = useCallback((idx: number, how: 'click' | 'run') => {
+    const voicing = tileVoicingsRef.current[idx]
+    const isOctave = idx === diatonicChords.length
+    const chord = diatonicChords[isOctave ? 0 : idx]
+    if (!voicing || !chord) return
+    const notes = [...voicing].sort((a, b) => a - b)
+    setSelectedDegree(isOctave ? null : idx)
+    setOctaveTileSelected(isOctave)
+    lightKeys(notes, chord.harmonicRootPC)
+    setExplorerChordDisplay({
+      name: chord.baseName,
+      invCount: inversionOf(chord.harmonicRootPC, chord.tonePcs.map(pc => (pc - chord.harmonicRootPC + 12) % 12), notes),
+      noteCount: notes.length,
+    })
     setInfoRowChord({
       progName: '',
-      labels: [chord.roman],
+      labels: [isOctave ? chord.roman + '⁸' : chord.roman],
       notes: notes.map(m => getNoteName(m, displayNaming, accidentals)),
       step: 0,
     })
-    if (voicing) {
-      const playNote = (window as any).__orfeoPlayNote
-      if (playNote) {
-        for (const h of humanizeChord(notes)) {
-          const t = setTimeout(() => playNote(h.midi, h.vel, 900, undefined, false), h.delayMs)
-          chordSeqTimersRef.current.push(t)
-        }
-      }
-    } else {
-      ringNotes(notes)
-    }
-  }, [setExplorerKeys, displayNaming, accidentals, noteColor, selectedRoot, ringNotes])
+    if (how === 'click') ringChord(notes)
+    else strikeStep(notes, Math.round(SPEED_MS[speedRef.current] * 1.12), () => chordSeqRunningRef.current)
+  }, [diatonicChords, lightKeys, setExplorerChordDisplay, displayNaming, accidentals])
+  const playTileRef = useRef(playTile)
+  playTileRef.current = playTile
 
-  // ── Play the tonic chord one octave higher (8th tile) ────────────────────
-  // Transposes every MIDI note in diatonicChords[0] up by 12. Clears regular
-  // degree selection so only the octave tile appears highlighted.
-  const playOctaveDegree = useCallback(() => {
-    if (!diatonicChords[0]) return
-    const tonic = diatonicChords[0]
-    const octaveMidi = tonic.midiNotes.map(n => n + 12)
-    setSelectedDegree(null)
-    setOctaveTileSelected(true)
-    // ── Scale-root-relative, same as playDegree above (the octave tile is the
-    // tonic, so it always contains the scale root — but keyed the same way
-    // for consistency). ─────────────────────────────────────────────────────
-    const keys = new Set(octaveMidi)
-    const colors = new Map(octaveMidi.map(m => [m, noteColor(m, selectedRoot)] as const))
-    setExplorerKeys(keys, colors)
-    // ── Store chord identity in Zustand so Keyboard.tsx can display it ────
-    setExplorerChordDisplay({ name: tonic.chordName, invCount: 0, noteCount: octaveMidi.length })
-    setInfoRowChord({
-      progName: '',
-      labels: [tonic.roman + '⁸'],
-      notes: octaveMidi.map(m => getNoteName(m, displayNaming, accidentals)),
-      step: 0,
-    })
-    ringNotes(octaveMidi)
-  }, [diatonicChords, setExplorerKeys, displayNaming, accidentals, noteColor, selectedRoot, ringNotes])
+  // ── Voicing mode switched — re-light the selected tile where it now sits
+  // (silently; the next click or run plays it there). ──────────────────────
+  const prevVoicingRef = useRef(progressionVoicing)
+  useEffect(() => {
+    if (prevVoicingRef.current === progressionVoicing) return
+    prevVoicingRef.current = progressionVoicing
+    if (progRunningRef.current || chordSeqRunningRef.current) return
+    const idx = octaveTileSelected ? diatonicChords.length : selectedDegree
+    const voicing = idx === null ? undefined : tileVoicings[idx]
+    const chord = idx === null ? undefined : diatonicChords[idx === diatonicChords.length ? 0 : idx]
+    if (!voicing || !chord) return
+    lightKeys(voicing, chord.harmonicRootPC)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressionVoicing])
 
   // ── Auto-play all chords in the scale, one after another — the "Chords in
-  // the Scale" row's play button. Runs every diatonic tile (5 for pentatonic,
-  // 7 otherwise), voiced through the shared engine under `progressionVoicing`,
-  // each ringing for 700ms before the next starts. 'roots' finishes on the
-  // octave tonic (the 8th tile); the voice-led modes resolve home in register
-  // instead. Toggles: a second click (or spacebar) stops it. ──────────────
+  // the Scale" play button. Plays every tile, octave tile last, at the
+  // progression speed; voicing, speed and the root accent are all read live,
+  // so changing any of them mid-run takes effect on the next chord. A second
+  // click (or spacebar) stops it. ────────────────────────────────────────────
   const playChordsInSequence = useCallback(() => {
     if (chordSeqPlaying) { stopChordSequence(); return }
     if (diatonicChords.length === 0) return
     stopChordSequence()
+    stopProgression()
+    chordSeqRunningRef.current = true
     setChordSeqPlaying(true)
-    const STEP_MS = 700
-    const isRoots = progressionVoicing === 'roots'
-    const chordSpec = diatonicChords.map(c => ({ rootPc: c.rootPC, semis: semisFromMidi(c.midiNotes) }))
-    // Voice-led modes get an extra tonic step so the run still lands home.
-    const specForEngine = isRoots ? chordSpec : [...chordSpec, chordSpec[0]]
-    const voicings = voiceProgression(specForEngine, progressionVoicing, RANGES[61])
-
-    diatonicChords.forEach((chord, i) => {
-      const t = setTimeout(() => playDegree(chord, voicings[i]), i * STEP_MS)
+    const step = (i: number) => {
+      if (!chordSeqRunningRef.current) return
+      const last = tileVoicingsRef.current.length - 1
+      playTileRef.current(i, 'run')
+      const t = setTimeout(
+        () => i < last ? step(i + 1) : stopChordSequence(),
+        SPEED_MS[speedRef.current],
+      )
       chordSeqTimersRef.current.push(t)
-    })
-    const tLast = setTimeout(
-      () => isRoots ? playOctaveDegree() : playDegree(diatonicChords[0], voicings[diatonicChords.length]),
-      diatonicChords.length * STEP_MS,
-    )
-    chordSeqTimersRef.current.push(tLast)
-    const tEnd = setTimeout(() => setChordSeqPlaying(false), (diatonicChords.length + 1) * STEP_MS)
-    chordSeqTimersRef.current.push(tEnd)
-  }, [chordSeqPlaying, diatonicChords, progressionVoicing, stopChordSequence, playDegree, playOctaveDegree])
+    }
+    step(0)
+  }, [chordSeqPlaying, diatonicChords.length, stopChordSequence, stopProgression])
 
-  // ── Base MIDI notes for the currently selected tile (inversion source) ─────
-  // Octave tile takes precedence: returns tonic notes +12 when that tile is
-  // active so the inversion buttons remain enabled and operate at the right pitch.
-  const currentBaseMidi = useMemo(() => {
-    if (octaveTileSelected && diatonicChords[0]) return diatonicChords[0].midiNotes.map(n => n + 12)
-    if (selectedDegree === null || !diatonicChords[selectedDegree]) return []
-    return diatonicChords[selectedDegree].midiNotes
-  }, [selectedDegree, octaveTileSelected, diatonicChords])
-
-  // ── Root pitch class of the currently selected tile — stays fixed through
-  // inversion (unlike voicing position), so it's what noteColor keys off. ────
-  const currentRootPC = useMemo(() => {
-    if (octaveTileSelected && diatonicChords[0]) return diatonicChords[0].rootPC
-    if (selectedDegree === null || !diatonicChords[selectedDegree]) return null
-    return diatonicChords[selectedDegree].rootPC
-  }, [selectedDegree, octaveTileSelected, diatonicChords])
+  const hasTileSelected = selectedDegree !== null || octaveTileSelected
 
   // ── Rotate the live chord voicing down (prev) or up (next) ──────────────
-  // Mirrors ChordExplorer's handleInversion: reads explorerKeys from the store
+  // Same as ChordExplorer's handleInversion: reads the lit keys from the store
   // each time so rotations accumulate across octaves instead of wrapping at
-  // chord length. Root pitch class stays pink (if enabled) regardless of
-  // which voicing position it lands in after rotating. ───────────────────
-  const handlePrevInversion = useCallback(() => {
+  // chord length. The accented root stays pink wherever it lands. ─────────
+  const stepInversion = useCallback((dir: 'prev' | 'next') => {
     const state = useStore.getState()
     if (state.explorerKeys.size === 0) return
-    const notes = prevInversionSet(state.explorerKeys)
+    const notes = dir === 'next' ? nextInversionSet(state.explorerKeys) : prevInversionSet(state.explorerKeys)
     const sorted = Array.from(notes).sort((a, b) => a - b)
-    const colors = new Map(sorted.map(m => [m, noteColor(m, currentRootPC)] as const))
-    setExplorerKeys(notes, colors)
+    lightKeys(sorted, accentRootRef.current)
     const cd = state.explorerChordDisplay
-    if (cd) state.setExplorerChordDisplay({ ...cd, invCount: cd.invCount - 1 })
-    ringNotes(sorted)
-  }, [setExplorerKeys, noteColor, currentRootPC, ringNotes])
-
-  // ── Step to next inversion ────────────────────────────────────────────────
-  const handleNextInversion = useCallback(() => {
-    const state = useStore.getState()
-    if (state.explorerKeys.size === 0) return
-    const notes = nextInversionSet(state.explorerKeys)
-    const sorted = Array.from(notes).sort((a, b) => a - b)
-    const colors = new Map(sorted.map(m => [m, noteColor(m, currentRootPC)] as const))
-    setExplorerKeys(notes, colors)
-    const cd = state.explorerChordDisplay
-    if (cd) state.setExplorerChordDisplay({ ...cd, invCount: cd.invCount + 1 })
-    ringNotes(sorted)
-  }, [setExplorerKeys, noteColor, currentRootPC, ringNotes])
+    if (cd) state.setExplorerChordDisplay({ ...cd, invCount: cd.invCount + (dir === 'next' ? 1 : -1) })
+    ringChord(sorted)
+  }, [lightKeys])
 
   // ── Play one progression step and schedule the next ──────────────────────
-  // The shared voice-leading engine (utils/voiceLeading.ts) picks each step's
-  // voicing from the one that just played, under the `progressionVoicing`
-  // mode (read live so a mode switch mid-run takes on the next chord) — the
-  // tracking mode never dictates register any more.
+  // Same rules as the Chord Explorer (utils/explorerShared.ts): the step's
+  // chord is exactly what its numeral says in this key — I–bVII–IV plays
+  // C–B♭–F in C — and the shared voice-leading engine picks its voicing from
+  // the one that just played, under the live Voicing mode. A step whose chord
+  // is one of the tiles lights that tile.
   const playProgStepAt = useCallback((
     step: number,
     progIndex: number,
     prevMidi: number[] | null,
   ) => {
     if (!progRunningRef.current) return
-    if (diatonicChords.length === 0) return
-    const prog = PROGRESSIONS[progIndex]
+    if (selectedRoot === null) return
+    const prog = ALL_PROGRESSIONS[progIndex]
     if (!prog) return
-    const labels = prog.labels
-    const label = labels[step % labels.length]
-    const degreeIdx = ROMAN_TO_DEGREE[label] ?? 0
-    const clampedDeg = degreeIdx % diatonicChords.length
-    const chord = diatonicChords[clampedDeg]
-    if (!chord) return
+    const resolved = resolveProgressionStep(prog, step, selectedRoot)
+    if (!resolved) return
+    const semis = intervalsToSemis(resolved.info.intervals)
 
     const voicingMode = useStore.getState().progressionVoicing
-    const notes = nextVoicing(
-      prevMidi, chord.rootPC, semisFromMidi(chord.midiNotes), voicingMode, RANGES[61],
-    )
+    const notes = nextVoicing(prevMidi, resolved.rootPc, semis, voicingMode, EXPLORER_RANGE, lowRootRef.current)
 
-    // ── 'roots' keeps the tile look (scale-root-relative pink); once the
-    // engine starts inverting, the chord's own root stays accented. ────────
-    const rootPcForColor = voicingMode === 'roots' ? selectedRoot : chord.rootPC
-    const keys = new Set(notes)
-    const colors = new Map(notes.map(m => [m, noteColor(m, rootPcForColor)] as const))
-    setExplorerKeys(keys, colors)
+    lightKeys(notes, resolved.rootPc)
+    setExplorerChordDisplay({
+      name: getNoteName(resolved.rootPc, displayNaming, accidentals) + formatChordSuffix(resolved.info.suffix, chordNamingStyle),
+      invCount: inversionOf(resolved.rootPc, semis, notes),
+      noteCount: notes.length,
+    })
     setProgStep(step)
-    setSelectedDegree(clampedDeg)
+    const pcs = new Set(semis.map(st => (resolved.rootPc + st) % 12))
+    const tileIdx = diatonicChords.findIndex(c => c.tonePcs.length === pcs.size && c.tonePcs.every(pc => pcs.has(pc)))
+    setSelectedDegree(tileIdx >= 0 ? tileIdx : null)
     // ── Octave tile has its own bool, independent of selectedDegree — must be
     // cleared explicitly or it stays stuck "selected" (stale highlight) once a
-    // progression starts stepping through the regular 0-6 degree tiles. ──────
+    // progression starts stepping through the regular degree tiles. ─────────
     setOctaveTileSelected(false)
     setInfoRowChord({
       progName: prog.name,
@@ -703,30 +692,23 @@ export default function ScaleExplorer() {
       step,
     })
 
-    const currentSpeed = speedRef.current
-    const playNote = (window as any).__orfeoPlayNote
-    if (playNote) {
-      for (const h of humanizeChord(notes)) {
-        setTimeout(() => {
-          if (progRunningRef.current) playNote(h.midi, h.vel, Math.round(SPEED_MS[speedRef.current] * 1.12), undefined, false)
-        }, h.delayMs)
-      }
-    }
+    strikeStep(notes, Math.round(SPEED_MS[speedRef.current] * 1.12), () => progRunningRef.current)
 
-    const nextStep = (step + 1) % labels.length
+    const nextStep = (step + 1) % prog.labels.length
     progTimerRef.current = setTimeout(() => {
       playProgStepAt(nextStep, progIndex, notes)
     }, SPEED_MS[speedRef.current])
-  }, [diatonicChords, setExplorerKeys, displayNaming, accidentals, noteColor, selectedRoot])
+  }, [diatonicChords, lightKeys, setExplorerChordDisplay, displayNaming, accidentals, chordNamingStyle, selectedRoot])
 
   // ── Start progression from step 0 ────────────────────────────────────────
   const startProgression = useCallback(() => {
     if (selectedProg === null || diatonicChords.length === 0) return
     stopProgression()
+    stopChordSequence()
     progRunningRef.current = true
     setProgPlaying(true)
     playProgStepAt(0, selectedProg, null)
-  }, [selectedProg, diatonicChords.length, stopProgression, playProgStepAt])
+  }, [selectedProg, diatonicChords.length, stopProgression, stopChordSequence, playProgStepAt])
 
   // ── Stop progression + chords-in-scale sequence when root/scale changes ───
   useEffect(() => {
@@ -912,7 +894,7 @@ export default function ScaleExplorer() {
       {/* CoF section — scale buttons | Circle of Fifths SVG + note names, right-aligned */}
       <div style={{
         flexShrink: 0, display: 'flex', alignItems: 'center',
-        padding: '16px 50px 46px 12px',
+        padding: '16px 50px 66px 12px',
         background: 'var(--bg-modal-header)', borderBottom: '1px solid var(--border)',
         gap: 'var(--space-2)', overflow: 'visible', position: 'relative',
       }}>
@@ -926,8 +908,8 @@ export default function ScaleExplorer() {
           Click a key on the circle to explore its scale and diatonic chords. Select a progression and click play to hear the chords in the scale. Try chord inversions and variations!
         </div>
         {/* Scale type buttons — centred at CoF middle */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 116, flexShrink: 0, alignSelf: 'center', marginTop: 55 }}>
-          <span style={{ ...ROW_LABEL, fontSize: 12, marginBottom: 3 }}>Scale</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 116, flexShrink: 0, alignSelf: 'center', marginTop: 105 }}>
+          <span style={{ ...ROW_LABEL, fontSize: 12, marginBottom: 3, color: 'var(--text-amber)' }}>Scale</span>
           {SCALES.map((s, i) => {
             const sel = selectedScaleIdx === i
             return (
@@ -1020,13 +1002,8 @@ export default function ScaleExplorer() {
                 </g>
               )
             })}
-            {/* Centre label */}
-            <text x={CX} y={CY - 8} textAnchor="middle" dominantBaseline="middle"
-              fontSize={13} fontFamily="var(--font-ui)" fontWeight={400} fill="var(--text-amber)"
-              style={{ userSelect: 'none', pointerEvents: 'none' }}>Circle</text>
-            <text x={CX} y={CY + 8} textAnchor="middle" dominantBaseline="middle"
-              fontSize={13} fontFamily="var(--font-ui)" fontWeight={400} fill="var(--text-amber)"
-              style={{ userSelect: 'none', pointerEvents: 'none' }}>of Fifths</text>
+            {/* Centre label — hand-lettered "Circle of Fifths" title */}
+            <CofTitleMark cx={CX} cy={CY} width={80} fill="var(--text-amber)" />
           </svg>
           {/* Note-names row — centred under the CoF (same column, same width),
               pushed down below it. Trailing octave-repeat note completes the
@@ -1055,36 +1032,48 @@ export default function ScaleExplorer() {
           )}
           </div>
         </div>
-        {/* Chords in the Scale — two stacked rows: label + play icon on top,
-            dimmed instruction text below. Absolute at bottom of CoF section. ── */}
-        <div style={{ position: 'absolute', bottom: 6, left: 12, right: 12, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ ...ROW_LABEL, fontSize: 11 }}>Chords in the Scale</span>
-            <Tooltip title="Play Chords" description={chordSeqPlaying ? 'Stop playback.' : 'Play all chords in the scale one after another.'}>
-              <button
-                onClick={playChordsInSequence}
-                disabled={selectedRoot === null}
-                style={{
-                  background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center',
-                  cursor: selectedRoot === null ? 'default' : 'pointer',
-                  color: selectedRoot === null ? 'var(--state-disabled)' : 'var(--text-amber)',
-                }}
-                onMouseEnter={e => { if (selectedRoot !== null) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
-                onMouseLeave={e => { e.currentTarget.style.color = selectedRoot === null ? 'var(--state-disabled)' : 'var(--text-amber)' }}
-              >
-                {chordSeqPlaying
-                  ? <Square size={12} fill="currentColor" strokeWidth={0} />
-                  : <Play size={13} fill="currentColor" strokeWidth={0} />}
-              </button>
-            </Tooltip>
-          </div>
-          {/* ── "Click tiles..." hint left, Color Root Note toggle right — same row ── */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-dimmest)', opacity: 0.75, pointerEvents: 'none' }}>
-              Click tiles to hear chords or play them in sequence
+        {/* Chords in the Scale row — three equal columns (see
+            .claude/rules/css-layout.md): label + play + hint | Starmap
+            placeholder | Accent root note. Absolute at bottom of CoF section. ── */}
+        <div style={{
+          position: 'absolute', bottom: 6, left: 12, right: 12,
+          display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', alignItems: 'center',
+        }}>
+          {/* Left — label + play icon on top, hint below ─────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifySelf: 'start', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ ...ROW_LABEL, fontSize: 11 }}>Chords in the Scale</span>
+              <Tooltip title="Play Chords" description={chordSeqPlaying ? 'Stop playback.' : 'Play all chords in the scale one after another.'}>
+                <button
+                  onClick={playChordsInSequence}
+                  disabled={selectedRoot === null}
+                  style={{
+                    background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center',
+                    cursor: selectedRoot === null ? 'default' : 'pointer',
+                    color: selectedRoot === null ? 'var(--state-disabled)' : 'var(--text-amber)',
+                  }}
+                  onMouseEnter={e => { if (selectedRoot !== null) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = selectedRoot === null ? 'var(--state-disabled)' : 'var(--text-amber)' }}
+                >
+                  {chordSeqPlaying
+                    ? <Square size={12} fill="currentColor" strokeWidth={0} />
+                    : <Play size={13} fill="currentColor" strokeWidth={0} />}
+                </button>
+              </Tooltip>
+            </div>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-dimmest)', opacity: 0.75, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+              {t`Click tiles to hear chords`}
             </span>
-            {/* ── On by default: the chord/scale's true root pitch class (any
-                octave) highlights pink instead of blending into the uniform amber. ── */}
+          </div>
+          {/* Centre — Starmap switch placeholder (not wired up yet) ───────── */}
+          <div style={{ justifySelf: 'center', display: 'flex', alignItems: 'center', gap: 6, opacity: 0.75, cursor: 'default', userSelect: 'none' }}>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-dimmest)' }}>{t`Open Starmap`}</span>
+            <span style={{ display: 'flex', color: 'var(--text-inactive)' }}><ToggleLeft size={16} strokeWidth={1.5} /></span>
+          </div>
+          {/* Right — Accent root note toggle. On by default: the chord/scale's
+              true root pitch class (any octave) highlights pink instead of
+              blending into the uniform amber. ───────────────────────────── */}
+          <div style={{ justifySelf: 'end' }}>
             <Tooltip title="Accent Root Note" description="Highlights the scale or chord's true root pitch class in pink, in any octave, instead of blending it.">
               <button
                 onClick={() => setColorRootNoteEnabled(!colorRootNoteEnabled)}
@@ -1100,7 +1089,7 @@ export default function ScaleExplorer() {
         </div>
       </div>
 
-      {/* Diatonic chord tiles — 7 tiles in a horizontal row */}
+      {/* Diatonic chord tiles — one per chord, plus the octave tile */}
       <div style={{ flexShrink: 0, padding: 'var(--space-1) var(--space-3)', minHeight: 'var(--row-height)' }}>
         {selectedRoot === null ? (
           <div style={{ minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1108,77 +1097,44 @@ export default function ScaleExplorer() {
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-            {diatonicChords.map(chord => {
-              const sel = selectedDegree === chord.degree
+            {[...diatonicChords, ...(diatonicChords[0] ? [diatonicChords[0]] : [])].map((chord, idx) => {
+              const isOctave = idx === diatonicChords.length
+              const sel = isOctave ? octaveTileSelected : selectedDegree === idx
+              const voicing = tileVoicings[idx]
+              const notes = voicing ? [...voicing].sort((a, b) => a - b) : chord.midiNotes
               return (
                 // Chord tile: chord name left, notes + roman stacked right-aligned
                 <button
-                  key={chord.degree}
-                  onMouseDown={() => { stopChordSequence(); playDegree(chord) }}
+                  key={isOctave ? 'octave' : chord.degree}
+                  onMouseDown={() => { stopChordSequence(); playTile(idx, 'click') }}
                   style={{
-                    flex: 1, background: sel ? 'var(--state-selected-blue-bg)' : 'var(--bg-tile)',
-                    border: `1px solid ${sel ? 'var(--accent-chord-note)' : 'var(--state-hover-bg)'}`,
+                    flex: 1, minWidth: 0, background: sel ? 'var(--accent-amber-medium)' : 'var(--bg-tile)',
+                    border: `1px solid ${sel ? 'var(--text-amber)' : 'var(--state-hover-bg)'}`,
                     borderRadius: 6,
                     paddingTop: 'var(--space-2)', paddingBottom: 'var(--space-2)', paddingLeft: 6, paddingRight: 6,
                     cursor: 'pointer', textAlign: 'left',
                     display: 'flex', flexDirection: 'row',
                     justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-1)',
                   }}
-                  onMouseEnter={e => { if (!sel) e.currentTarget.style.borderColor = 'var(--state-hover-border-blue)' }}
+                  onMouseEnter={e => { if (!sel) e.currentTarget.style.borderColor = 'var(--state-hover-border)' }}
                   onMouseLeave={e => { if (!sel) e.currentTarget.style.borderColor = 'var(--state-hover-bg)' }}
                 >
-                  {/* Left: chord name */}
-                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 700, color: 'var(--text-key-label)', lineHeight: 1, flexShrink: 0 }}>
-                    {chord.chordName}
+                  {/* Left: chord name as voiced */}
+                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 700, color: sel ? 'var(--text-amber)' : 'var(--text-key-label)', lineHeight: 1, flexShrink: 0 }}>
+                    {voicedName(chord, voicing)}
                   </span>
                   {/* Right: note names + roman numeral stacked, right-aligned */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-end' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', lineHeight: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      {chord.midiNotes.map(m => getNoteName(m, displayNaming, accidentals)).join(' ')}
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', lineHeight: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', maxWidth: '100%' }}>
+                      {notes.map(m => getNoteName(m, displayNaming, accidentals)).join(' ')}
                     </span>
                     <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--accent-amber-bold)', lineHeight: 1, textAlign: 'right' }}>
-                      {chord.roman}
+                      {chord.roman}{isOctave ? '⁸' : ''}
                     </span>
                   </div>
                 </button>
               )
             })}
-            {/* ── 8th tile: tonic chord one octave higher — completes the run ── */}
-            {diatonicChords[0] && (() => {
-              const tonic = diatonicChords[0]
-              const sel = octaveTileSelected
-              const octaveMidi = tonic.midiNotes.map(n => n + 12)
-              return (
-                <button
-                  onMouseDown={() => { stopChordSequence(); playOctaveDegree() }}
-                  style={{
-                    flex: 1, background: sel ? 'var(--state-selected-blue-bg)' : 'var(--bg-tile)',
-                    border: `1px solid ${sel ? 'var(--accent-chord-note)' : 'var(--state-hover-bg)'}`,
-                    borderRadius: 6,
-                    paddingTop: 'var(--space-2)', paddingBottom: 'var(--space-2)', paddingLeft: 6, paddingRight: 6,
-                    cursor: 'pointer', textAlign: 'left',
-                    display: 'flex', flexDirection: 'row',
-                    justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-1)',
-                  }}
-                  onMouseEnter={e => { if (!sel) e.currentTarget.style.borderColor = 'var(--state-hover-border-blue)' }}
-                  onMouseLeave={e => { if (!sel) e.currentTarget.style.borderColor = 'var(--state-hover-bg)' }}
-                >
-                  {/* Left: chord name — same as tonic */}
-                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 700, color: 'var(--text-key-label)', lineHeight: 1, flexShrink: 0 }}>
-                    {tonic.chordName}
-                  </span>
-                  {/* Right: octave note names + roman numeral with ⁸ superscript */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-end' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', lineHeight: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      {octaveMidi.map(m => getNoteName(m, displayNaming, accidentals)).join(' ')}
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--accent-amber-bold)', lineHeight: 1, textAlign: 'right' }}>
-                      {tonic.roman}⁸
-                    </span>
-                  </div>
-                </button>
-              )
-            })()}
           </div>
         )}
       </div>
@@ -1238,8 +1194,8 @@ export default function ScaleExplorer() {
         )}
       </div>
 
-      {/* Progressions + voicing row — real 3-track grid so the centred PLAY
-          button stays put no matter how wide the pattern name gets (see
+      {/* Progressions row — real 3-track grid so the centred PLAY/speed group
+          stays put no matter how wide the pattern name gets (see
           .claude/rules/css-layout.md). */}
       <div style={{
         ...ROW, minHeight: 'var(--row-height)', borderTop: '1px solid var(--border)',
@@ -1262,13 +1218,13 @@ export default function ScaleExplorer() {
               background: 'transparent',
               color: selectedProg !== null ? 'var(--text-amber)' : 'var(--text-inactive)',
               fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', display: 'block',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
             }}
             onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
             onMouseLeave={e => { e.currentTarget.style.color = selectedProg !== null ? 'var(--text-amber)' : 'var(--text-inactive)' }}
           >
-            {selectedProg !== null ? PROGRESSIONS[selectedProg].name : 'Select'} ▾
+            {selectedProg !== null ? ALL_PROGRESSIONS[selectedProg].name : 'Select'} ▾
           </button>
           {selectedProg !== null && (
             <button onClick={() => { setSelectedProg(null); stopProgression() }}
@@ -1279,44 +1235,108 @@ export default function ScaleExplorer() {
           )}
         </div>
 
-        {/* Centre column: PLAY/STOP button + SpeedControl ─────────────────── */}
-        <div style={{
-          justifySelf: 'center',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          {/* ── Progression play/stop button — green ready, red stop ─────────── */}
-          <Tooltip
-            oneLine
-            title={selectedProg === null ? 'Pick a pattern above first.' : progPlaying ? 'Stops the chord progression.' : 'Plays the selected chord progression in a loop.'}
+        {/* Centre column: PLAY/STOP (only once a progression is picked — its
+            space stays reserved so the speed chevrons never jump) + speed,
+            which also sets the pace of the chords-in-the-scale run. ──────── */}
+        <div style={{ justifySelf: 'center', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={() => { if (progPlaying) stopProgression(); else startProgression() }}
+            disabled={selectedProg === null || diatonicChords.length === 0}
+            aria-hidden={selectedProg === null}
+            tabIndex={selectedProg === null ? -1 : 0}
+            style={{
+              visibility: selectedProg === null ? 'hidden' : 'visible',
+              display: 'flex', alignItems: 'center', gap: 4,
+              fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+              padding: '3px 10px', borderRadius: 4, cursor: 'pointer',
+              background: 'none',
+              border: `1.5px solid ${progPlaying ? 'var(--status-error)' : 'var(--status-success)'}`,
+              boxShadow: progPlaying ? '0 0 6px var(--status-error)' : '0 0 6px var(--status-success)',
+              color: progPlaying ? 'var(--status-error)' : 'var(--status-success)',
+            }}
           >
-            <button
-              onClick={() => { if (progPlaying) stopProgression(); else startProgression() }}
-              disabled={selectedProg === null || diatonicChords.length === 0}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-                padding: '3px 10px', borderRadius: 4, cursor: 'pointer',
-                background: 'none',
-                border: `1.5px solid ${progPlaying ? 'var(--status-error)' : selectedProg !== null && diatonicChords.length > 0 ? 'var(--status-success)' : 'var(--text-inactive)'}`,
-                boxShadow: progPlaying ? '0 0 6px var(--status-error)' : selectedProg !== null && diatonicChords.length > 0 ? '0 0 6px var(--status-success)' : 'none',
-                color: progPlaying ? 'var(--status-error)' : selectedProg !== null && diatonicChords.length > 0 ? 'var(--status-success)' : 'var(--text-inactive)',
-              }}
-            >
-              {progPlaying ? <Square size={12} /> : <ChevronPlayIcon size={12} />}
-              {progPlaying ? 'STOP' : 'PLAY'}
-            </button>
-          </Tooltip>
-          {/* Speed selector SVG component — half the Play/Inversion chevron size */}
+            {progPlaying ? <Square size={12} /> : <ChevronPlayIcon size={12} />}
+            {progPlaying ? 'STOP' : 'PLAY'}
+          </button>
           <SpeedControl
             value={progSpeed}
             onChange={v => { setProgSpeed(v); speedRef.current = v }}
-            size={7}
+            size={11}
           />
         </div>
 
-        {/* Right column: VOICING label + mode icons (shared with Chord Explorer) */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, justifySelf: 'end', minWidth: 0 }}>
-          <span style={ROW_LABEL}>Voicing</span>
+        {/* Right column: inversion browser — Play icons + static grey label + reset */}
+        <div style={{ justifySelf: 'end', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Previous inversion — Play icon mirrored on vertical axis */}
+          <Tooltip oneLine title="Previous inversion">
+          <button onMouseDown={() => stepInversion('prev')} disabled={!hasTileSelected}
+            style={{ background: 'none', border: 'none', color: hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)', cursor: hasTileSelected ? 'pointer' : 'default', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+            onMouseEnter={e => { if (hasTileSelected) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)' }}
+          ><ChevronPlayIcon size={14} mirrored /></button>
+          </Tooltip>
+          {/* Static grey label — chord display is above the keyboard only */}
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--text-inactive)', letterSpacing: '0.12em', textTransform: 'uppercase', userSelect: 'none', whiteSpace: 'nowrap' }}>
+            Play  Inversion
+          </span>
+          {/* Next inversion — Play icon normal */}
+          <Tooltip oneLine title="Next inversion">
+          <button onMouseDown={() => stepInversion('next')} disabled={!hasTileSelected}
+            style={{ background: 'none', border: 'none', color: hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)', cursor: hasTileSelected ? 'pointer' : 'default', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+            onMouseEnter={e => { if (hasTileSelected) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = hasTileSelected ? 'var(--text-amber)' : 'var(--state-disabled)' }}
+          ><ChevronPlayIcon size={14} /></button>
+          </Tooltip>
+          {/* Reset button */}
+          <Tooltip oneLine title="Clear & Reset">
+            <button
+              onClick={() => {
+                setCofPos(null); setCofRing(null); setSelectedScaleIdx(0)
+                setSelectedDegree(null); setOctaveTileSelected(false)
+                stopProgression(); stopChordSequence(); setSelectedProg(null)
+                setProgSpeed('med'); speedRef.current = 'med'
+                setInfoRowChord(null); clearExplorerChordDisplay()
+                clearExplorerKeys(); clearLockedKeys(); useStore.getState().clearDisplayedChord()
+              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-inactive)', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-inactive)'}
+            ><RotateCcw size={13} /></button>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* Footer — SHOW AS + OCTAVE | VOICING | Chords Explorer switch, real
+          3-track grid so the voicing group sits on true centre. */}
+      <div style={{
+        ...ROW, minHeight: 'var(--row-height)',
+        borderTop: '1px solid var(--border)', borderBottom: 'none',
+        background: 'var(--bg-modal-header)', padding: '0 var(--space-3)',
+        display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+      }}>
+        {/* Left: accidentals toggle + octave control */}
+        <div style={{ justifySelf: 'start', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            <span style={{ ...ROW_LABEL, fontSize: 10 }}>Show As</span>
+            {(['flat', 'sharp'] as const).map(v => (
+              <button key={v} onClick={() => setAccidentals(v)}
+                style={{
+                  fontFamily: 'var(--font-ui)', fontSize: 'var(--text-lg)', background: 'none', border: 'none',
+                  color: accidentals === v ? 'var(--text-amber)' : 'var(--text-inactive)', cursor: 'pointer', padding: '0 3px',
+                }}
+                onMouseEnter={e => { if (accidentals !== v) e.currentTarget.style.color = 'var(--text-muted)' }}
+                onMouseLeave={e => { if (accidentals !== v) e.currentTarget.style.color = 'var(--text-inactive)' }}
+              >{v === 'flat' ? '♭' : '♯'}</button>
+            ))}
+          </div>
+          <ExplorerOctaveControl />
+        </div>
+
+        {/* Centre: VOICING label + mode icons (shared with Chord Explorer) —
+            sets how the tiles, the chords-in-the-scale run and progressions
+            are voiced. */}
+        <div style={{ justifySelf: 'center', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ ...ROW_LABEL, fontSize: 10 }}>Voicing</span>
           {PROGRESSION_VOICINGS.map(v => {
             const Icon = VOICING_ICON[v]
             const active = progressionVoicing === v
@@ -1332,109 +1352,59 @@ export default function ScaleExplorer() {
             )
           })}
         </div>
-      </div>
 
-      {/* Footer — SHOW AS + inversion browser + Chords Explorer switch */}
-      <div style={{
-        ...ROW, minHeight: 'var(--row-height)',
-        borderTop: '1px solid var(--border)', borderBottom: 'none',
-        background: 'var(--bg-modal-header)', padding: '0 var(--space-3)', position: 'relative',
-      }}>
-        {/* Accidentals toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-          <span style={{ ...ROW_LABEL, fontSize: 10 }}>Show As</span>
-          {(['flat', 'sharp'] as const).map(v => (
-            <button key={v} onClick={() => setAccidentals(v)}
-              style={{
-                fontFamily: 'var(--font-ui)', fontSize: 'var(--text-lg)', background: 'none', border: 'none',
-                color: accidentals === v ? 'var(--text-amber)' : 'var(--text-inactive)', cursor: 'pointer', padding: '0 3px',
-              }}
-              onMouseEnter={e => { if (accidentals !== v) e.currentTarget.style.color = 'var(--text-muted)' }}
-              onMouseLeave={e => { if (accidentals !== v) e.currentTarget.style.color = 'var(--text-inactive)' }}
-            >{v === 'flat' ? '♭' : '♯'}</button>
-          ))}
-        </div>
-
-        {/* Centre: inversion browser — Play icons + static grey label */}
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* Previous inversion — Play icon mirrored on vertical axis */}
-          <Tooltip oneLine title="Previous inversion">
-          <button onMouseDown={handlePrevInversion} disabled={!currentBaseMidi.length}
-            style={{ background: 'none', border: 'none', color: currentBaseMidi.length ? 'var(--text-amber)' : 'var(--state-disabled)', cursor: currentBaseMidi.length ? 'pointer' : 'default', padding: '0 2px', display: 'flex', alignItems: 'center' }}
-            onMouseEnter={e => { if (currentBaseMidi.length) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = currentBaseMidi.length ? 'var(--text-amber)' : 'var(--state-disabled)' }}
-          ><ChevronPlayIcon size={14} mirrored /></button>
-          </Tooltip>
-          {/* Static grey label — chord display is above the keyboard only */}
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--text-inactive)', letterSpacing: '0.12em', textTransform: 'uppercase', userSelect: 'none' }}>
-            Play  Inversion
-          </span>
-          {/* Next inversion — Play icon normal */}
-          <Tooltip oneLine title="Next inversion">
-          <button onMouseDown={handleNextInversion} disabled={!currentBaseMidi.length}
-            style={{ background: 'none', border: 'none', color: currentBaseMidi.length ? 'var(--text-amber)' : 'var(--state-disabled)', cursor: currentBaseMidi.length ? 'pointer' : 'default', padding: '0 2px', display: 'flex', alignItems: 'center' }}
-            onMouseEnter={e => { if (currentBaseMidi.length) e.currentTarget.style.color = 'var(--accent-amber-hover)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = currentBaseMidi.length ? 'var(--text-amber)' : 'var(--state-disabled)' }}
-          ><ChevronPlayIcon size={14} /></button>
-          </Tooltip>
-          {/* Reset button */}
-          <Tooltip oneLine title="Clear & Reset">
+        {/* Right: switch to Chord Explorer */}
+        <div style={{ justifySelf: 'end' }}>
+          <Tooltip oneLine title="Switch to Chords Explorer">
             <button
-              onClick={() => {
-                setCofPos(null); setCofRing(null); setSelectedScaleIdx(0)
-                setSelectedDegree(null); stopProgression(); setSelectedProg(null)
-                setProgSpeed('med'); speedRef.current = 'med'
-                setInfoRowChord(null); clearExplorerChordDisplay()
-                clearExplorerKeys(); clearLockedKeys(); useStore.getState().clearDisplayedChord()
-              }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-inactive)', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+              onClick={() => { setScaleExplorerOpen(false); setChordExplorerOpen(true) }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap', padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
               onMouseLeave={e => e.currentTarget.style.color = 'var(--text-inactive)'}
-            ><RotateCcw size={13} /></button>
+            >Chords Explorer <ArrowUpRight size={11} /></button>
           </Tooltip>
         </div>
-
-        {/* Switch to Chord Explorer */}
-        <Tooltip oneLine title="Switch to Chords Explorer">
-          <button
-            onClick={() => { setScaleExplorerOpen(false); setChordExplorerOpen(true) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap', padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-inactive)'}
-          >Chords Explorer <ArrowUpRight size={11} /></button>
-        </Tooltip>
       </div>
 
-      {/* Progression dropdown — portalled to body to avoid modal clipping */}
+      {/* Progression dropdown — portalled to body to avoid modal clipping.
+          Same list as the Chord Explorer: base progressions with their
+          rotations indented below. */}
       {progDropdownOpen && dropdownRect && createPortal(
         <div ref={progDropRef} style={{
           position: 'fixed', top: dropdownRect.top, left: dropdownRect.left,
           background: 'var(--bg-tile)', border: '1px solid var(--state-hover-bg)',
-          borderRadius: 6, zIndex: 1000, minWidth: 260, maxHeight: 260,
+          borderRadius: 6, zIndex: 1000, minWidth: 300, maxHeight: 340,
           overflowY: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.7)',
         }}>
-          {PROGRESSIONS.map((p, i) => (
-            <button key={p.name}
-              onClick={() => { setSelectedProg(i); setProgDropdownOpen(false); setDropdownRect(null) }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 16,
-                width: '100%', textAlign: 'left',
-                background: selectedProg === i ? 'var(--state-hover-bg)' : 'none',
-                border: 'none', padding: '5px 10px',
-                color: selectedProg === i ? 'var(--text-amber)' : 'var(--text-muted)',
-                fontFamily: 'var(--font-ui)', fontSize: 10, cursor: 'pointer',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--state-hover-bg)'; e.currentTarget.style.color = 'var(--text-amber)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = selectedProg === i ? 'var(--state-hover-bg)' : 'none'; e.currentTarget.style.color = selectedProg === i ? 'var(--text-amber)' : 'var(--text-muted)' }}
-            >
-              {/* Left column: progression name */}
-              <span style={{ minWidth: 90, flexShrink: 0, whiteSpace: 'nowrap' }}>{p.name}</span>
-              {/* Right column: roman numerals — dimmer, monospace */}
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, opacity: 0.65, whiteSpace: 'nowrap' }}>
-                {p.labels.join('  ')}
-              </span>
-            </button>
-          ))}
+          {ALL_PROGRESSIONS.map((p, i) => {
+            const isRot = !!p.isRotation
+            const baseColor = selectedProg === i ? 'var(--text-amber)' : (isRot ? 'var(--text-dim-control)' : 'var(--text-muted)')
+            const rotLabel = isRot ? p.name.replace(p.baseName! + ' ', '') : ''
+            return (
+              <button key={p.name}
+                onClick={() => { setSelectedProg(i); setProgDropdownOpen(false); setDropdownRect(null) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  width: '100%', textAlign: 'left',
+                  background: selectedProg === i ? 'var(--state-hover-bg)' : 'none',
+                  border: 'none', padding: isRot ? '3px 10px 3px 22px' : '5px 10px',
+                  color: baseColor,
+                  fontFamily: 'var(--font-ui)', fontSize: 10, cursor: 'pointer',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--state-hover-bg)'; e.currentTarget.style.color = 'var(--text-amber)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = selectedProg === i ? 'var(--state-hover-bg)' : 'none'; e.currentTarget.style.color = baseColor }}
+              >
+                {/* Left column: name — rotations show "↳ (vi start)" short form */}
+                <span style={{ minWidth: 110, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  {isRot ? `↳ ${rotLabel}` : p.name}
+                </span>
+                {/* Right column: roman numerals — dimmer, monospace */}
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, opacity: isRot ? 0.40 : 0.65, whiteSpace: 'nowrap' }}>
+                  {p.labels.join('  ')}
+                </span>
+              </button>
+            )
+          })}
         </div>,
         document.body
       )}

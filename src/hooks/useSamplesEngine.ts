@@ -732,6 +732,9 @@ export function setChannelVolume(ch: number, value: number): void {
   try { ;(_synth as any).controllerChange(ch, 7, val) } catch {}
 }
 
+// ── Pending note-offs for timed click-to-play notes, keyed ch*128+note ──────
+const _clickNoteOffs = new Map<number, ReturnType<typeof setTimeout>>()
+
 // ── Hook: self-gates on audioEngine !== 'samples' ────────────────────────────
 export function useSamplesEngine() {
   // ── Register global click-to-play and hardware note-on/off handlers ─────────
@@ -752,8 +755,14 @@ export function useSamplesEngine() {
         try { _synth.programChange(ch, track?.program ?? 0) } catch {}
         _samplesChanInit.add(ch)
       }
+      // ── Re-striking a note that's still ringing: release it first and drop
+      // its pending note-off, or the older strike's timer cuts the new one
+      // short (repeat clicks on a chord tile sounded clipped). ──────────────
+      const key = ch * 128 + midiNum
+      const pending = _clickNoteOffs.get(key)
+      if (pending) { clearTimeout(pending); _synth.noteOff(ch, midiNum) }
       _synth.noteOn(ch, midiNum, Math.round(vel * 127))
-      setTimeout(() => _synth?.noteOff(ch, midiNum), durMs)
+      _clickNoteOffs.set(key, setTimeout(() => { _clickNoteOffs.delete(key); _synth?.noteOff(ch, midiNum) }, durMs))
       if (visual) lightKey(midiNum, color ?? amberHex(), durMs + 100)
     }
     // ── Sustained note-on for hardware MIDI input ────────────────────────────

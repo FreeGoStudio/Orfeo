@@ -36,7 +36,7 @@ export const PROGRESSION_VOICING_LABEL: Record<ProgressionVoicing, string> = {
 
 export const PROGRESSION_VOICING_HINT: Record<ProgressionVoicing, string> = {
   roots:    'Every chord in root position, each one higher than the last',
-  climbing: 'First chord low, then inversions stepping upward — never resets to the octave',
+  climbing: 'First chord low, then inversions stepping upward — starts again low after about two octaves',
   smooth:   'Nearest voicing each step — the fewest notes move, staying under one hand',
 }
 
@@ -44,6 +44,17 @@ export interface VoicingRange { min: number; max: number }
 
 // Default low anchor for the first chord of a run — C3.
 const DEFAULT_LOW_ROOT = 48
+
+// ── Smooth mode's home position: the average pitch it gravitates to, above
+// the low anchor, and how far it may wander before being pulled back. ────
+const HOME_OFFSET = 9
+const HOME_SLACK = 4
+
+// ── How high Roots / Climbing may take the bass above the low anchor before
+// starting again from the bottom (semitones): Roots' root up to the B two
+// octaves up, Climbing's bass a little further since inversions sit higher. ─
+const ROOTS_CEILING = 23
+const CLIMB_CEILING = 28
 
 // ── tonal interval strings → semitone offsets from the root ──────────────────
 export function intervalsToSemis(intervals: string[]): number[] {
@@ -105,6 +116,16 @@ function candidates(rootPc: number, semis: number[], range: VoicingRange): numbe
   return out
 }
 
+// ── Root-position voicing with its root in the octave starting at lowRoot
+// (C3–B3 for the default anchor) — every key starts in the same register
+// instead of G and up snapping down to the octave below. Drops an octave at
+// a time only if the chord would run past the top of the range. ───────────
+export function rootPositionFrom(rootPc: number, semis: number[], range: VoicingRange, lowRoot: number = DEFAULT_LOW_ROOT): number[] {
+  let rootMidi = lowRoot + norm12(rootPc - lowRoot)
+  while (rootMidi + (semis[semis.length - 1] ?? 0) > range.max && rootMidi - 12 >= range.min) rootMidi -= 12
+  return stack(rootMidi, semis)
+}
+
 // ── Root-position voicing whose bottom note is nearest a target MIDI value ──
 function rootPositionNear(rootPc: number, semis: number[], range: VoicingRange, target: number): number[] {
   const pc = norm12(rootPc)
@@ -119,9 +140,30 @@ function rootPositionNear(rootPc: number, semis: number[], range: VoicingRange, 
   return best ?? stack(pc + 48, semis)
 }
 
-// ── Summed nearest-voice movement between two voicings (greedy match) ───────
+// ── Summed voice movement between two voicings ─────────────────────────────
+// Same-size chords up to 5 notes: the best one-to-one pairing of voices
+// (tries every pairing). Otherwise a greedy nearest-voice match.
+function permutations(n: number): number[][] {
+  if (n <= 1) return [[0]]
+  const out: number[][] = []
+  for (const p of permutations(n - 1)) {
+    for (let i = 0; i <= p.length; i++) out.push([...p.slice(0, i), n - 1, ...p.slice(i)])
+  }
+  return out
+}
+const PERMS = [1, 2, 3, 4, 5].map(permutations)
+
 function motion(a: number[], b: number[]): number {
   if (a.length === 0) return 0
+  if (a.length === b.length && a.length <= 5) {
+    let best = Infinity
+    for (const p of PERMS[a.length - 1]) {
+      let total = 0
+      for (let i = 0; i < a.length; i++) total += Math.abs(a[i] - b[p[i]])
+      if (total < best) best = total
+    }
+    return best
+  }
   const pool = [...b]
   let total = 0
   for (const n of a) {
@@ -157,22 +199,26 @@ export function nextVoicing(
   if (semis.length === 0) return []
   const pc = norm12(rootPc)
 
-  // First chord of the run: root position, low.
+  // First chord of the run: root position, root in the lowRoot octave.
   if (prev === null || prev.length === 0) {
-    return rootPositionNear(pc, semis, range, lowRoot)
+    return rootPositionFrom(pc, semis, range, lowRoot)
   }
 
   const prevLow = lowestNote(prev)
 
   if (strategy === 'roots') {
-    // First root-position placement at or above the previous bottom note;
-    // if none fits under the ceiling, wrap back down near the low anchor.
+    // First root-position placement at or above the previous bottom note,
+    // with its root at most two octaves above the low anchor (room for a
+    // whole scale run plus its octave in any key); past that, wrap back down
+    // to the anchor octave rather than climbing a looping progression off
+    // the top of the keyboard.
     for (let oct = 0; oct <= 8; oct++) {
       const v = stack(pc + (oct + 1) * 12, semis)
       if (v[0] < range.min || v[v.length - 1] > range.max) continue
+      if (v[0] > lowRoot + ROOTS_CEILING) break
       if (v[0] >= prevLow - 1) return v
     }
-    return rootPositionNear(pc, semis, range, lowRoot)
+    return rootPositionFrom(pc, semis, range, lowRoot)
   }
 
   const cands = candidates(pc, semis, range)
@@ -182,27 +228,37 @@ export function nextVoicing(
     // Each chord should sit a little ABOVE the last — a gentle staircase, not
     // a flat line and never a step down. Target roughly a third per chord;
     // common tones and small inner motion are only tie-breakers.
+    // Root position is charged extra so the climb really moves through
+    // inversions — otherwise a stepwise run (the chords of a scale) comes out
+    // identical to Roots, since parallel root-position triads are already the
+    // closest fit when every chord is one step above the last.
     const TARGET_STEP = 3
-    const ascending = cands.filter(v => lowestNote(v) >= prevLow)
-    const pool = ascending.length > 0 ? ascending : cands // out of headroom → allow a drop
+    const ROOT_POSITION_COST = 4
+    const ascending = cands.filter(v => lowestNote(v) >= prevLow && lowestNote(v) <= lowRoot + CLIMB_CEILING)
+    // Out of headroom → start the climb again from the bottom
+    if (ascending.length === 0) return rootPositionFrom(pc, semis, range, lowRoot)
+    const pool = ascending
     let best = pool[0]
     let bestScore = Infinity
     for (const v of pool) {
       const jump = lowestNote(v) - prevLow
       const stepCost = jump < 0 ? 60 - jump * 5 : Math.abs(jump - TARGET_STEP)
-      const score = stepCost * 2 + motion(prev, v) * 0.15 - commonTones(prev, v) * 0.4
+      const rootPosition = norm12(lowestNote(v)) === pc ? ROOT_POSITION_COST : 0
+      const score = stepCost * 2 + rootPosition + motion(prev, v) * 0.15 - commonTones(prev, v) * 0.4
       if (score < bestScore) { bestScore = score; best = v }
     }
     return best
   }
 
-  // smooth — least total movement, hold common tones, don't drift register
+  // smooth — least total movement, hold common tones, and stay in one hand
+  // position around the starting register (the low anchor's octave) instead
+  // of creeping upward chord after chord through a long run.
   let best = cands[0]
   let bestScore = Infinity
-  const prevAvg = avgPitch(prev)
+  const home = lowRoot + HOME_OFFSET
   for (const v of cands) {
-    const drift = Math.abs(avgPitch(v) - prevAvg)
-    const score = motion(prev, v) - commonTones(prev, v) * 1.2 + (drift > 9 ? (drift - 9) * 2 : 0)
+    const away = Math.abs(avgPitch(v) - home)
+    const score = motion(prev, v) - commonTones(prev, v) * 1.2 + (away > HOME_SLACK ? (away - HOME_SLACK) * 2 : 0)
     if (score < bestScore) { bestScore = score; best = v }
   }
   return best

@@ -391,6 +391,9 @@ async function warmupEditChannels() {
   return _warmupPromise
 }
 
+// ── Pending note-offs for timed click-to-play notes, keyed ch*128+note ──────
+const _clickNoteOffs = new Map<number, ReturnType<typeof setTimeout>>()
+
 // ── Combined hook ─────────────────────────────────────────────────────────────
 export function useAudioEngine() {
   // Always mount Samples engine (it self-gates on audioEngine !== 'samples')
@@ -427,8 +430,17 @@ export function useAudioEngine() {
         await initJZZ()
         if (!_port) return
         if (ch === 14) ensureClickChannel()
+        // ── Re-striking a note that's still ringing: release it first and
+        // drop its pending note-off, or the older strike's timer cuts the
+        // new one short (repeat clicks on a chord tile sounded clipped). ──
+        const key = ch * 128 + midiNum
+        const pending = _clickNoteOffs.get(key)
+        if (pending) { clearTimeout(pending); _port.send([0x80 | ch, midiNum, 0]) }
         _port.send([0x90 | ch, midiNum, Math.round(vel * 127)])
-        setTimeout(() => { try { _port.send([0x80 | ch, midiNum, 0]) } catch {} }, durMs)
+        _clickNoteOffs.set(key, setTimeout(() => {
+          _clickNoteOffs.delete(key)
+          try { _port.send([0x80 | ch, midiNum, 0]) } catch {}
+        }, durMs))
         if (visual) lightKey(midiNum, color ?? amberHex(), durMs + 100)
       } catch (e) { console.error('[Orfeo GM] playNote error:', e) }
     }

@@ -258,6 +258,10 @@ interface OrfeoStore {
   // On by default. ──────────────────────────────────────────────────────
   colorRootNoteEnabled: boolean
   setColorRootNoteEnabled: (v: boolean) => void
+  // ── Scale/Chord Explorer — shared octave shift for everything the
+  // explorers play (0 = roots start in C3–B3). Session-only, not saved. ──
+  explorerOctave: number
+  setExplorerOctave: (v: number) => void
   displayedChord: string | null
   setDisplayedChord: (chord: string | null) => void
   clearDisplayedChord: () => void
@@ -686,6 +690,8 @@ export const useStore = create<OrfeoStore>((set, get) => ({
   explorerKeyColors: new Map(),
   colorRootNoteEnabled: true,
   setColorRootNoteEnabled: (colorRootNoteEnabled) => set({ colorRootNoteEnabled }),
+  explorerOctave: 0,
+  setExplorerOctave: (explorerOctave) => set({ explorerOctave }),
   // ── Opening always clears the minimized flag so restore-from-minimize works ──
   setChordExplorerOpen: (chordExplorerOpen) =>
     set(chordExplorerOpen ? { chordExplorerOpen, chordExplorerMinimized: false } : { chordExplorerOpen }),

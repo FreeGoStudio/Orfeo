@@ -5,6 +5,35 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
+## [Unreleased] — Explorers upgrade
+
+### New
+- **Major Blues and Minor Blues scales** in the Scales Explorer. Their tiles are the chords you play the scale over — C7, C6, A7, C7♯9 for C Major Blues; Cm7, C7, F7, G7 for C Minor Blues — because stacking every other note of a blues scale gives odd chords.
+- **Octave control in both Explorers.** *Octave* with up and down arrows and a reset, at the bottom left, moves everything the Explorers play up or down by whole octaves (from C2 to C5 roots). The chord that's lit on the keyboard moves with it, and both Explorers share the setting.
+- **Accent root note in the Chord Explorer.** The same switch as in the Scales Explorer, now at the bottom right of the Chord Explorer too: the chord's root shows in pink on the keyboard, in every octave.
+- **Smooth voicing for Chord Explorer tiles.** With Voicing set to Smooth, a chord tile clicked while another chord is lit plays the version closest to it — C, then Cmaj7, then C7 stay under one hand instead of each starting from the root.
+- **Hand-lettered "Circle of Fifths"** title in the middle of the circle.
+
+### Changed
+- **Both Explorers now follow the same rules.** The same progressions, speeds, starting register, inversion buttons, chord colours and the way a clicked chord sounds — any later change applies to both.
+- **The Scales Explorer has the full progression list** — 20 progressions, 61 counting the versions that start on another chord, the same list as the Chord Explorer, with the variants indented under each one.
+- **Progressions play exactly as their numerals say, in both Explorers.** I–♭VII–IV in C plays C–B♭–F, Andalusian gets its major V, and Pop is always I–V–vi–IV. In the Scales Explorer a progression can now step outside the selected scale; steps that match a tile still light it.
+- **Voicing now applies to the chord tiles and the "Chords in the Scale" run**, not just progressions, and takes effect the moment you pick it — the selected tile moves to its new place on the keyboard. Each tile shows the chord as it's voiced, with the bass note after a slash (Dm/F).
+- **The three voicings sound clearly different.** *Roots*: every chord in root position. *Climbing*: the chords climb through inversions (C, Dm/F, Em/G, F/A …). *Smooth*: the chords stay under one hand around the starting position.
+- **Every key starts in the same place.** The scale run, the chord tiles and the first chord of a progression start with the root between C3 and B3 in both Explorers, in every key.
+- **Speed applies to the "Chords in the Scale" run too**, and changes take effect on the next chord. The speed arrows are bigger.
+- **Clicked chords ring longer**, like holding the sustain pedal, and chords sound the moment you press a tile or an inversion arrow.
+- **The pink root note is always the chord's own root**, in every voicing, in both Explorers — and switching *Accent root note* recolours the keyboard straight away, even mid-run.
+- **Scales Explorer layout.** The *Chords in the Scale* row has more room above it and is split into three: the play button with "Click tiles to hear chords", a placeholder for the upcoming Starmap view, and *Accent root note*. The selected tile is light amber. *Play Inversion* moved to the right end of the Progressions row and *Voicing* to the middle of the bottom row, next to *Show as* and *Octave*. The PLAY button appears once a progression is picked. *SCALE* is in amber and the scale list sits a little lower. Roots mode has a new note icon.
+- **Chord Explorer:** the PLAY button appears once a progression is picked, the selected tile is light amber, and sharps show as ♯.
+
+### Fixed
+- **Scales Explorer chord tiles in keys other than C jumped around the keyboard.** Each tile was placed on its own, so in G the C chord dropped below the G chord. The row is now laid out as one run from the home chord in every key.
+- **♭VII and ♭III progressions** (Mixolydian Rock, Grunge · Modal, Step-Down) **played the home chord** in place of those steps in the Scales Explorer.
+- **Looping progressions in Roots and Climbing kept rising** every time round, up to the top of the keyboard. They now come back down after about two octaves.
+- **Clicking the same chord tile quickly cut its sound short.**
+- **Turning off *Accent root note*** left the last chord's root pink and didn't affect a run already playing.
+
 ## [1.4.1] — 11. 10. 2026 — Smaller download
 
 **In short**

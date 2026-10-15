@@ -19,6 +19,7 @@ feature list see the [README](../README.md).
 - [Audio — two engines](#audio--two-engines)
 - [MIDI parsing and foreign formats](#midi-parsing-and-foreign-formats)
 - [Music theory — tonal.js](#music-theory--tonaljs)
+- [Chord and Scales Explorers — shared logic](#chord-and-scales-explorers--shared-logic)
 - [Metadata embedded in the MIDI file](#metadata-embedded-in-the-midi-file)
 - [Tap Tempo — beat-grid corrections](#tap-tempo--beat-grid-corrections)
 - [Hand-assignment engine](#hand-assignment-engine)
@@ -247,6 +248,35 @@ Detection is restricted to a curated set of common chord types
 (`chordVocabulary.ts`); tonal.js's full dictionary is only consulted, via
 `chordDetection.ts`, for the paused right-click / Chord Explorer paths and only
 surfaces an exotic name when nothing common fits.
+
+---
+
+## Chord and Scales Explorers — shared logic
+
+The two Explorers (`ChordExplorer.tsx`, `ScaleExplorer.tsx`) are separate
+windows, but everything they have in common runs through the same code, so a
+change to one rule lands in both:
+
+| File | What it owns |
+|---|---|
+| `src/utils/explorerShared.ts` | Progression list + rotations (`ALL_PROGRESSIONS`), `resolveProgressionStep` (a step's chord = key + semitone offset, quality from the numeral as written, optionally re-voiced by a Style), playback speeds, the 61-key range, the starting register (`explorerLowRoot`, roots in C3–B3 moved by the octave control), inversion stepping, `ringChord` (clicked chords, pedal-like ring), `strikeStep` (rolled sequence steps), `inversionOf`, `explorerKeyColors` (amber + chord root in pink), the voicing-mode icons |
+| `src/utils/voiceLeading.ts` | `nextVoicing` / `voiceProgression` — the three voicing modes: **Roots** (root position, rising, wraps back to the anchor octave), **Climbing** (inversions stepping upward, restarts low past a ceiling), **Smooth** (least movement, pulled to a home position) |
+| `src/utils/genreVoicing.ts` | Chord Explorer Styles — numeral × quality → richer chord type |
+| `src/components/ExplorerOctaveControl.tsx` | Octave ˄ ˅ ↺, writes the shared `store.explorerOctave` (session-only) and moves lit keys with it |
+
+Shared store fields: `progressionVoicing` (persisted), `colorRootNoteEnabled`
+(persisted, the "Accent root note" switch), `explorerOctave` (session-only).
+
+Scales Explorer specifics: each tile's voicing comes from running the whole row
+(plus the octave tile) through `voiceProgression` under the current mode, so
+tiles, the "Chords in the Scale" run and the keyboard always agree. Blues
+scales define their tiles explicitly (`ScaleDef.chords`) as chords played over
+the scale rather than stacked from it. Progressions play as written, so a step
+can fall outside the selected scale; a step matching a tile lights that tile.
+
+Chord Explorer specifics: tiles are root position from the anchor octave,
+except in Smooth, where a tile clicked while a chord is lit takes the nearest
+voicing to it.
 
 ---
 

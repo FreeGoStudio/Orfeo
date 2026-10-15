@@ -96,3 +96,8 @@ public/images/
 # and its icons are kept here only as the source for the site ──────────────
 docs/HOW_TO_USE.md
 docs/how-to-use-icons/
+
+# Starmap feature plan: internal planning doc, local only
+docs/PLAN-starmap-view.md
+docs/nota.svg
+docs/COF1-01.svg
