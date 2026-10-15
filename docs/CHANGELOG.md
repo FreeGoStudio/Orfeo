@@ -5,7 +5,12 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
-## [Unreleased]
+## [1.4.4] — 15. 10. 2026 — Starmap
+
+**In short**
+- New Starmap view in the Scales Explorer: the chord you hear drawn as a glowing star on a ring of the 12 notes, gliding from chord to chord. Turn it on in Settings › Appearance.
+- Play a chord on your MIDI keyboard and the Starmap draws it too.
+- Hand-lettered start screen, and the keyboard bar's hint now stays centred in the window.
 
 ### New
 - **Starmap view in the Scales Explorer.** Turn it on in *Settings › Appearance › Starmap*, then flip the *Starmap* switch in the explorer's right-hand column to swap the Circle of Fifths (still the default) for a ring of the 12 notes, C at the top.
