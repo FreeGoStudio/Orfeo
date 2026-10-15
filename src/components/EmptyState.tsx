@@ -1,6 +1,7 @@
 import { useMidiFile } from '../hooks/useMidiFile'
 import { useAppZoomPercent } from '../hooks/useAppZoomPercent'
 import OrfeoMark from './OrfeoMark'
+import FaceTheMusicMark from './FaceTheMusicMark'
 
 // ── Empty state shown when no MIDI file is loaded ────────────────────────────
 // Outer div fills the piano-roll area (position:absolute inset:0).
@@ -55,7 +56,8 @@ export default function EmptyState() {
           textAlign: 'center',
           pointerEvents: 'auto',
         }}>
-          <span style={{ fontSize: 24, fontWeight: 500, color: 'var(--text-standard)' }}>Let's face the music</span>
+          {/* Hand-lettered title, amber */}
+          <div style={{ marginBottom: 8 }}><FaceTheMusicMark width={300} fill="var(--text-amber)" /></div>
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
             Orfeo supports MIDI, Karaoke, MusicXML, Guitar Pro, and Capella file formats.<br />
             Drag any supported file here, or click Open a file to begin.

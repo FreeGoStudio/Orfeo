@@ -5,6 +5,24 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
+## [Unreleased]
+
+### New
+- **Starmap view in the Scales Explorer.** Turn it on in *Settings › Appearance › Starmap*, then flip the *Starmap* switch in the explorer's right-hand column to swap the Circle of Fifths (still the default) for a ring of the 12 notes, C at the top.
+  - The chord you hear is drawn as a glowing star joining its notes, in its root's own colour, with its name in the centre. Every major chord is the same triangle turned, every minor chord its mirror image, and 7ths and 9ths are four- and five-pointed stars.
+  - **The star glides from chord to chord**: notes the two chords share stay put, the others travel round the ring, the colour blends and the names cross-fade. The glide always finishes before the next chord, even at the fastest speed. With Windows' animation effects turned off, the star jumps instead.
+  - The scale's notes are bright, the home note amber, and with no chord playing a faint outline joins the scale's notes. In the blues scales the blue note has a blue ring.
+  - **Play it yourself:** hold a chord of 3 to 6 notes on your MIDI keyboard and the Starmap draws it as a star with its name, gliding from chord to chord as you play. Let go and it glides back to the explorer's chord. The explorer's own chord and keys stay as they were.
+  - **Two ring orders**, switched in the corner of the ring: *Semitones* (C, C♯, D…) or *Fifths* (C, G, D… — the Circle of Fifths order, where a scale is one unbroken arc and chords pack tight). The star glides between them.
+  - Hovering a note lights its band of the ring (where its name sits) amber (tooltip: *Click to play* that key in the selected scale); the note's star dot shows the key name.
+  - Click a note on the ring to pick the key. *Maj | Min* next to the Starmap switch decides which: switching it turns C major into C minor. A scale that already fits (Dorian, Lydian…) stays selected.
+
+### Changed
+- **The start screen's "Let's face the music"** is now hand-lettered, in amber.
+- **The keyboard bar's hint** (*Shift+Click three keys…*) stays in the middle of the window whether the side panels are open or closed — it used to slide sideways.
+- **The switch to the other Explorer** (*Chords Explorer ↗* / *Scales Explorer ↗*) now looks the same in both: a dashed amber outline, text turning amber on hover.
+- **Scales Explorer chord tiles** show every note of the chord on its own line above the chord's name, so names like *C♯/G♯* no longer cut the notes off. The tiles are a little taller.
+
 ## [1.4.3] — 15. 10. 2026 — Chords Explorer styles
 
 **In short**

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, type CSSProperties } from 'react'
+import { useMemo, useState, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
 import { useStore } from '../../store'
 import Tooltip from '../Tooltip'
 import type { KeyboardSize } from '../../types'
@@ -82,8 +82,41 @@ export default function KeyboardControls() {
   // tags present), otherwise the hint occupies that space instead. ────────
   const practiceLineActive = showHandLabels && handLabelMode === 'practice' && !presentationMode && smoothedPct !== null
 
+  // ── Shift+click hint sits in the middle of the whole Orfeo window, not of
+  // this bar — the bar narrows when a side panel opens, which used to slide
+  // the hint sideways. Its centre cell is shifted by the difference, never so
+  // far that it runs into the controls on either side. Floating keyboard: no
+  // shift (it's not tied to the window's width). ─────────────────────────
+  const rowRef = useRef<HTMLDivElement>(null)
+  const hintCellRef = useRef<HTMLDivElement>(null)
+  const hintRef = useRef<HTMLSpanElement>(null)
+  const [hintShift, setHintShift] = useState(0)
+  useLayoutEffect(() => {
+    const row = rowRef.current, cell = hintCellRef.current
+    if (!row || !cell) return
+    const measure = () => {
+      const hint = hintRef.current
+      if (!isDocked || !hint) { setHintShift(0); return }
+      const c = cell.getBoundingClientRect()
+      const w = hint.getBoundingClientRect().width
+      const left = (cell.previousElementSibling as HTMLElement | null)?.getBoundingClientRect().right ?? c.left
+      const right = (cell.nextElementSibling as HTMLElement | null)?.getBoundingClientRect().left ?? c.right
+      const want = window.innerWidth / 2 - (c.left + c.width / 2)
+      const gap = 16
+      const min = left + gap + w / 2 - (c.left + c.width / 2)
+      const max = right - gap - w / 2 - (c.left + c.width / 2)
+      setHintShift(Math.round(Math.max(min, Math.min(max, want))))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(row)
+    window.addEventListener('resize', measure)
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure) }
+  }, [isDocked, practiceLineActive, presentationMode])
+
   return (
     <div
+      ref={rowRef}
       style={{
         height: 34,
         background: 'var(--bg-modal-header)',
@@ -163,9 +196,9 @@ export default function KeyboardControls() {
 
       {/* ── Center: shift+click hint — hidden while the practice-mode split
           line (below) is actively rendering; the line takes this spot instead. ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', justifySelf: 'center', minWidth: 0 }}>
+      <div ref={hintCellRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', justifySelf: 'center', minWidth: 0 }}>
         {!practiceLineActive && !presentationMode && (
-          <span style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', userSelect: 'none', whiteSpace: 'nowrap' }}>
+          <span ref={hintRef} style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', userSelect: 'none', whiteSpace: 'nowrap', transform: `translateX(${hintShift}px)` }}>
             Shift+Click three keys or more to build &amp; lock a chord
           </span>
         )}

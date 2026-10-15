@@ -1,7 +1,7 @@
-import { Palette, ZoomIn, RotateCcw } from 'lucide-react'
+import { Palette, ZoomIn, RotateCcw, Sparkles } from 'lucide-react'
 import { useStore } from '../../../store'
 import { t } from '../../../utils/i18n'
-import { AppBgBtn, ZoomStepper, GlanceLine, InlineIcon, useSurface } from '../controls'
+import { AppBgBtn, ZoomStepper, GlanceLine, InlineIcon, Switch, useSurface } from '../controls'
 import { useAppZoom } from '../../../hooks/useAppZoom'
 import type { SettingDef } from '../types'
 
@@ -42,4 +42,8 @@ export const APPEARANCE_DEFS: SettingDef[] = [
   { id: 'theme', icon: Palette, kind: 'choice', Control: ThemeControl },
   { id: 'appZoom', icon: ZoomIn, kind: 'inline', Control: AppZoomControl, Glance: AppZoomGlance, glanceQuickOnly: true, Extra: AppZoomCap,
     Description: () => <>{t`Makes everything in Orfeo bigger or smaller. Ctrl + / Ctrl − / Ctrl 0 work exactly as in a web browser.`} {t`Click`} <InlineIcon><RotateCcw size={10} /></InlineIcon> {t`to reset.`}</> },
+  {
+    id: 'starmap', icon: Sparkles, kind: 'switch',
+    Control: () => { const v = useStore(s => s.starmapEnabled); return <Switch value={v} onChange={useStore.getState().setStarmapEnabled} label={t`Starmap`} /> },
+  },
 ]

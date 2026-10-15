@@ -5,6 +5,7 @@
 // shift, inversion stepping and how a clicked chord rings. Both explorers
 // import from here so a change to any of it lands in both at once.
 
+import type { CSSProperties } from 'react'
 import { Music2, TrendingUp, Spline } from 'lucide-react'
 import { getGenreVoicing, isTritoneSub, TRITONE_SUB_CHORD, type Genre } from './genreVoicing'
 import { ALL_CHORDS, resolveChord, type ChordInfo } from './chordVocabulary'
@@ -19,6 +20,15 @@ export const EXPLORER_OCTAVE_MIN = -1
 export const EXPLORER_OCTAVE_MAX = 2
 export function explorerLowRoot(octave: number): number {
   return EXPLORER_BASE_MIDI + 12 * octave
+}
+
+// ── The "switch to the other Explorer" button — the same in both: dashed
+// amber border, dim text that turns amber on hover. ─────────────────────
+export const EXPLORER_SWITCH_STYLE: CSSProperties = {
+  background: 'none', border: '1px dashed var(--text-amber)', borderRadius: 4, cursor: 'pointer',
+  color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600,
+  letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+  padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 3,
 }
 
 // ── Progression playback speeds (ms per chord) ──────────────────────────────

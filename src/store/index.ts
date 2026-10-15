@@ -59,6 +59,9 @@ interface OrfeoStore {
   keyboardSize: KeyboardSize
   keyboardMode: KeyboardMode
   activeKeys: Set<number>
+  // ── Keys held down on a hardware MIDI keyboard right now (useMidiInput) —
+  // only those, unlike activeKeys, which playback and clicks also light ──
+  midiHeldKeys: Set<number>
   activeKeyColors: Map<number, string>
 
   setKeyboardSize: (size: KeyboardSize) => void
@@ -448,6 +451,9 @@ interface OrfeoStore {
 
   showOctaveLabels: boolean
   setShowOctaveLabels: (v: boolean) => void
+  // ── Scales Explorer shows the Starmap instead of the Circle of Fifths ──
+  starmapEnabled: boolean
+  setStarmapEnabled: (v: boolean) => void
   showNoteNamesOnKeyboard: boolean
   setShowNoteNamesOnKeyboard: (v: boolean) => void
 
@@ -616,6 +622,7 @@ export const useStore = create<OrfeoStore>((set, get) => ({
   keyboardSize: 73,
   keyboardMode: 'docked',
   activeKeys: new Set(),
+  midiHeldKeys: new Set(),
   activeKeyColors: new Map(),
 
   setKeyboardSize: (keyboardSize) => set({ keyboardSize }),
@@ -999,6 +1006,8 @@ export const useStore = create<OrfeoStore>((set, get) => ({
   // ── Keyboard label visibility — octave numbers and note name labels ────────
   showOctaveLabels: true,
   setShowOctaveLabels: (showOctaveLabels) => set({ showOctaveLabels }),
+  starmapEnabled: false,
+  setStarmapEnabled: (starmapEnabled) => set({ starmapEnabled }),
   showNoteNamesOnKeyboard: true,
   setShowNoteNamesOnKeyboard: (showNoteNamesOnKeyboard) => set({ showNoteNamesOnKeyboard }),
 
@@ -1178,6 +1187,7 @@ async function restoreLibraryPrefs() {
     if (prefs.rhMaxFingers === 4 || prefs.rhMaxFingers === 5) store.setRhMaxFingers(prefs.rhMaxFingers)
     if (prefs.lhMaxFingers === 4 || prefs.lhMaxFingers === 5) store.setLhMaxFingers(prefs.lhMaxFingers)
     if (typeof prefs.showOctaveLabels === 'boolean') store.setShowOctaveLabels(prefs.showOctaveLabels)
+    if (typeof prefs.starmapEnabled === 'boolean') store.setStarmapEnabled(prefs.starmapEnabled)
     if (typeof prefs.showNoteNamesOnKeyboard === 'boolean') store.setShowNoteNamesOnKeyboard(prefs.showNoteNamesOnKeyboard)
     if (typeof prefs.autoCollapseDrawers === 'boolean') store.setAutoCollapseDrawers(prefs.autoCollapseDrawers)
     if (typeof prefs.trackVuColorEnabled === 'boolean') store.setTrackVuColorEnabled(prefs.trackVuColorEnabled)
@@ -1271,6 +1281,7 @@ let _prevPerformanceSplitSensitivity: number | null = null
 let _prevRhMaxFingers: number | null = null
 let _prevLhMaxFingers: number | null = null
 let _prevShowOctaveLabels: boolean | null = null
+let _prevStarmapEnabled: boolean | null = null
 let _prevShowNoteNamesOnKeyboard: boolean | null = null
 let _prevAutoCollapseDrawers: boolean | null = null
 let _prevTrackVuColorEnabled: boolean | null = null
@@ -1333,6 +1344,7 @@ const _unsubPrefs = useStore.subscribe((state) => {
     _prevRhMaxFingers = state.rhMaxFingers
     _prevLhMaxFingers = state.lhMaxFingers
     _prevShowOctaveLabels = state.showOctaveLabels
+    _prevStarmapEnabled = state.starmapEnabled
     _prevShowNoteNamesOnKeyboard = state.showNoteNamesOnKeyboard
     _prevAutoCollapseDrawers = state.autoCollapseDrawers
     _prevTrackVuColorEnabled = state.trackVuColorEnabled
@@ -1398,6 +1410,7 @@ const _unsubPrefs = useStore.subscribe((state) => {
     state.rhMaxFingers !== _prevRhMaxFingers ||
     state.lhMaxFingers !== _prevLhMaxFingers ||
     state.showOctaveLabels !== _prevShowOctaveLabels ||
+    state.starmapEnabled !== _prevStarmapEnabled ||
     state.showNoteNamesOnKeyboard !== _prevShowNoteNamesOnKeyboard ||
     state.autoCollapseDrawers !== _prevAutoCollapseDrawers ||
     state.trackVuColorEnabled !== _prevTrackVuColorEnabled ||
@@ -1455,6 +1468,7 @@ const _unsubPrefs = useStore.subscribe((state) => {
     _prevRhMaxFingers = state.rhMaxFingers
     _prevLhMaxFingers = state.lhMaxFingers
     _prevShowOctaveLabels = state.showOctaveLabels
+    _prevStarmapEnabled = state.starmapEnabled
     _prevShowNoteNamesOnKeyboard = state.showNoteNamesOnKeyboard
     _prevAutoCollapseDrawers = state.autoCollapseDrawers
     _prevTrackVuColorEnabled = state.trackVuColorEnabled
@@ -1518,6 +1532,7 @@ const _unsubPrefs = useStore.subscribe((state) => {
       rhMaxFingers: state.rhMaxFingers,
       lhMaxFingers: state.lhMaxFingers,
       showOctaveLabels: state.showOctaveLabels,
+      starmapEnabled: state.starmapEnabled,
       showNoteNamesOnKeyboard: state.showNoteNamesOnKeyboard,
       autoCollapseDrawers: state.autoCollapseDrawers,
       trackVuColorEnabled: state.trackVuColorEnabled,

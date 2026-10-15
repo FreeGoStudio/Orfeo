@@ -15,7 +15,7 @@ export type SettingId =
   | 'displaySystem' | 'accidentals' | 'chordTracking' | 'chordReading' | 'chordNaming'
   | 'keyRange' | 'showOctaves' | 'showNoteNames' | 'reflectPianoRoll' | 'preciseScrubTime'
   | 'rollZoom' | 'barNumbers' | 'playbar' | 'visualEffects'
-  | 'theme' | 'appZoom'
+  | 'theme' | 'appZoom' | 'starmap'
 
 export interface SettingInfo {
   id: SettingId
@@ -34,7 +34,7 @@ export const GROUPS: GroupInfo[] = [
   { id: 'notation', name: t`Notation & Chords`, intro: t`How notes and chords are named, and which instruments the chord display listens to.`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files/how-orfeo-reads-chords' },
   { id: 'keyboard', name: t`Keyboard`, intro: t`The on-screen keyboard: its size and what's printed on the keys.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
   { id: 'piano-roll', name: t`Piano Roll`, intro: t`The falling-notes view: zoom, bar lines, the playbar and visual effects.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll' },
-  { id: 'appearance', name: t`Appearance`, intro: t`How Orfeo looks: theme and the size of everything on screen.`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
+  { id: 'appearance', name: t`Appearance`, intro: t`How Orfeo looks: theme, the size of everything on screen, and the Starmap view.`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
 ]
 
 export const SETTINGS: SettingInfo[] = [
@@ -142,6 +142,9 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'appZoom', group: 'appearance', name: t`App Zoom`, summary: t`Make everything in Orfeo bigger or smaller.`,
     description: t`Makes everything in Orfeo bigger or smaller. Ctrl + / Ctrl − / Ctrl 0 work exactly as in a web browser. Click reset to go back to 100%.`,
     keywords: 'zoom scale size bigger smaller ctrl' },
+  { id: 'starmap', group: 'appearance', name: t`Starmap`, summary: t`Adds the Starmap view to the Scales Explorer.`,
+    description: t`Makes the Starmap available in the Scales Explorer: switch it on in the explorer's Starmap row to swap the Circle of Fifths for a ring of the 12 notes. The chord you hear is drawn as a glowing star joining its notes, gliding from chord to chord — every major chord is the same shape turned, every minor chord its mirror image.`,
+    keywords: 'starmap star shape circle scales explorer chord geometry' },
 ]
 
 export const SETTING_BY_ID = Object.fromEntries(SETTINGS.map(s => [s.id, s])) as Record<SettingId, SettingInfo>

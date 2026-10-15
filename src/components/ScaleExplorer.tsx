@@ -3,7 +3,7 @@ import { Chord, Note } from 'tonal'
 import { RotateCcw, Play, Square, ArrowUpRight, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useStore } from '../store'
 import { getNoteName } from '../utils/noteNames'
-import { formatChordSuffix, detectChordStructured } from '../utils/chordDetection'
+import { formatChordSuffix, detectChordStructured, localizeChord } from '../utils/chordDetection'
 import type { NoteNaming, Accidentals, ChordNamingStyle } from '../types'
 import SpeedControl from './SpeedControl'
 import OrfeoMark from './OrfeoMark'
@@ -21,11 +21,13 @@ import {
 import {
   EXPLORER_RANGE, explorerLowRoot, SPEED_MS, VOICING_ICON, ALL_PROGRESSIONS,
   resolveProgressionStep, nextInversionSet, prevInversionSet, ringChord, strikeStep, inversionOf,
-  explorerKeyColors, captureStruckShape, restoreStruckShape, type ProgSpeed, type StruckShape,
+  explorerKeyColors, captureStruckShape, restoreStruckShape, EXPLORER_SWITCH_STYLE, type ProgSpeed, type StruckShape,
 } from '../utils/explorerShared'
 import { ALL_CHORDS } from '../utils/chordVocabulary'
 import ExplorerOctaveControl from './ExplorerOctaveControl'
 import CofTitleMark from './CofTitleMark'
+import StarmapRing, { type LitChord } from './Starmap/StarmapRing'
+import { STAR_MIN_NOTES, STAR_MAX_NOTES, type RingLayout } from '../utils/starmap'
 import { t } from '../utils/i18n'
 
 // ── Modal dimensions — explorer area on the left, settings column on the
@@ -61,6 +63,8 @@ interface ScaleDef {
   intervals: number[]
   romans: string[]
   chords?: { offset: number; type: string }[]
+  // blues scales: the "blue note", semitones above the tonic (Starmap marks it)
+  blueNote?: number
 }
 
 const SCALES: ScaleDef[] = [
@@ -70,9 +74,9 @@ const SCALES: ScaleDef[] = [
   { name: 'Melodic Minor',    intervals: [0,2,3,5,7,9,11], romans: ['i','ii','III+','IV','V','vi°','vii°'] },
   { name: 'Major Pentatonic', intervals: [0,2,4,7,9],       romans: ['I','II','III','V','VI'] },
   { name: 'Minor Pentatonic', intervals: [0,3,5,7,10],      romans: ['i','III','IV','v','VII'] },
-  { name: 'Major Blues',      intervals: [0,2,3,4,7,9],     romans: ['I7','I6','VI7','I7♯9'],
+  { name: 'Major Blues',      intervals: [0,2,3,4,7,9],     romans: ['I7','I6','VI7','I7♯9'], blueNote: 3,
     chords: [{ offset: 0, type: '7' }, { offset: 0, type: '6' }, { offset: 9, type: '7' }, { offset: 0, type: '7#9' }] },
-  { name: 'Minor Blues',      intervals: [0,3,5,6,7,10],    romans: ['i7','I7','IV7','V7'],
+  { name: 'Minor Blues',      intervals: [0,3,5,6,7,10],    romans: ['i7','I7','IV7','V7'], blueNote: 6,
     chords: [{ offset: 0, type: 'm7' }, { offset: 0, type: '7' }, { offset: 5, type: '7' }, { offset: 7, type: '7' }] },
   { name: 'Dorian',           intervals: [0,2,3,5,7,9,10], romans: ['i','ii','III','IV','v','vi°','VII'] },
   { name: 'Phrygian',         intervals: [0,1,3,5,7,8,10], romans: ['i','II','III','iv','v°','VI','VII'] },
@@ -104,13 +108,15 @@ const SETTING_DESC: React.CSSProperties = {
   textWrap: 'balance',
 } as React.CSSProperties
 
-function SettingRow({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
+// oneLine: the description never wraps (rows whose control changes width
+// must keep the same height, or the column jumps).
+function SettingRow({ title, desc, oneLine, children }: { title: string; desc: string; oneLine?: boolean; children: React.ReactNode }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', alignItems: 'center', columnGap: 12 }}>
       <div style={{ justifySelf: 'start', display: 'flex', alignItems: 'center' }}>{children}</div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, minWidth: 0 }}>
         <span style={{ ...ROW_LABEL, fontSize: 11, whiteSpace: 'nowrap' }}>{title}</span>
-        <span style={SETTING_DESC}>{desc}</span>
+        <span style={oneLine ? { ...SETTING_DESC, whiteSpace: 'nowrap' } : SETTING_DESC}>{desc}</span>
       </div>
     </div>
   )
@@ -348,6 +354,8 @@ export default function ScaleExplorer() {
   const setProgressionVoicing = useStore(s => s.setProgressionVoicing)
   const setAccidentals = useStore(s => s.setAccidentals)
   const explorerOctave = useStore(s => s.explorerOctave)
+  const starmapEnabled = useStore(s => s.starmapEnabled)
+  const midiHeldKeys = useStore(s => s.midiHeldKeys)
 
   // ── Window drag position — centred on the window, bottom edge just above
   // the keyboard's chord display row; recomputed each time the modal opens. ─
@@ -365,6 +373,17 @@ export default function ScaleExplorer() {
   const [cofRing, setCofRing] = useState<'major' | 'minor' | null>(null)
   const [selectedScaleIdx, setSelectedScaleIdx] = useState(0)
   const [selectedDegree, setSelectedDegree] = useState<number | null>(null)
+  // ── The chord sounding now, for the Starmap's star — set beside every
+  // chord the explorer strikes, cleared when the key or scale changes. ────
+  const [litChord, setLitChord] = useState<LitChord | null>(null)
+  // ── Circle shown: the Circle of Fifths by default, the Starmap when the
+  // STARMAP row's switch is on — available once Settings › Appearance ›
+  // Starmap is on. Kept for the session (closing the explorer keeps it). ──
+  const [starmapView, setStarmapView] = useState(false)
+  const showStarmap = starmapEnabled && starmapView
+  // ── Starmap ring order: by semitone (default) or by fifths ───────────────
+  const [ringLayout, setRingLayout] = useState<RingLayout>('chromatic')
+
 
   // ── Progression state ─────────────────────────────────────────────────────
   const [selectedProg, setSelectedProg] = useState<number | null>(null)
@@ -410,6 +429,25 @@ export default function ScaleExplorer() {
   const [playTrigger, setPlayTrigger] = useState(0)
 
   const displayNaming: NoteNaming = noteNaming === 'hidden' ? 'english' : noteNaming
+
+  // ── A chord held on the MIDI keyboard (3–6 different notes) takes over the
+  // Starmap's star while it's held — drawing only, the explorer's own chord
+  // and keys stay as they are, and the star glides back on release. Read a
+  // moment after the last key change so a rolled chord doesn't flicker
+  // through its first two notes. ──────────────────────────────────────────
+  const [heldChord, setHeldChord] = useState<LitChord | null>(null)
+  useEffect(() => {
+    if (!showStarmap) { setHeldChord(null); return }
+    const id = setTimeout(() => {
+      const pcs = new Set(Array.from(midiHeldKeys, m => m % 12))
+      if (pcs.size < STAR_MIN_NOTES || pcs.size > STAR_MAX_NOTES) { setHeldChord(null); return }
+      const found = detectChordStructured(midiHeldKeys)
+      const lowest = Math.min(...midiHeldKeys) % 12
+      const name = found ? (localizeChord(found.rawRootName, displayNaming, accidentals, chordNamingStyle) ?? '') : ''
+      setHeldChord({ pcs: Array.from(pcs), rootPc: found?.rootPitchClass ?? lowest, name })
+    }, 40)
+    return () => clearTimeout(id)
+  }, [midiHeldKeys, showStarmap, displayNaming, accidentals, chordNamingStyle])
 
   // ── Derived root pitch class from CoF selection ───────────────────────────
   const selectedRoot = useMemo(() => {
@@ -466,6 +504,20 @@ export default function ScaleExplorer() {
       if (newPos >= 0) { setCofRing(ring); setCofPos(newPos) }
     }
   }, [selectedRoot, clearExplorerChordDisplay])
+
+  // ── Pick a key — a wedge on the Circle of Fifths, a note on the Starmap, or
+  // the Starmap's Major | Minor switch. A wedge sets Major or Natural Minor;
+  // the Starmap keeps the selected scale when it already fits the chosen
+  // major/minor side (Dorian stays Dorian), else switches to Major / Natural
+  // Minor. Replays the scale either way. ────────────────────────────────────
+  const pickKey = useCallback((pc: number, ring: 'major' | 'minor', keepScale: boolean) => {
+    const table = ring === 'major' ? COF_MAJOR_PC : COF_MINOR_PC
+    setCofPos(table.indexOf(pc)); setCofRing(ring)
+    const side = MINOR_SCALES.has(SCALES[selectedScaleIdx].name) ? 'minor' : 'major'
+    if (!keepScale || side !== ring) setSelectedScaleIdx(ring === 'major' ? 0 : 1)
+    setInfoRowChord(null); setSelectedDegree(null); clearExplorerChordDisplay()
+    playTriggerRef.current += 1; setPlayTrigger(playTriggerRef.current)
+  }, [selectedScaleIdx, clearExplorerChordDisplay])
 
   // ── Stop progression and clear its timer ─────────────────────────────────
   const stopProgression = useCallback(() => {
@@ -576,6 +628,7 @@ export default function ScaleExplorer() {
     const noteMidis = [...scale.intervals.map(iv => rootMidi + iv), rootMidi + 12]
       .filter(m => m >= EXPLORER_RANGE.min && m <= EXPLORER_RANGE.max)
     lightKeys(noteMidis, selectedRoot)
+    setLitChord(null)
     setSelectedDegree(null)
     setOctaveTileSelected(false)
 
@@ -614,6 +667,7 @@ export default function ScaleExplorer() {
     setSelectedDegree(isOctave ? null : idx)
     setOctaveTileSelected(isOctave)
     lightKeys(notes, chord.harmonicRootPC)
+    setLitChord({ pcs: notes.map(m => m % 12), rootPc: chord.harmonicRootPC, name: chord.baseName })
     setExplorerChordDisplay({
       name: chord.baseName,
       invCount: inversionOf(chord.harmonicRootPC, chord.tonePcs.map(pc => (pc - chord.harmonicRootPC + 12) % 12), notes),
@@ -713,8 +767,10 @@ export default function ScaleExplorer() {
     const notes = nextVoicing(prevMidi, resolved.rootPc, semis, voicingMode, EXPLORER_RANGE, lowRootRef.current)
 
     lightKeys(notes, resolved.rootPc)
+    const stepName = getNoteName(resolved.rootPc, displayNaming, accidentals) + formatChordSuffix(resolved.info.suffix, chordNamingStyle)
+    setLitChord({ pcs: notes.map(m => m % 12), rootPc: resolved.rootPc, name: stepName })
     setExplorerChordDisplay({
-      name: getNoteName(resolved.rootPc, displayNaming, accidentals) + formatChordSuffix(resolved.info.suffix, chordNamingStyle),
+      name: stepName,
       invCount: inversionOf(resolved.rootPc, semis, notes),
       noteCount: notes.length,
     })
@@ -869,6 +925,7 @@ export default function ScaleExplorer() {
 
   // ── Key quality suffix — 'm' for minor-family scales, '' for major-family ───
   const keyQuality = MINOR_SCALES.has(scale.name) ? 'm' : ''
+  const starmapSide: 'major' | 'minor' = MINOR_SCALES.has(scale.name) ? 'minor' : 'major'
 
   // Closed (open=false): unmount entirely. Minimized (open=true, minimized=true): render but hide.
   if (!scaleExplorerOpen) return null
@@ -946,7 +1003,9 @@ export default function ScaleExplorer() {
               fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-dimmest)', opacity: 0.75, lineHeight: '1.6',
               textWrap: 'balance', userSelect: 'none',
             } as CSSProperties}>
-              Click a key on the circle to explore its scale and diatonic chords. Select a progression and click play to hear the chords in the scale. Try chord inversions and variations!
+              {showStarmap
+                ? t`Click a note on the ring to explore its scale and chords: every chord you play lights up as a star. Select a progression and click play to watch the stars move.`
+                : 'Click a key on the circle to explore its scale and diatonic chords. Select a progression and click play to hear the chords in the scale. Try chord inversions and variations!'}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1, width: 116 }}>
               <span style={{ ...ROW_LABEL, fontSize: 12, marginBottom: 3, color: 'var(--text-amber)' }}>Scale</span>
@@ -971,12 +1030,49 @@ export default function ScaleExplorer() {
 
           {/* Right — CoF SVG with the note-names row under it, centred in the
               space beside the guideline/scale column */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, minWidth: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, minWidth: 0, position: 'relative' }}>
+          {/* Starmap ring order — by semitone or by fifths, in the corner the
+              round disc leaves free */}
+          {showStarmap && (
+            <div style={{ position: 'absolute', top: 0, right: 0, zIndex: 1, display: 'flex', background: 'var(--bg-tile)', borderRadius: 'var(--radius-md)', padding: 2, gap: 1 }}>
+              {(['chromatic', 'fifths'] as const).map(l => {
+                const active = ringLayout === l
+                return (
+                  <Tooltip key={l} oneLine title={l === 'chromatic' ? t`Notes in semitone order` : t`Notes in Circle of Fifths order`}>
+                    <button onClick={() => setRingLayout(l)} aria-pressed={active}
+                      style={{
+                        padding: '2px 7px', borderRadius: 'var(--radius-sm)', border: 'none',
+                        background: active ? 'var(--state-hover-bg)' : 'transparent',
+                        color: active ? 'var(--text-amber)' : 'var(--text-inactive)',
+                        fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >{l === 'chromatic' ? t`Semitones` : t`Fifths`}</button>
+                  </Tooltip>
+                )
+              })}
+            </div>
+          )}
           <svg
             width={Math.round(COF_VIEW.w * COF_SCALE)} height={Math.round(COF_VIEW.h * COF_SCALE)}
             viewBox={`${COF_VIEW.x} ${COF_VIEW.y} ${COF_VIEW.w} ${COF_VIEW.h}`}
             style={{ overflow: 'visible', flexShrink: 0 }}
           >
+            {showStarmap ? (
+              <StarmapRing
+                cx={CX} cy={CY}
+                layout={ringLayout}
+                scaleName={scale.name}
+                tonicPc={selectedRoot}
+                scalePcs={selectedRoot === null ? [] : scale.intervals.map(iv => (selectedRoot + iv) % 12)}
+                blueNotePc={selectedRoot !== null && scale.blueNote !== undefined ? (selectedRoot + scale.blueNote) % 12 : null}
+                litChord={heldChord ?? litChord}
+                naming={displayNaming}
+                accidentals={accidentals}
+                keyQuality={starmapSide}
+                morphMs={Math.min(400, Math.round(SPEED_MS[progSpeed] * 0.6))}
+                onPickNote={pc => pickKey(pc, starmapSide, true)}
+              />
+            ) : (<>
             {Array.from({ length: 12 }, (_, i) => {
               const startDeg = -90 + i * 30
               const endDeg   = startDeg + 30
@@ -1001,7 +1097,7 @@ export default function ScaleExplorer() {
                     d={wedgePath(CX, CY, R_OUTER1, R_OUTER2, startDeg, endDeg)}
                     fill={outerFill} stroke="var(--state-hover-bg)" strokeWidth={1}
                     style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
-                    onClick={() => { setCofPos(i); setCofRing('major'); setSelectedScaleIdx(0); setInfoRowChord(null); setSelectedDegree(null); clearExplorerChordDisplay(); playTriggerRef.current += 1; setPlayTrigger(playTriggerRef.current) }}
+                    onClick={() => pickKey(COF_MAJOR_PC[i], 'major', false)}
                     onMouseEnter={e => { if (!isSelOuter) (e.target as SVGPathElement).setAttribute('fill', 'var(--state-hover-bg)') }}
                     onMouseLeave={e => { if (!isSelOuter) (e.target as SVGPathElement).setAttribute('fill', 'var(--border)') }}
                   >
@@ -1012,7 +1108,7 @@ export default function ScaleExplorer() {
                     d={wedgePath(CX, CY, R_INNER1, R_INNER2, startDeg, endDeg)}
                     fill={innerFill} stroke="var(--state-hover-bg)" strokeWidth={1}
                     style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
-                    onClick={() => { setCofPos(i); setCofRing('minor'); setSelectedScaleIdx(1); setInfoRowChord(null); setSelectedDegree(null); clearExplorerChordDisplay(); playTriggerRef.current += 1; setPlayTrigger(playTriggerRef.current) }}
+                    onClick={() => pickKey(COF_MINOR_PC[i], 'minor', false)}
                     onMouseEnter={e => { if (!isSelInner) (e.target as SVGPathElement).setAttribute('fill', 'var(--state-hover-bg-inner)') }}
                     onMouseLeave={e => { if (!isSelInner) (e.target as SVGPathElement).setAttribute('fill', 'var(--border-row)') }}
                   >
@@ -1048,6 +1144,7 @@ export default function ScaleExplorer() {
             })}
             {/* Centre label — hand-lettered "Circle of Fifths" title */}
             <CofTitleMark cx={CX} cy={CY} width={80} fill="var(--text-amber)" />
+            </>)}
           </svg>
           {/* Note-names row — centred under the CoF (same column, same width),
               pushed down below it. Trailing octave-repeat note completes the
@@ -1122,7 +1219,7 @@ export default function ScaleExplorer() {
               const voicing = tileVoicings[idx]
               const notes = voicing ? [...voicing].sort((a, b) => a - b) : chord.midiNotes
               return (
-                // Chord tile: chord name left, notes + roman stacked right-aligned
+                // Chord tile: notes on top, chord name + roman numeral below
                 <button
                   key={isOctave ? 'octave' : chord.degree}
                   onMouseDown={() => { stopChordSequence(); playTile(idx, 'click') }}
@@ -1130,24 +1227,23 @@ export default function ScaleExplorer() {
                     flex: 1, minWidth: 0, background: sel ? 'var(--accent-amber-medium)' : 'var(--bg-tile)',
                     border: `1px solid ${sel ? 'var(--text-amber)' : 'var(--state-hover-bg)'}`,
                     borderRadius: 6,
-                    paddingTop: 'var(--space-2)', paddingBottom: 'var(--space-2)', paddingLeft: 6, paddingRight: 6,
+                    paddingTop: 6, paddingBottom: 'var(--space-2)', paddingLeft: 6, paddingRight: 6,
                     cursor: 'pointer', textAlign: 'left',
-                    display: 'flex', flexDirection: 'row',
-                    justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-1)',
+                    display: 'flex', flexDirection: 'column', gap: 5,
                   }}
                   onMouseEnter={e => { if (!sel) e.currentTarget.style.borderColor = 'var(--state-hover-border)' }}
                   onMouseLeave={e => { if (!sel) e.currentTarget.style.borderColor = 'var(--state-hover-bg)' }}
                 >
-                  {/* Left: chord name as voiced */}
-                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 700, color: sel ? 'var(--text-amber)' : 'var(--text-key-label)', lineHeight: 1, flexShrink: 0 }}>
-                    {voicedName(chord, voicing)}
+                  {/* Top: every note of the voicing, low to high, on its own line */}
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                    {notes.map(m => getNoteName(m, displayNaming, accidentals)).join(' ')}
                   </span>
-                  {/* Right: note names + roman numeral stacked, right-aligned */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-end' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', lineHeight: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', maxWidth: '100%' }}>
-                      {notes.map(m => getNoteName(m, displayNaming, accidentals)).join(' ')}
+                  {/* Bottom: chord name as voiced, roman numeral on the right */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 4, minWidth: 0 }}>
+                    <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 700, color: sel ? 'var(--text-amber)' : 'var(--text-key-label)', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                      {voicedName(chord, voicing)}
                     </span>
-                    <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--accent-amber-bold)', lineHeight: 1, textAlign: 'right' }}>
+                    <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--accent-amber-bold)', lineHeight: 1, flexShrink: 0 }}>
                       {chord.roman}{isOctave ? '⁸' : ''}
                     </span>
                   </div>
@@ -1395,11 +1491,49 @@ export default function ScaleExplorer() {
           </button>
         </SettingRow>
 
-        {/* Starmap — placeholder switch, not wired up yet */}
-        <SettingRow title={t`Starmap`} desc={t`Coming soon`}>
-          <span style={{ display: 'flex', color: 'var(--state-disabled)', cursor: 'default' }}>
-            <ToggleLeft size={20} strokeWidth={1.5} />
-          </span>
+        {/* Starmap — swaps the Circle of Fifths for the Starmap (made
+            available in Settings › Appearance); in Starmap mode Major | Minor
+            decides which key a clicked note picks */}
+        <SettingRow
+          title={t`Starmap`}
+          oneLine
+          desc={!starmapEnabled ? t`Turn on in Settings › Appearance` : showStarmap ? t`Major or minor keys` : t`Swap the circle for the Starmap`}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Tooltip oneLine title={!starmapEnabled ? t`Turn on in Settings › Appearance` : showStarmap ? t`Back to the Circle of Fifths` : t`Show the Starmap`}>
+              <button
+                onClick={() => { if (starmapEnabled) setStarmapView(v => !v) }}
+                disabled={!starmapEnabled}
+                aria-pressed={showStarmap}
+                style={{
+                  display: 'flex', alignItems: 'center', background: 'none', border: 'none', padding: 0,
+                  cursor: starmapEnabled ? 'pointer' : 'default',
+                  color: !starmapEnabled ? 'var(--state-disabled)' : showStarmap ? 'var(--text-amber)' : 'var(--text-inactive)',
+                }}
+              >
+                {showStarmap ? <ToggleRight size={20} strokeWidth={1.5} /> : <ToggleLeft size={20} strokeWidth={1.5} />}
+              </button>
+            </Tooltip>
+            {showStarmap && (
+              <div style={{ display: 'flex', background: 'var(--bg-tile)', borderRadius: 'var(--radius-md)', padding: 2, gap: 1 }}>
+                {(['major', 'minor'] as const).map(side => {
+                  const active = starmapSide === side
+                  return (
+                    <button key={side}
+                      onClick={() => { if (selectedRoot !== null && !active) pickKey(selectedRoot, side, true) }}
+                      aria-pressed={active}
+                      style={{
+                        padding: '2px 7px', borderRadius: 'var(--radius-sm)', border: 'none',
+                        background: active ? 'var(--state-hover-bg)' : 'transparent',
+                        color: active ? 'var(--text-amber)' : 'var(--text-inactive)',
+                        fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >{side === 'major' ? t`Maj` : t`Min`}</button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </SettingRow>
 
         {/* Start over — clears the key, scale, progression and speed and
@@ -1412,7 +1546,7 @@ export default function ScaleExplorer() {
                 setSelectedDegree(null); setOctaveTileSelected(false)
                 stopProgression(); stopChordSequence(); setSelectedProg(null)
                 setProgSpeed('med'); speedRef.current = 'med'
-                setInfoRowChord(null); clearExplorerChordDisplay()
+                setInfoRowChord(null); clearExplorerChordDisplay(); setLitChord(null)
                 clearExplorerKeys(); clearLockedKeys(); useStore.getState().clearDisplayedChord()
                 struckShapeRef.current = null; setInverted(false)
               }}
@@ -1428,9 +1562,9 @@ export default function ScaleExplorer() {
           <Tooltip oneLine title="Switch to Chords Explorer">
             <button
               onClick={() => { setScaleExplorerOpen(false); setChordExplorerOpen(true) }}
-              style={{ background: 'none', border: '1px solid var(--state-hover-bg)', borderRadius: 4, cursor: 'pointer', color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 3 }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--text-amber)' }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-inactive)'; e.currentTarget.style.borderColor = 'var(--state-hover-bg)' }}
+              style={EXPLORER_SWITCH_STYLE}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-inactive)' }}
             >Chords Explorer <ArrowUpRight size={11} /></button>
           </Tooltip>
         </div>

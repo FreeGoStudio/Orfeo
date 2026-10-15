@@ -14,7 +14,8 @@ function pressNote(midiNum: number, vel: number) {
   const { activeKeys, activeKeyColors } = useStore.getState()
   const nk = new Set(activeKeys); nk.add(midiNum)
   const nc = new Map(activeKeyColors); nc.set(midiNum, HARDWARE_COLOR)
-  useStore.setState({ activeKeys: nk, activeKeyColors: nc })
+  const held = new Set(useStore.getState().midiHeldKeys); held.add(midiNum)
+  useStore.setState({ activeKeys: nk, activeKeyColors: nc, midiHeldKeys: held })
   const { audioEngine } = useStore.getState()
   if (audioEngine === 'samples') {
     ;(window as any).__orfeoNoteOnSamples?.(midiNum, vel / 127)
@@ -28,7 +29,8 @@ function releaseNote(midiNum: number) {
   const { activeKeys, activeKeyColors } = useStore.getState()
   const nk = new Set(activeKeys); nk.delete(midiNum)
   const nc = new Map(activeKeyColors); nc.delete(midiNum)
-  useStore.setState({ activeKeys: nk, activeKeyColors: nc })
+  const held = new Set(useStore.getState().midiHeldKeys); held.delete(midiNum)
+  useStore.setState({ activeKeys: nk, activeKeyColors: nc, midiHeldKeys: held })
   const { audioEngine } = useStore.getState()
   if (audioEngine === 'samples') {
     ;(window as any).__orfeoNoteOffSamples?.(midiNum)

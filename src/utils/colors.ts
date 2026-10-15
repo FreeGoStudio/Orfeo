@@ -20,6 +20,26 @@ export const TRACK_COLOR_PALETTE = [
   '#c99a4a', // Warm Gold
 ] as const
 
+// ── Starmap note colours — one pastel "starlight" colour per note, used for
+// the chord shapes in the Scales Explorer's Starmap view. Hue walks the
+// circle of fifths (OKLCH L 0.84 C 0.11, hue 110° + 30° per fifth), so notes
+// a fifth apart get neighbouring colours. Index = note (0 = C … 11 = B/H).
+// Kept clear of brand amber and the two hand colours. ──────────────────────
+export const PITCH_CLASS_COLORS = [
+  '#cfd17a', // C
+  '#ebb3f7', // C♯/D♭
+  '#7ae2c0', // D
+  '#ffadad', // D♯/E♭
+  '#78d8ff', // E
+  '#f0c374', // F
+  '#c9beff', // F♯/G♭
+  '#a4dd98', // G
+  '#ffadd5', // G♯/A♭
+  '#65e0e7', // A
+  '#ffb589', // A♯/B♭
+  '#a0ccff', // B/H
+] as const
+
 // ── Piano-family default colors — deterministic regardless of track order,
 // so the same visual identity (1st = LH blue, 2nd = RH pink, 3rd+ = amber)
 // shows up for any file instead of whatever slot a round-robin lands on.

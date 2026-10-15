@@ -23,7 +23,7 @@ import {
 import {
   EXPLORER_RANGE, explorerLowRoot, SPEED_MS, VOICING_ICON, ALL_PROGRESSIONS,
   resolveProgressionStep, nextInversionSet, prevInversionSet, ringChord, strikeStep, inversionOf,
-  explorerKeyColors, captureStruckShape, restoreStruckShape, type ProgSpeed, type StruckShape,
+  explorerKeyColors, captureStruckShape, restoreStruckShape, EXPLORER_SWITCH_STYLE, type ProgSpeed, type StruckShape,
 } from '../utils/explorerShared'
 import ChevronPlayIcon from './ChevronPlayIcon'
 import ExplorerOctaveControl from './ExplorerOctaveControl'
@@ -1251,9 +1251,9 @@ export default function ChordExplorer() {
         <Tooltip oneLine title="Switch to Scales Explorer">
         <button
           onClick={() => { setChordExplorerOpen(false); setScaleExplorerOpen(true) }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap', padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-inactive)'}
+          style={EXPLORER_SWITCH_STYLE}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-inactive)' }}
         >Scales Explorer <ArrowUpRight size={11} /></button>
         </Tooltip>
       </div>
