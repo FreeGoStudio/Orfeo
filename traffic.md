@@ -8,16 +8,16 @@ Updated **2026-10-17** (daily, automatically) · [Squarebow/Orfeo](https://githu
 
 | | All time | Since 2026-10-17 (tracking started) |
 |---|---:|---:|
-| **Downloads** (installer + portable) | **138** | **0** |
-| — Installer (`Orfeo-Setup-x.y.z.exe`) | 102 | 0 |
-| — Portable (`Orfeo-x.y.z-portable.exe`) | 36 | 0 |
-| App starts checking for updates (`latest.yml`) | 119 | 0 |
+| **Downloads** (installer + portable) | **145** | **0** |
+| — Installer (`Orfeo-Setup-x.y.z.exe`) | 106 | 0 |
+| — Portable (`Orfeo-x.y.z-portable.exe`) | 39 | 0 |
+| App starts checking for updates (`latest.yml`) | 124 | 0 |
 | Updates installed (`.blockmap`) | 18 | 0 |
 | Repository page views (since 2026-10-03) | 985 | 331 |
 | Unique visitors (added up per day) | 237 | 105 |
 | Repository clones | 379 | 177 |
 
-Downloads by others, excluding the developer's own test downloads (about 4): **≈ 134**.
+Downloads by others, excluding the developer's own test downloads (about 4): **≈ 141**.
 
 *Downloads* count each time a release file was downloaded. *App starts* count installed copies (installer version) checking GitHub for a newer version when Orfeo starts, so they show the app being used, not just downloaded. The portable version does not check automatically.
 
@@ -25,11 +25,11 @@ Downloads by others, excluding the developer's own test downloads (about 4): **�
 
 | Release | Published | Installer | Portable | Total downloads | App starts | Updates |
 |---|---|---:|---:|---:|---:|---:|
-| [v1.4.4](https://github.com/Squarebow/Orfeo/releases/tag/v1.4.4) | 2026-10-15 | 34 | 12 | **46** | 45 | 6 |
+| [v1.4.4](https://github.com/Squarebow/Orfeo/releases/tag/v1.4.4) | 2026-10-15 | 38 | 15 | **53** | 50 | 6 |
 | [v1.4.3](https://github.com/Squarebow/Orfeo/releases/tag/v1.4.3) | 2026-10-15 | 6 | 0 | **6** | 7 | 4 |
 | [v1.4.2](https://github.com/Squarebow/Orfeo/releases/tag/v1.4.2) | 2026-10-15 | 4 | 2 | **6** | 0 | 0 |
 | [v1.4.1](https://github.com/Squarebow/Orfeo/releases/tag/v1.4.1) | 2026-10-11 | 58 | 22 | **80** | 67 | 8 |
-| **All releases** | | **102** | **36** | **138** | **119** | **18** |
+| **All releases** | | **106** | **39** | **145** | **124** | **18** |
 
 ## Last 7 days, day by day
 
@@ -63,12 +63,12 @@ Downloads before 2026-10-17 (when tracking started) are in the all-time totals a
 | github.com | 29 | 8 | 29 |
 | Bing | 12 | 7 | 12 |
 | Google | 7 | 5 | 7 |
-| search.brave.com | 4 | 4 | 4 |
 | orfeo.cc | 4 | 3 | 4 |
+| search.brave.com | 4 | 4 | 4 |
 | yandex.com.tr | 2 | 1 | 2 |
 | DuckDuckGo | 2 | 2 | 2 |
-| Yahoo | 1 | 1 | 1 |
 | ntp.msn.com | 1 | 1 | 1 |
+| Yahoo | 1 | 1 | 1 |
 
 GitHub only reports referring sites as 14-day totals. All-time adds up non-overlapping 14-day periods recorded since 2026-10-17. Search engines and AI assistants don't pass on what was searched.
 
