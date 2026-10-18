@@ -67,8 +67,8 @@ Downloads before 2026-10-17 (when tracking started) are in the all-time totals a
 | search.brave.com | 6 | 6 | 4 |
 | yandex.com.tr | 2 | 1 | 2 |
 | DuckDuckGo | 5 | 4 | 2 |
-| ntp.msn.com | 1 | 1 | 1 |
 | Yahoo | – | – | 1 |
+| ntp.msn.com | 1 | 1 | 1 |
 
 GitHub only reports referring sites as 14-day totals. All-time adds up non-overlapping 14-day periods recorded since 2026-10-17, plus an estimate for the days since the last full period (≈). Search engines and AI assistants don't pass on what was searched.
 
