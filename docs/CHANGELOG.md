@@ -5,6 +5,37 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
+## [Unreleased] — MIDI keyboard settings
+
+**In short**
+- A new MIDI Keyboard page in Settings: your keyboards, how quickly your playing is heard, touch, pedals, and a delay check.
+- With the Samples sound, the keys you play are heard 12 ms sooner.
+- General MIDI no longer goes silent when a USB keyboard is plugged in.
+- The MIDI icon names the keyboard you're actually playing. Click it to open its settings.
+- Orfeo is now in the Microsoft Store.
+
+### New
+- **Settings › MIDI Keyboard**, at the bottom of the Settings window:
+  - **Keyboards** — every connected keyboard by its own model name, with a light that flashes as you play it. Listen to all of them or only the ones you tick, reconnect automatically after unplugging, and *Rescan*.
+  - **Live playing response** (Samples) — *Low latency* (the default), *Balanced* and *Stable* (for computers that crackle).
+  - **Audio delay offset** — lines up key lights, count-in and tapping with what you hear when the measured delay isn't enough, such as Bluetooth headphones or an external instrument. It moves the picture, not the sound.
+  - **General MIDI sound** — play General MIDI through Orfeo's own synth or through a connected digital piano or sound module.
+  - **Touch response** — Soft, Normal, Hard or Fixed, plus ignoring very light touches and capping the loudest note.
+  - **Double-note filter** — ignores a key that accidentally sounds twice in a row.
+  - **Pedals & controls** — sustain, sostenuto and soft pedals, pitch bend, modulation wheel, aftertouch, expression and volume from your keyboard, each one marked *detected* once you use it and each one switchable off. The sustain pedal now works when you play your own keyboard.
+  - **Delay check** — how long each part of the trip from your key to the speaker takes on your computer, plus *Save log…* to send with a bug report.
+  - **Reset & repair** — clear stuck notes, reset MIDI input, reset these settings.
+- The first time you connect a new keyboard, Settings opens on its page.
+
+### Changed
+- **Keys you play on the Samples sound are heard 12 ms sooner.** They used to pass through the song's compressor and safety limiter, which hold every note back 6 ms each even when switched off. Songs still go through both.
+- **The MIDI icon in the top bar** shows the keyboard you're playing, not the first entry in Windows' device list. Its tooltip lists any other keyboards, and clicking it opens the MIDI Keyboard settings.
+- Unplugging a keyboard mid-note, or minimising Orfeo while holding keys, no longer leaves notes or the sustain pedal hanging.
+
+### Fixed
+- **The Microsoft Store version no longer tries to update itself from GitHub.** The Store keeps it up to date, and *Check for updates* opens the Store.
+- **General MIDI went silent with a USB keyboard plugged in.** Orfeo sent the song, and the keys you played, to the keyboard's own MIDI connection instead of its own synth. It now always uses its own synth unless you choose an instrument in *Settings › MIDI Keyboard › General MIDI sound*.
+
 ## [1.4.4] — 15. 10. 2026 — Starmap
 
 **In short**

@@ -12,6 +12,7 @@ import { useStore } from '../store'
 import { pushHitEffect, amberHex } from '../utils/hitEffectQueue'
 import { isHomogeneousHandTrack, resolveHandAwareColor } from '../utils/handColors'
 import { NES } from '../utils/noteEditorState'
+import { useMidiSettings, latencyOffsetSec, midiPrefsReady } from '../store/midiSettings'
 
 // ── Live edit-buffer awareness — mirrors useAudioEngine.ts's activeMidiData().
 // Gated on NES.dirty, not just NES.editMidi being non-null — the edit buffer
@@ -148,7 +149,121 @@ const _samplesChanInit = new Set<number>()
 // note was merely told to play. Exported so Keyboard.tsx's chord-name
 // display can apply the same correction. ────────────────────────────────
 export function getOutputLatencySec(): number {
+  const measured = getMeasuredOutputLatencySec()
+  return Math.max(0, measured + latencyOffsetSec())
+}
+// Raw device figure, without the user's manual offset (Settings readouts)
+export function getMeasuredOutputLatencySec(): number {
   return _ctx?.outputLatency || _ctx?.baseLatency || 0
+}
+
+// ── Live-playing path — notes from the player's own MIDI keyboard ──────────
+// Every DynamicsCompressorNode delays its output by a fixed 6 ms look-ahead
+// (measured: impulse in at 0 ms, out at exactly 6.00 ms, even at ratio 1:1),
+// so the master chain's compressor + safety limiter cost 12 ms on every
+// note. Fine for song playback, wrong for a key being played live. The
+// synth's worklet has one output per MIDI channel (0 = reverb/chorus,
+// 1..16 = channels 0..15), so channel 15 — the live/preview channel — can
+// take its own short path: gain → tone → zero-delay soft clip → speakers.
+// Songs that put a real track on channel 15 keep it on the full chain
+// (see applyLiveRouting) so that track still gets compressed/levelled.
+const LIVE_CH = 15
+const LIVE_OUTPUT = LIVE_CH + 1
+let _liveGainNode: GainNode | null = null
+let _liveFilterNode: BiquadFilterNode | null = null
+let _liveClipNode: WaveShaperNode | null = null
+let _liveRoutedDirect: boolean | null = null
+// Set when song playback reprograms channel 15; the next live note restores piano
+let _liveProgramDirty = true
+
+// Linear up to 0.8, then a smooth knee that never exceeds 1.0 — transparent
+// at normal playing levels, only shapes a hard 10-finger chord's peaks.
+// oversample 'none' keeps it zero-delay.
+function softClipCurve(): Float32Array<ArrayBuffer> {
+  const n = 2049, curve = new Float32Array(n), knee = 0.8
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1, a = Math.abs(x)
+    const y = a <= knee ? a : knee + (1 - knee) * Math.tanh((a - knee) / (1 - knee))
+    curve[i] = Math.sign(x) * y
+  }
+  return curve
+}
+
+// ── Wire channel 15 to the live path or the full chain. Called at init, when
+// the Live playing response setting changes, and when a song loads. ───────
+export function applyLiveRouting(): void {
+  const worklet = (_synth as any)?.worklet as AudioWorkletNode | undefined
+  if (!worklet || !_gainNode || !_liveGainNode) return
+  const midi = useStore.getState().midi as any
+  const songUsesLiveCh = !!midi?.tracks?.some((t: any) => t.channel === LIVE_CH && !t.isDrum && t.notes?.length)
+  const direct = useMidiSettings.getState().liveResponse !== 'balanced' && !songUsesLiveCh
+  if (direct === _liveRoutedDirect) return
+  try { worklet.disconnect(LIVE_OUTPUT) } catch {}
+  worklet.connect(direct ? _liveGainNode : _gainNode, LIVE_OUTPUT)
+  _liveRoutedDirect = direct
+}
+
+// Extra delay Orfeo itself adds to a live key right now (0 or 12 ms) — Settings
+export function getLiveChainDelaySec(): number {
+  return _liveRoutedDirect === false ? 0.012 : 0
+}
+// One synth processing block (128 samples) — the most a note can wait for its turn
+export function getSynthBlockSec(): number {
+  return _ctx ? 128 / _ctx.sampleRate : 0
+}
+// Whether the running sound engine was started with the larger Stable buffer
+// (null = not started yet). The setting itself only applies on the next start.
+let _startedStable: boolean | null = null
+export function getStartedStable(): boolean | null { return _startedStable }
+export function getSamplesSampleRate(): number {
+  return _ctx?.sampleRate ?? 0
+}
+
+function ensureLiveChannel() {
+  if (!_synth || !_liveProgramDirty) return
+  try { _synth.programChange(LIVE_CH, 0) } catch {}
+  _liveProgramDirty = false
+}
+
+// ── Live keyboard input — called straight from the MIDI message handler, before
+// any screen update, so nothing queues ahead of the sound. ─────────────────
+export function liveNoteOn(midiNum: number, vel127: number): void {
+  if (!_synth || !_synthReady) return
+  ensureLiveChannel()
+  _synth.noteOn(LIVE_CH, midiNum, vel127)
+}
+export function liveNoteOff(midiNum: number): void {
+  if (!_synth || !_synthReady) return
+  _synth.noteOff(LIVE_CH, midiNum)
+}
+// Pedals, wheels, pressure — on the live channel
+export function liveControl(cc: number, value: number): void {
+  if (!_synth || !_synthReady) return
+  try { ;(_synth as any).controllerChange(LIVE_CH, cc, value) } catch {}
+}
+export function livePitchBend(value14: number): void {
+  if (!_synth || !_synthReady) return
+  try { _synth.pitchWheel(LIVE_CH, value14) } catch {}
+}
+export function liveChannelPressure(value: number): void {
+  if (!_synth || !_synthReady) return
+  try { _synth.channelPressure(LIVE_CH, value) } catch {}
+}
+export function livePolyPressure(midiNum: number, value: number): void {
+  if (!_synth || !_synthReady) return
+  try { _synth.polyPressure(LIVE_CH, midiNum, value) } catch {}
+}
+// Clear stuck notes: everything on the live channel released, pedals up,
+// wheels centred, pressure off
+export function liveReset(): void {
+  if (!_synth || !_synthReady) return
+  try {
+    for (const cc of [64, 66, 67, 1]) (_synth as any).controllerChange(LIVE_CH, cc, 0)
+    ;(_synth as any).controllerChange(LIVE_CH, 11, 127)
+    _synth.pitchWheel(LIVE_CH, 8192)
+    _synth.channelPressure(LIVE_CH, 0)
+    ;(_synth as any).controllerChange(LIVE_CH, 123, 0)
+  } catch {}
 }
 
 // ── Per-note key-light timers ─────────────────────────────────────────────────
@@ -268,6 +383,7 @@ function clearSchedule() {
 // send. ─────────────────────────────────────────────────────────────────
 function ensureHwChannel() {
   if (!_synth) return
+  _liveProgramDirty = false
   try {
     _synth.programChange(15, 0)
     ;(_synth as any).controllerChange(15, 7, 127)
@@ -293,7 +409,14 @@ export async function initSamplesEngine(onProgress: (p: number) => void): Promis
 
   _synthInitP = (async () => {
     try {
-      _ctx = new AudioContext()
+      // 'interactive' is Chromium's default today, set explicitly so a future
+      // default can't quietly slow live playing down. Stable playback asks
+      // for the larger buffer (measured: +10 ms, fewer crackles on a busy
+      // machine); read once here, so it takes effect on the next start.
+      await midiPrefsReady
+      const stable = useMidiSettings.getState().liveResponse === 'stable'
+      _ctx = new AudioContext({ latencyHint: stable ? 'playback' : 'interactive' })
+      _startedStable = stable
 
       // ── Worklet: use ./ relative path so it resolves correctly in both dev
       // (http://localhost:5173/spessasynth_processor.min.js) and packaged
@@ -402,7 +525,28 @@ export async function initSamplesEngine(onProgress: (p: number) => void): Promis
       _safetyLimiterNode.attack.value = 0.001
       _safetyLimiterNode.release.value = 0.05
 
-      _synth.connect(_gainNode)
+      // Live-playing path (see applyLiveRouting) — mirrors master volume and tone
+      _liveGainNode = _ctx.createGain()
+      _liveGainNode.gain.value = _gainNode.gain.value
+      _liveFilterNode = _ctx.createBiquadFilter()
+      _liveFilterNode.type = 'highshelf'
+      _liveFilterNode.frequency.value = 3000
+      _liveFilterNode.gain.value = _filterNode.gain.value
+      _liveClipNode = _ctx.createWaveShaper()
+      _liveClipNode.curve = softClipCurve()
+      _liveClipNode.oversample = 'none'
+      _liveGainNode.connect(_liveFilterNode)
+      _liveFilterNode.connect(_liveClipNode)
+      _liveClipNode.connect(_ctx.destination)
+
+      // Outputs 0..15 (effects + channels 0-14) always take the full chain;
+      // output 16 (channel 15) is wired by applyLiveRouting
+      {
+        const worklet = (_synth as any).worklet as AudioWorkletNode
+        for (let i = 0; i < LIVE_OUTPUT; i++) worklet.connect(_gainNode, i)
+      }
+      _liveRoutedDirect = null
+      applyLiveRouting()
       _gainNode.connect(_filterNode)
       _filterNode.connect(_agcGainNode)
       _agcGainNode.connect(_analyserNode)
@@ -496,6 +640,7 @@ function buildSamplesPlayer(startSec: number) {
     if (!track.isDrum) {
       try { _synth.programChange(track.channel, ts.program) } catch {}
       _samplesChanInit.add(track.channel)
+      if (track.channel === LIVE_CH) _liveProgramDirty = true
     }
 
     // ── note.time and startSec are both in the file's OWN timeline (real
@@ -637,6 +782,7 @@ export function setMasterPan(value: number): void {
 export function setMasterTone(value: number): void {
   if (!_filterNode) return
   _filterNode.gain.value = value * 12
+  if (_liveFilterNode) _liveFilterNode.gain.value = value * 12
 }
 
 // ── setMasterCompressor — called on/off/preset change from MasterStrip, and
@@ -765,22 +911,26 @@ export function useSamplesEngine() {
       _clickNoteOffs.set(key, setTimeout(() => { _clickNoteOffs.delete(key); _synth?.noteOff(ch, midiNum) }, durMs))
       if (visual) lightKey(midiNum, color ?? amberHex(), durMs + 100)
     }
-    // ── Sustained note-on for hardware MIDI input ────────────────────────────
-    ;(window as any).__orfeoNoteOnSamples = (midiNum: number, vel: number) => {
-      if (!_synth || !_synthReady) return
-      ensureHwChannel()
-      _synth.noteOn(15, midiNum, Math.round(vel * 127))
-    }
-    // ── Immediate note-off for hardware MIDI input ───────────────────────────
-    ;(window as any).__orfeoNoteOffSamples = (midiNum: number) => {
-      if (!_synth || !_synthReady) return
-      _synth.noteOff(15, midiNum)
-    }
     return () => {
       delete (window as any).__orfeoPlayNoteSamples
-      delete (window as any).__orfeoNoteOnSamples
-      delete (window as any).__orfeoNoteOffSamples
     }
+  }, [])
+
+  // ── Live path routing follows the setting and the loaded song ─────────────
+  useEffect(() => {
+    let prevMidi = useStore.getState().midi
+    const unsubSong = useStore.subscribe((state) => {
+      if (state.midi === prevMidi) return
+      prevMidi = state.midi
+      applyLiveRouting()
+    })
+    let prevResp = useMidiSettings.getState().liveResponse
+    const unsubResp = useMidiSettings.subscribe((s) => {
+      if (s.liveResponse === prevResp) return
+      prevResp = s.liveResponse
+      applyLiveRouting()
+    })
+    return () => { unsubSong(); unsubResp() }
   }, [])
 
   // ── Subscribe to playback state and engine changes ───────────────────────
@@ -872,6 +1022,7 @@ export function useSamplesEngine() {
       if (state.masterVolume === prevVol) return
       prevVol = state.masterVolume
       if (_gainNode) _gainNode.gain.value = state.masterVolume * SAMPLES_BOOST
+      if (_liveGainNode) _liveGainNode.gain.value = state.masterVolume * SAMPLES_BOOST
     })
     return () => unsub()
   }, [])

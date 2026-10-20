@@ -237,9 +237,10 @@ declare global {
 // ── How the "check for updates" button behaves for this build, decided once
 // in electron/main.ts and read by SettingsPanel on mount:
 //   'auto'   — installed Windows build: electron-updater does check→download→install.
+//   'store'  — Microsoft Store build: the Store updates it; the button opens the Store.
 //   'manual' — portable / macOS / Linux / dev: the button just opens releasesUrl.
 export type UpdateInfo = {
-  mode: 'auto' | 'manual'
+  mode: 'auto' | 'store' | 'manual'
   releasesUrl: string
 }
 
@@ -273,4 +274,4 @@ export interface TapSession {
 // fold state (settingsGroupsCollapsed) already uses. ─────────────────────
 export type SettingsGroupId =
   | 'audio' | 'midi-files-library' | 'playback-editing' | 'practice'
-  | 'notation' | 'keyboard' | 'piano-roll' | 'appearance'
+  | 'notation' | 'keyboard' | 'piano-roll' | 'appearance' | 'midi'

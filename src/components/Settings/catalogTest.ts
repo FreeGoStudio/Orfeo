@@ -6,21 +6,21 @@ export function runCatalogTest(): number {
   let pass = 0, fail = 0
   const check = (c: boolean, m: string) => { c ? pass++ : (fail++, console.error('FAIL:', m)) }
 
-  // 1. 8 groups in the drawing's order, each with intro + orfeo.cc manual link
-  check(GROUPS.map(g => g.id).join() === 'audio,midi-files-library,playback-editing,practice,notation,keyboard,piano-roll,appearance', 'group order')
+  // 1. 9 groups in the drawing's order (MIDI Keyboard last), each with intro + orfeo.cc manual link
+  check(GROUPS.map(g => g.id).join() === 'audio,midi-files-library,playback-editing,practice,notation,keyboard,piano-roll,appearance,midi', 'group order')
   check(GROUPS.every(g => g.intro.length > 20 && g.manualUrl.startsWith('https://orfeo.cc/docs')), 'intro + manual url on every group')
 
   // 2. unique ids, every setting in a known group, every group non-empty, sizes per spec §4
   const ids = SETTINGS.map(s => s.id)
   check(new Set(ids).size === ids.length, 'unique setting ids')
   const count = (g: string) => SETTINGS.filter(s => s.group === g).length
-  check([3, 2, 7, 4, 5, 5, 4, 3].join() === GROUPS.map(g => count(g.id)).join(), `group sizes ${GROUPS.map(g => count(g.id))}`)
+  check([3, 2, 7, 4, 5, 5, 4, 3, 9].join() === GROUPS.map(g => count(g.id)).join(), `group sizes ${GROUPS.map(g => count(g.id))}`)
   check(SETTINGS.every(s => s.name && s.summary && s.description), 'name/summary/description on every setting')
   check(SETTINGS.every(s => !s.summary.includes('\n') && s.summary.length <= 90), 'summaries are one short line')
 
   // 3. Quick Settings = exactly the drawing's shortlist, in its order
   const quick = GROUPS.map(g => QUICK_LAYOUT[g.id].map(i => (typeof i === 'string' ? i : `#${i.heading}`)).join('+')).join(' | ')
-  check(quick === 'soundEngine | showDemo | focusMode+tapTempo+handAssignment | chordPrompter | displaySystem+accidentals+chordTracking | keyRange+showOctaves+showNoteNames | rollZoom+barNumbers+playbar | appZoom', `quick layout: ${quick}`)
+  check(quick === 'soundEngine | showDemo | focusMode+tapTempo+handAssignment | chordPrompter | displaySystem+accidentals+chordTracking | keyRange+showOctaves+showNoteNames | rollZoom+barNumbers+playbar | appZoom | ', `quick layout: ${quick}`)
   check(GROUPS.every(g => QUICK_LAYOUT[g.id].every(i => typeof i !== 'string' || SETTING_BY_ID[i].group === g.id)), 'quick items sit in their own group')
 
   // 4. search: name, description, keywords; case + accent insensitive; all words must match

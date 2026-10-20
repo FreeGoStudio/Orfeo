@@ -22,6 +22,8 @@ import { stepDisplayedBpm } from '../../utils/bpmStep'
 import { isCountingIn, cancelCountIn } from '../../utils/countInRunner'
 import { ContextMenu, ContextMenuItem, ContextMenuDivider, useMenuDismiss } from '../ContextMenu'
 import { t } from '../../utils/i18n'
+import { useMidiSettings } from '../../store/midiSettings'
+import { shortName } from '../../utils/midiDeviceNames'
 import { confirmDiscardDirtyNoteEdits } from '../../utils/noteEditorState'
 import { confirmDiscardDirtyTempoKey } from '../../utils/tempoKeySave'
 
@@ -88,6 +90,9 @@ export default function TopBar() {
   const closeMetroMenu = useCallback(() => setMetroMenu(null), [])
   const midiDeviceConnected = useStore((s) => s.midiDeviceConnected)
   const midiDeviceName = useStore((s) => s.midiDeviceName)
+  // Model of the keyboard being played, plus any others that are plugged in
+  const midiActiveKey = useMidiSettings((s) => s.activeDevice)
+  const midiOthers = useMidiSettings((s) => s.devices.filter(d => d.connected && d.key !== s.activeDevice).map(d => d.name).join(', '))
   const noteNaming = useStore((s) => s.noteNaming)
   const accidentals = useStore((s) => s.accidentals)
   const chordExplorerOpen = useStore((s) => s.chordExplorerOpen)
@@ -649,19 +654,22 @@ export default function TopBar() {
 
         <div style={{ width: 1, height: 'var(--button-height)', background: 'var(--border)', alignSelf: 'flex-end', marginBottom: 12 }} />
 
-        {/* MIDI */}
+        {/* MIDI — the keyboard being played; click opens its settings */}
         <Tooltip
-          title={midiDeviceConnected ? `MIDI: ${midiDeviceName}` : 'No MIDI keyboard connected'}
-          description={midiDeviceConnected ? 'MIDI keyboard is connected and ready to play.' : 'Connect an external MIDI keyboard via USB.'}
+          title={midiDeviceConnected ? midiDeviceName : t`No MIDI keyboard connected`}
+          description={midiDeviceConnected
+            ? (midiOthers ? t`Also connected: ${midiOthers}` + '\n' + t`Click for MIDI keyboard settings.` : t`Ready to play. Click for MIDI keyboard settings.`)
+            : t`Connect a MIDI keyboard by USB. Click for MIDI keyboard settings.`}
           placement="bottom"
           wrapperStyle={{ flexShrink: 0 }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '0 14px', color: midiDeviceConnected ? 'var(--topbar-midi-on)' : 'var(--topbar-midi-off)' }}>
+          <button className="app-no-drag" onClick={() => useStore.getState().openSettingsWindow('midi')} aria-label={t`MIDI keyboard settings`}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '0 14px', background: 'none', border: 'none', cursor: 'pointer', color: midiDeviceConnected ? 'var(--topbar-midi-on)' : 'var(--topbar-midi-off)' }}>
             <MidiIcon size={24} color={midiDeviceConnected ? 'var(--topbar-midi-on)' : 'var(--topbar-midi-off)'} />
             <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: midiDeviceConnected ? '0.08em' : '0.05em', color: midiDeviceConnected ? 'var(--topbar-midi-on)' : 'var(--topbar-midi-off)', lineHeight: 1, marginTop: 6, whiteSpace: 'nowrap' }}>
-              {midiDeviceConnected ? (midiDeviceName?.split(' ')[0] ?? 'MIDI') : 'NO KEYBOARD'}
+              {midiDeviceConnected ? shortName(midiActiveKey || midiDeviceName) : 'NO KEYBOARD'}
             </span>
-          </div>
+          </button>
         </Tooltip>
 
 

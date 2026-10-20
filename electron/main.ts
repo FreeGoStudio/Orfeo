@@ -1750,9 +1750,14 @@ ipcMain.handle('window:setFullScreen', (_e, value: boolean) => {
 // Settings "Check for updates" button just opening the releases page for
 // a manual look — see docs/CONTRIBUTING.md's "Releases & auto-update"
 // section. ─────────────────────────────────────────────────────────────────
-// ── Two distinct update modes, decided once here and never re-derived:
+// ── Three distinct update modes, decided once here and never re-derived:
 //   'auto'   — packaged Windows installer build: electron-updater drives the
 //              whole check → download → install flow against the GitHub feed.
+//   'store'  — Microsoft Store (MSIX) build: the Store updates the app itself.
+//              electron-updater must never run here — it would download the
+//              GitHub installer and put a second, non-Store copy beside it
+//              (and Store policy forbids an app updating itself). The button
+//              opens the Store's Downloads and updates page.
 //   'manual' — portable build, macOS/Linux, and dev: no installer for
 //              electron-updater to act on, so the button just opens the
 //              GitHub releases page in the browser. Nothing is ever
@@ -1761,9 +1766,11 @@ ipcMain.handle('window:setFullScreen', (_e, value: boolean) => {
 // button's tooltip + click behavior from it — it never has to click and
 // wait to discover which mode it's in. ───────────────────────────────────
 const RELEASES_URL = 'https://github.com/Squarebow/Orfeo/releases'
+const STORE_UPDATES_URL = 'ms-windows-store://downloadsandupdates'
 const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR
-const updateMode: 'auto' | 'manual' =
-  app.isPackaged && process.platform === 'win32' && !isPortable ? 'auto' : 'manual'
+const updateMode: 'auto' | 'store' | 'manual' =
+  process.windowsStore ? 'store'
+  : app.isPackaged && process.platform === 'win32' && !isPortable ? 'auto' : 'manual'
 
 autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = false
@@ -1802,6 +1809,7 @@ ipcMain.handle('update:check', () => {
   // 'manual' mode: the only action is "open the releases page". Keep it in
   // main so the button does exactly one thing regardless of build.
   if (updateMode === 'manual') { void shell.openExternal(RELEASES_URL); return }
+  if (updateMode === 'store') { void shell.openExternal(STORE_UPDATES_URL); return }
   autoUpdater.checkForUpdates().catch((err) => sendUpdateStatus(summarizeUpdateError(err)))
 })
 

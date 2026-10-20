@@ -13,7 +13,7 @@
     "build": "npm run copyworklet && npm run check:hand-engine && electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run copyworklet && npm run check:hand-engine && electron-vite build && electron-builder",
+    "dist": "npm run copyworklet && npm run check:hand-engine && electron-vite build && electron-builder --win nsis portable appx",
     "dist:portable": "npm run copyworklet && npm run check:hand-engine && electron-vite build && electron-builder --win portable",
     "release:notes": "node scripts/release-notes.mjs"
   },
@@ -85,9 +85,23 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "appx",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "public/icon.ico"
+    },
+    "appx": {
+      "applicationId": "Orfeo",
+      "identityName": "Squarebow.Orfeo",
+      "publisher": "CN=0D175E82-5309-4021-B6EE-10D4D85601F5",
+      "publisherDisplayName": "Squarebow",
+      "artifactName": "Orfeo-${version}.${ext}",
+      "showNameOnTiles": true
     },
     "nsis": {
       "artifactName": "Orfeo-Setup-${version}.${ext}",

@@ -580,6 +580,7 @@ export function UpdateButton({ placement = 'left', showStatus = true }: { placem
       <Tooltip
         title={
           updateInfo.mode === 'manual'         ? t`Check for updates` :
+          updateInfo.mode === 'store'          ? t`Updates come from the Microsoft Store — click to check there` :
           updateStatus.state === 'checking'    ? 'Checking for updates…' :
           updateStatus.state === 'downloading' ? `Downloading update${updateStatus.percent ? ` — ${Math.round(updateStatus.percent)}%` : '…'}` :
           updateStatus.state === 'ready'       ? `Update ${updateStatus.version ?? ''} ready — click to restart and install` :

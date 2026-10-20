@@ -10,11 +10,17 @@ import { pushHitEffect, amberHex } from '../utils/hitEffectQueue'
 import { isHomogeneousHandTrack, resolveHandAwareColor } from '../utils/handColors'
 import { NES } from '../utils/noteEditorState'
 import { editableCopyToBuffer } from '../utils/noteEditorCommands'
+import { useMidiSettings, latencyOffsetSec, midiPrefsReady } from '../store/midiSettings'
 
 let _jzzReady = false
 let _jzzInitP: Promise<void> | null = null
 let _JZZ: any = null
 let _port: any = null
+// jzz-synth-tiny instance, kept once created so switching the GM output back
+// to Orfeo's own synth doesn't build a second audio context
+let _tinyPort: any = null
+// Name of the MIDI output port actually open ('' = Orfeo's built-in synth)
+let _openOutput = ''
 let _player: any = null
 // ── Module-level muted channel set — updated in-place so the live filter reads it ──
 let _mutedCh = new Set<number>()
@@ -31,11 +37,16 @@ let _warmupPromise: Promise<void> | null = null
 // has no equivalent to measure this way, so this returns 0 for that case —
 // not compensated, not yet measured. ─────────────────────────────────────
 export function getOutputLatencySec(): number {
+  return Math.max(0, getMeasuredOutputLatencySec() + latencyOffsetSec())
+}
+// Raw device figure, without the user's manual offset (Settings readouts)
+export function getMeasuredOutputLatencySec(): number {
   try {
     const ctx = typeof _port?.getAudioContext === 'function' ? _port.getAudioContext() : null
     return ctx?.outputLatency || ctx?.baseLatency || 0
   } catch { return 0 }
 }
+export function getGmOutputName(): string { return _openOutput }
 
 function initJZZ(): Promise<void> {
   if (_jzzReady) return Promise.resolve()
@@ -52,25 +63,44 @@ function initJZZ(): Promise<void> {
       await new Promise<void>((resolve) => {
         engine.and(function(this: any) { resolve() }).or(() => resolve())
       })
-      await new Promise<void>((resolve) => {
-        _JZZ().openMidiOut().and(function(this: any) {
-          _port = this; _jzzReady = true
-          console.log('[Orfeo GM] System MIDI out:', this.name())
+      // ── Output: Orfeo's own synth unless the player chose a MIDI output in
+      // Settings → MIDI Keyboard. This used to be openMidiOut() with no
+      // name = "first MIDI output there is". Chromium hides Windows' GS
+      // Wavetable Synth, so with a USB keyboard plugged in, the first output
+      // was the KEYBOARD's own MIDI port — songs and live keys were sent
+      // back to the keyboard (silent on a controller without speakers).
+      // Confirmed with a simulated Launchkey port: JZZ opened it and the
+      // note went there. ──────────────────────────────────────────────────
+      await midiPrefsReady
+      const wanted = useMidiSettings.getState().gmOutput
+      const openTiny = () => new Promise<void>((resolve) => {
+        if (_tinyPort) { _port = _tinyPort; _openOutput = ''; _jzzReady = true; resolve(); return }
+        _JZZ.synth.Tiny().and(function(this: any) {
+          _port = _tinyPort = this; _openOutput = ''; _jzzReady = true
+          console.log('[Orfeo GM] jzz-synth-tiny active')
+          // Diagnostic for the audio/visual sync fix — see
+          // getOutputLatencySec() above.
+          console.log('[Orfeo GM] measured output latency:', getMeasuredOutputLatencySec(), 's')
           resolve()
-        }).or(() => {
-          _JZZ.synth.Tiny().and(function(this: any) {
-            _port = this; _jzzReady = true
-            console.log('[Orfeo GM] jzz-synth-tiny active')
-            // Diagnostic for the audio/visual sync fix — see
-            // getOutputLatencySec() above.
-            console.log('[Orfeo GM] measured output latency:', getOutputLatencySec(), 's')
-            resolve()
-          }).or((e: any) => {
-            console.error('[Orfeo GM] Both MIDI outputs failed:', e)
-            _jzzReady = true; resolve()
-          })
+        }).or((e: any) => {
+          console.error('[Orfeo GM] built-in synth failed:', e)
+          _jzzReady = true; resolve()
         })
       })
+      if (wanted) {
+        await new Promise<void>((resolve) => {
+          _JZZ().openMidiOut(wanted).and(function(this: any) {
+            _port = this; _openOutput = wanted; _jzzReady = true
+            console.log('[Orfeo GM] MIDI out:', this.name())
+            resolve()
+          }).or(() => {
+            console.warn('[Orfeo GM] chosen MIDI output not available, using the built-in synth:', wanted)
+            openTiny().then(resolve)
+          })
+        })
+      } else {
+        await openTiny()
+      }
     } catch (e) {
       _jzzInitP = null
       console.error('[Orfeo GM] JZZ init error:', e)
@@ -349,6 +379,43 @@ function applyMasterVolume(v: number) {
   try { for (let ch = 0; ch < 16; ch++) _port.send([0xB0 | ch, 7, val]) } catch {}
 }
 
+// ── Settings → MIDI Keyboard changed the GM output: silence, close the old
+// port, open the new one. Playback is paused first so the song player isn't
+// left connected to a closed port; Play resumes on the new output. ────────
+export async function reopenGmOutput(): Promise<void> {
+  if (!_jzzReady && !_jzzInitP) return  // not started yet — next init reads the setting
+  const st = useStore.getState()
+  if (st.audioEngine === 'gm' && st.playbackState === 'playing') st.setPlaybackState('paused')
+  try { await _jzzInitP } catch {}
+  // GM's lights/player only — with Samples playing, its lights stay untouched
+  if (st.audioEngine === 'gm') stopAudio()
+  else destroyPlayer()
+  if (_port && _port !== _tinyPort) { try { _port.close() } catch {} }
+  _port = null; _jzzReady = false; _jzzInitP = null; _prepared = null
+  await initJZZ()
+}
+
+// ── Live keyboard input (GM) — always channel 16 (index 15) ──────────────────
+// The very first key before the synth exists waits for it rather than being lost
+export function liveNoteOn(midiNum: number, vel127: number): void {
+  const play = () => { if (!_port) return; ensureHardwareChannel(); try { _port.send([0x9F, midiNum, vel127]) } catch {} }
+  if (_port) play(); else initJZZ().then(play).catch(() => {})
+}
+export function liveSend(bytes: number[]): void {
+  if (!_port) { void initJZZ(); return }
+  try { _port.send(bytes) } catch {}
+}
+export function liveReset(): void {
+  if (!_port) return
+  try {
+    for (const cc of [64, 66, 67, 1]) _port.send([0xBF, cc, 0])
+    _port.send([0xBF, 11, 127])
+    _port.send([0xEF, 0, 64])
+    _port.send([0xDF, 0])
+    _port.send([0xBF, 123, 0])
+  } catch {}
+}
+
 function stopAudio() {
   destroyPlayer(); clearLightSchedule(); clearAllKeys()
   if (_port) {
@@ -446,20 +513,6 @@ export function useAudioEngine() {
     }
     ;(window as any).__orfeoPlayNote = playNote
 
-    // ── Sustained note-on for hardware MIDI input (GM path) ──────────────────
-    ;(window as any).__orfeoNoteOn = async (midiNum: number, vel: number) => {
-      try {
-        await initJZZ()
-        if (!_port) return
-        ensureHardwareChannel()
-        _port.send([0x9F, midiNum, Math.round(vel * 127)])
-      } catch (e) { console.error('[Orfeo GM] noteOn error:', e) }
-    }
-    // ── Immediate note-off for hardware MIDI input (GM path) ─────────────────
-    ;(window as any).__orfeoNoteOff = (midiNum: number) => {
-      try { _port?.send([0x8F, midiNum, 0]) } catch (e) { console.error('[Orfeo GM] noteOff error:', e) }
-    }
-
     // ── Warm up GM channels via a temporary silent SMF player ────────────────
     ;(window as any).__orfeoWarmupEditChannels = () => {
       if (useStore.getState().audioEngine === 'gm') warmupEditChannels()
@@ -468,8 +521,6 @@ export function useAudioEngine() {
     return () => {
       delete (window as any).__orfeoPlayNote
       delete (window as any).__orfeoWarmupEditChannels
-      delete (window as any).__orfeoNoteOn
-      delete (window as any).__orfeoNoteOff
       stopAudio()
     }
   }, [])

@@ -1,0 +1,118 @@
+// ── MIDI keyboard timing diagnostics + exportable performance log ────────────
+// Per key press, two numbers measured on the real machine:
+//  • input  — Windows/Chromium received the key → Orfeo's handler started
+//             (the MIDI event's own timestamp vs. performance.now(); this is
+//             where a busy screen redraw would show up)
+//  • handle — handler start → the note was handed to the synth
+// The fixed parts (synth block, Orfeo's own chain, the output device) come
+// from the engines. Nothing here is persisted; the log is for bug reports.
+
+import { useStore } from '../store'
+import { useMidiSettings } from '../store/midiSettings'
+import {
+  getMeasuredOutputLatencySec as samplesOut, getLiveChainDelaySec, getSynthBlockSec, getSamplesSampleRate,
+} from '../hooks/useSamplesEngine'
+import { getMeasuredOutputLatencySec as gmOut, getGmOutputName } from '../hooks/useAudioEngine'
+
+interface NoteSample { at: number; inputMs: number | null; handleMs: number; note: number; vel: number; device: string }
+
+const MAX = 500
+const _samples: NoteSample[] = []
+export const counters = { duplicatesDropped: 0, softIgnored: 0, stuckReleases: 0, disconnects: 0, messages: 0 }
+
+let _bumpTimer: ReturnType<typeof setTimeout> | null = null
+function bump() {
+  if (_bumpTimer) return
+  _bumpTimer = setTimeout(() => {
+    _bumpTimer = null
+    useMidiSettings.setState(s => ({ diagVersion: s.diagVersion + 1 }))
+  }, 250)
+}
+
+export function recordNote(eventStamp: number, t0: number, t1: number, note: number, vel: number, device: string) {
+  // A stamp of 0, or one "after" the handler started, means the browser gave
+  // no usable receive time for this message — keep the handle part only
+  const inputMs = eventStamp > 0 && eventStamp <= t0 ? t0 - eventStamp : null
+  _samples.push({ at: t0, inputMs, handleMs: t1 - t0, note, vel, device })
+  if (_samples.length > MAX) _samples.shift()
+  bump()
+}
+export function countEvent(k: keyof typeof counters) { counters[k]++; if (k !== 'messages') bump() }
+
+export function clearDiagnostics() {
+  _samples.length = 0
+  for (const k of Object.keys(counters) as (keyof typeof counters)[]) counters[k] = 0
+  bump()
+}
+
+export interface TimingStats {
+  notes: number
+  lastInputMs: number | null; avgInputMs: number | null; worstInputMs: number | null
+  avgHandleMs: number | null; worstHandleMs: number | null
+}
+export function getStats(): TimingStats {
+  const inp = _samples.map(s => s.inputMs).filter((v): v is number => v !== null)
+  const hnd = _samples.map(s => s.handleMs)
+  const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null)
+  const max = (a: number[]) => (a.length ? Math.max(...a) : null)
+  return {
+    notes: _samples.length,
+    lastInputMs: _samples.length ? _samples[_samples.length - 1].inputMs : null,
+    avgInputMs: avg(inp), worstInputMs: max(inp), avgHandleMs: avg(hnd), worstHandleMs: max(hnd),
+  }
+}
+
+// ── The fixed parts of key → ear for the current engine, in ms ──────────────
+export interface DelayBreakdown {
+  engine: 'gm' | 'samples'
+  synthBlockMs: number      // waiting for the synth's next 128-sample block (worst case)
+  chainMs: number           // Orfeo's own processing (Samples: 0 on the live path, 12 through the compressors)
+  outputMs: number | null   // the sound card / Windows output; null = can't be measured for this output
+  externalOutput: string    // GM sent to a MIDI device instead of Orfeo's synth
+}
+export function getDelayBreakdown(): DelayBreakdown {
+  const engine = useStore.getState().audioEngine
+  if (engine === 'samples') {
+    const out = samplesOut()
+    return { engine, synthBlockMs: getSynthBlockSec() * 1000, chainMs: getLiveChainDelaySec() * 1000, outputMs: out > 0 ? out * 1000 : null, externalOutput: '' }
+  }
+  const out = gmOut()
+  const ext = getGmOutputName()
+  return { engine, synthBlockMs: ext ? 0 : 128 / 48000 * 1000, chainMs: 0, outputMs: out > 0 && !ext ? out * 1000 : null, externalOutput: ext }
+}
+
+// ── Exportable performance log — JSON a player can attach to a bug report
+export function buildPerformanceLog() {
+  const m = useMidiSettings.getState()
+  const prefs = Object.fromEntries(Object.entries(m).filter(([k, v]) => typeof v !== 'function' && !['activity', 'diagVersion', 'devices', 'outputs', 'detected'].includes(k)))
+  return {
+    kind: 'orfeo-midi-performance-log',
+    version: 1,
+    appVersion: __APP_VERSION__,
+    createdAt: new Date().toISOString(),
+    platform: navigator.userAgent,
+    audioEngine: useStore.getState().audioEngine,
+    sampleRate: getSamplesSampleRate() || null,
+    delay: getDelayBreakdown(),
+    timing: getStats(),
+    counters: { ...counters },
+    devices: m.devices,
+    outputs: m.outputs,
+    detectedControls: m.detected,
+    settings: prefs,
+    notes: _samples.map(s => ({ ...s, at: Math.round(s.at), inputMs: s.inputMs === null ? null : +s.inputMs.toFixed(2), handleMs: +s.handleMs.toFixed(2) })),
+  }
+}
+
+export function exportPerformanceLog() {
+  const json = JSON.stringify(buildPerformanceLog(), null, 2)
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+  const a = document.createElement('a')
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+  a.href = url
+  a.download = `orfeo-midi-log-${stamp}.json`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
+}

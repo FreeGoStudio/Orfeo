@@ -16,7 +16,7 @@ export default function QuickSettings() {
   const setCollapsed = useStore(s => s.setSettingsGroupCollapsed)
   return (
     <>
-      {GROUPS.map(g => {
+      {GROUPS.filter(g => QUICK_LAYOUT[g.id].length > 0).map(g => {
         const Icon = GROUP_ICONS[g.id]
         return (
           <CollapsibleSection key={g.id} icon={<Icon size={11} />} label={g.name}

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { useStore } from '../store'
 import type { SoundfontId, SoundfontInfo } from '../types'
-import { initSamplesEngine, loadSelectedSoundfont, getOutputLatencySec as getSamplesOutputLatencySec } from './useSamplesEngine'
-import { getOutputLatencySec as getGmOutputLatencySec } from './useAudioEngine'
+import { initSamplesEngine, loadSelectedSoundfont, getMeasuredOutputLatencySec as getSamplesOutputLatencySec } from './useSamplesEngine'
+import { getMeasuredOutputLatencySec as getGmOutputLatencySec } from './useAudioEngine'
 
 // ── Sound sets + Samples loading — one shared copy for the drawer's Quick
 // Settings and the Settings window (both show the same status). ──────────

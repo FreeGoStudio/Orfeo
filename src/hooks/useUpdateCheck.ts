@@ -13,7 +13,7 @@ const setStatus = (status: UpdateStatus) => useUpdateState.setState({ status })
 
 export function pressUpdateButton() {
   const { status, info } = useUpdateState.getState()
-  if (info.mode === 'manual') { void window.electronAPI.checkForUpdates(); return }
+  if (info.mode === 'manual' || info.mode === 'store') { void window.electronAPI.checkForUpdates(); return }
   if (status.state === 'ready') { void window.electronAPI.installUpdate(); return }
   if (status.state === 'error') { void window.electronAPI.openExternal(info.releasesUrl); return }
   setStatus({ state: 'checking' })

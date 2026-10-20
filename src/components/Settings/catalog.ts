@@ -16,6 +16,8 @@ export type SettingId =
   | 'keyRange' | 'showOctaves' | 'showNoteNames' | 'reflectPianoRoll' | 'preciseScrubTime'
   | 'rollZoom' | 'barNumbers' | 'playbar' | 'visualEffects'
   | 'theme' | 'appZoom' | 'starmap'
+  | 'midiKeyboards' | 'liveResponse' | 'latencyOffset' | 'gmOutput' | 'touchResponse' | 'duplicateFilter'
+  | 'pedalsControls' | 'delayCheck' | 'midiTools'
 
 export interface SettingInfo {
   id: SettingId
@@ -35,6 +37,7 @@ export const GROUPS: GroupInfo[] = [
   { id: 'keyboard', name: t`Keyboard`, intro: t`The on-screen keyboard: its size and what's printed on the keys.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
   { id: 'piano-roll', name: t`Piano Roll`, intro: t`The falling-notes view: zoom, bar lines, the playbar and visual effects.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll' },
   { id: 'appearance', name: t`Appearance`, intro: t`How Orfeo looks: theme, the size of everything on screen, and the Starmap view.`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
+  { id: 'midi', name: t`MIDI Keyboard`, intro: t`Your own MIDI keyboard: which ones Orfeo listens to, how quickly your playing is heard, touch, pedals, and a delay check.`, manualUrl: 'https://orfeo.cc/docs/settings/midi-keyboard-settings' },
 ]
 
 export const SETTINGS: SettingInfo[] = [
@@ -145,6 +148,34 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'starmap', group: 'appearance', name: t`Starmap`, summary: t`Adds the Starmap view to the Scales Explorer.`,
     description: t`Makes the Starmap available in the Scales Explorer: switch it on in the explorer's Starmap row to swap the Circle of Fifths for a ring of the 12 notes. The chord you hear is drawn as a glowing star joining its notes, gliding from chord to chord — every major chord is the same shape turned, every minor chord its mirror image.`,
     keywords: 'starmap star shape circle scales explorer chord geometry' },
+  // ── MIDI Keyboard
+  { id: 'midiKeyboards', group: 'midi', name: t`Keyboards`, summary: t`Which connected keyboards Orfeo listens to.`,
+    description: t`Every MIDI keyboard connected by USB, with a light that flashes as you play it. Listen to all of them, or only the ones you tick. The top bar shows the one you're playing.`,
+    keywords: 'midi keyboard usb device controller connect input port rescan reconnect' },
+  { id: 'liveResponse', group: 'midi', name: t`Live playing response`, summary: t`How quickly a key you play is heard.`,
+    description: t`Samples engine. Low latency: the keys you play skip the compressor and limiter the song goes through, and are heard 12 ms sooner. Balanced: your keys share the song's compressor (12 ms later). Stable: a larger sound buffer for computers that crackle (10 ms later, from the next start).`,
+    keywords: 'latency delay lag responsiveness buffer low latency balanced stable crackle' },
+  { id: 'latencyOffset', group: 'midi', name: t`Audio delay offset`, summary: t`Line the screen up with what you hear.`,
+    description: t`Orfeo measures how late your sound output plays and lights keys, counts in and reads taps to match. If it still feels off — Bluetooth headphones, or General MIDI played through an external instrument — shift it here. This moves the picture, not the sound: no setting can make a note arrive sooner.`,
+    keywords: 'latency delay offset compensation sync bluetooth calibrate' },
+  { id: 'gmOutput', group: 'midi', name: t`General MIDI sound`, summary: t`Play General MIDI through Orfeo or an external instrument.`,
+    description: t`General MIDI plays through Orfeo's own synth. Choose a connected instrument here to hear it through a digital piano's or sound module's own sounds instead.`,
+    keywords: 'gm general midi output port device sound module digital piano external' },
+  { id: 'touchResponse', group: 'midi', name: t`Touch response`, summary: t`How your playing strength turns into loudness.`,
+    description: t`Soft makes gentle playing louder, Hard needs a firmer touch for the same loudness, Fixed plays every note at one level. You can also ignore very light touches and cap the loudest.`,
+    keywords: 'velocity curve sensitivity touch soft hard fixed minimum maximum dynamics' },
+  { id: 'duplicateFilter', group: 'midi', name: t`Double-note filter`, summary: t`Ignore a key that accidentally sounds twice.`,
+    description: t`Some keyboards now and then send one key press twice in a row — a worn key contact, for example. Repeats of the same key closer together than this are ignored.`,
+    keywords: 'duplicate double trigger repeat filter glitch' },
+  { id: 'pedalsControls', group: 'midi', name: t`Pedals & controls`, summary: t`Sustain pedal, wheels and key pressure from your keyboard.`,
+    description: t`A keyboard can't tell Orfeo which pedals and controls it has, so each one shows as detected the first time you use it. Switch any of them off to have Orfeo ignore it.`,
+    keywords: 'sustain pedal sostenuto soft pitch bend modulation wheel aftertouch pressure expression volume' },
+  { id: 'delayCheck', group: 'midi', name: t`Delay check`, summary: t`How long the trip from your key to the speaker takes.`,
+    description: t`Play a few notes: Orfeo shows how long each part of the trip from your key to the speaker takes on this computer. Save a log to send along with a bug report.`,
+    keywords: 'latency delay diagnostic measure test log export performance report' },
+  { id: 'midiTools', group: 'midi', name: t`Reset & repair`, summary: t`Fix hanging notes or a confused keyboard.`,
+    description: t`Clear stuck notes lets go of every key and pedal. Reset MIDI input also reconnects every keyboard. Reset settings puts everything on this page back to how it started.`,
+    keywords: 'stuck hanging notes reset panic all notes off reconnect defaults' },
 ]
 
 export const SETTING_BY_ID = Object.fromEntries(SETTINGS.map(s => [s.id, s])) as Record<SettingId, SettingInfo>
@@ -161,4 +192,6 @@ export const QUICK_LAYOUT: Record<SettingsGroupId, QuickItem[]> = {
   'keyboard': ['keyRange', 'showOctaves', 'showNoteNames'],
   'piano-roll': ['rollZoom', 'barNumbers', 'playbar'],
   'appearance': ['appZoom'],
+  // Settings window only for now
+  'midi': [],
 }

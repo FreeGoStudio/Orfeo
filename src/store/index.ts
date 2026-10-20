@@ -964,6 +964,7 @@ export const useStore = create<OrfeoStore>((set, get) => ({
     keyboard: false,
     'piano-roll': false,
     appearance: false,
+    midi: false,
   },
   setSettingsGroupCollapsed: (id, collapsed) => set((s) => ({
     settingsGroupsCollapsed: { ...s.settingsGroupsCollapsed, [id]: collapsed },

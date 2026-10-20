@@ -136,10 +136,13 @@ So: **no auto-update on macOS/Linux, by design** — same as the Windows
 **portable** build (no installer for `electron-updater` to act on). Users on
 any of these check the [Releases](https://github.com/Squarebow/Orfeo/releases)
 page manually. `electron/main.ts` decides this once as `updateMode` (`'auto'`
-for the installed Windows build, `'manual'` for everything else) and the
-renderer reads it on mount via `update:info`; in `'manual'` mode the Settings
-"Check for updates" button just opens the Releases page in the browser — it
-never enters a checking/downloading state.
+for the installed Windows build, `'store'` for the Microsoft Store build,
+`'manual'` for everything else) and the renderer reads it on mount via
+`update:info`; in `'manual'` mode the Settings "Check for updates" button just
+opens the Releases page in the browser — it never enters a checking/downloading
+state. In `'store'` mode (`process.windowsStore`) the Store updates the app and
+the button opens the Store's *Downloads and updates* page; `electron-updater`
+never runs there, since it would install a second, non-Store copy.
 
 </details>
 
@@ -154,13 +157,15 @@ it.
 |---|---|---|
 | 1. Changelog | `docs/CHANGELOG.md` | A section `## [X.Y.Z] — D. M. YYYY — Title` at the top, optionally starting with an **In short** list of 2–4 lines, then `### New` / `### Changed` / `### Fixed`. Preview the notes with `npm run release:notes -- X.Y.Z`. |
 | 2. Version and tag | Git | `version` in `package.json` set to `X.Y.Z`, committed, tagged `vX.Y.Z`; the commit, the tag and `main` pushed to GitHub. |
-| 3. Run the workflow | GitHub → Actions → **Release** → **Run workflow** | Branch `main`, version `X.Y.Z`. Optional: *Pre-release* (installed copies don't update to it) or *Test run* (keeps the release as a draft). |
+| 3. Run the workflow | GitHub → Actions → **Release** → **Run workflow** | Branch `main`, version `X.Y.Z`. Optional: *Pre-release* (installed copies don't update to it, and the Store is skipped), *Test run* (keeps the release as a draft; the Store only gets a draft), and *Microsoft Store*: `submit` (default), `draft` or `skip`. |
 
 The workflow checks that the tag, `package.json` and the changelog agree,
 builds the installer (`Orfeo-Setup-X.Y.Z.exe`) and the portable app
 (`Orfeo-X.Y.Z-portable.exe`) on Windows from the tag, uploads them with
 `latest.yml` and the blockmap, writes the release notes from the changelog and
-publishes the release as *Latest*.
+publishes the release as *Latest*. It then builds the Microsoft Store package
+(`Orfeo-X.Y.Z.appx`, from the same app folder) and submits it to the Store —
+see below.
 
 > [!IMPORTANT]
 > `latest.yml` is what makes auto-update work, and `electron-updater` only sees
@@ -174,7 +179,47 @@ from before the public release.
 
 Fallback, if GitHub Actions is unavailable: `GH_TOKEN=<token> npm run dist`
 on a Windows machine uploads the same files to a draft release; publish it by
-hand on the Releases page.
+hand on the Releases page. `npm run dist` also builds `release/Orfeo-X.Y.Z.appx`
+for a manual upload in Partner Center.
+
+### Microsoft Store
+
+Orfeo is in the Microsoft Store as an MSIX package (`appx` in `package.json`,
+identity `Squarebow.Orfeo`; tile logos in `build/appx/`). The **4. Microsoft
+Store** job of the release workflow uploads each new version with the
+[Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/overview):
+`msstore publish` starts a new submission from the last published one (same
+listing, screenshots and price), swaps in the new package and commits it for
+certification. Store users get the update automatically once it passes.
+
+- The Store needs a plain version (`1.5.0` → package `1.5.0.0`), higher than
+  the one already in the Store. Pre-releases are never sent to the Store.
+- A *Test run*, or *Microsoft Store: draft*, only uploads the package and
+  leaves the submission as a draft in Partner Center to review and submit by hand.
+- Until the one-time setup below is done, the job just says so and skips; the
+  `.appx` is still in the run's `store-package` artifact for a manual upload.
+
+One-time setup (Partner Center + GitHub):
+
+1. Partner Center → **Account settings → Tenants**: associate (or create) a
+   Microsoft Entra ID tenant.
+2. [Entra admin center](https://entra.microsoft.com) → **App registrations →
+   New registration** (e.g. `orfeo-store-publisher`). Note its **Application
+   (client) ID** and the **Directory (tenant) ID**; under **Certificates &
+   secrets** create a client secret and copy its value.
+3. Partner Center → **Account settings → User management → Microsoft Entra
+   applications → Add**: add that app with the **Manager** role.
+4. Partner Center → **Account settings → Legal info** (or *Identifiers*): copy
+   the **Seller ID**. The app's **Store ID** (12 characters, starts with `9`) is
+   under *Product management → Product identity*.
+5. GitHub → **Settings → Secrets and variables → Actions**:
+   - Secrets: `AZURE_AD_TENANT_ID`, `AZURE_AD_APPLICATION_CLIENT_ID`,
+     `AZURE_AD_APPLICATION_SECRET`, `SELLER_ID`.
+   - Variable: `MS_STORE_PRODUCT_ID` = the Store ID.
+
+The client secret expires (the Entra default is 6 months to 2 years): renew it
+in Entra and update `AZURE_AD_APPLICATION_SECRET` before it does, or the Store
+job fails at *Sign in to Partner Center*.
 
 <details>
 <summary><b>Contributing a macOS / Linux build (community)</b></summary>

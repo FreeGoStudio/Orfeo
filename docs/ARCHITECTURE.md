@@ -17,6 +17,7 @@ feature list see the [README](../README.md).
 - [Rendering — PixiJS / WebGL](#rendering--pixijs--webgl)
 - [State — Zustand](#state--zustand)
 - [Audio — two engines](#audio--two-engines)
+- [MIDI keyboard input](#midi-keyboard-input)
 - [MIDI parsing and foreign formats](#midi-parsing-and-foreign-formats)
 - [Music theory — tonal.js](#music-theory--tonaljs)
 - [Chord and Scales Explorers — shared logic](#chord-and-scales-explorers--shared-logic)
@@ -182,10 +183,12 @@ Orfeo ships **two independent playback engines**. The user picks one in
 | **GM Synth** | `useAudioEngine.ts` — lazy-loads `jzz`, `jzz-midi-smf`, `jzz-synth-tiny` | General-MIDI wavetable | Instant, nothing to download | Quick playback, low resource use |
 | **Samples** | `useSamplesEngine.ts` — `spessasynth_lib` `WorkletSynthesizer` running `spessasynth_processor.min.js` as an AudioWorklet | SF2 / SF3 soundfonts | One-time download (~31 MB for GeneralUser GS) | Musical, expressive listening |
 
-**GM Synth** first tries to open a real hardware MIDI-out port; if there is none
-it falls back to JZZ's built-in `Tiny` synth. The same JZZ layer also handles
-**hardware MIDI input** (play-along), with true sustain and multi-device
-support.
+**GM Synth** plays through JZZ's built-in `Tiny` synth. It opens a hardware
+MIDI-out port only when the user picks one in *Settings → MIDI Keyboard →
+General MIDI sound* (`midiSettings.gmOutput`). It never picks the "first port
+there is": Chromium hides Windows' GS Wavetable Synth, so with a USB keyboard
+plugged in the first output is the keyboard's own port, and songs and live keys
+would be sent back to a controller that has no speakers.
 
 **Samples** downloads soundfonts on demand into the app-data folder and caches
 them. The catalog (GeneralUser GS, FluidR3 GM, MuseScore General) is data-driven
@@ -204,6 +207,62 @@ that channel during normal playback and would otherwise leave the preview
 channel set to the wrong instrument for the rest of the session.
 
 </details>
+
+---
+
+## MIDI keyboard input
+
+`src/hooks/useMidiInput.ts` owns the one Web MIDI connection
+(`navigator.requestMIDIAccess`). Settings and live device state live in their
+own small store, `src/store/midiSettings.ts`, persisted under the
+`midiSettings` key of `orfeo-prefs.json`. It's a separate store so that
+activity lights and pedal detection don't wake every main-store subscriber on
+each key press.
+
+- **Devices.** Windows lists one keyboard as several ports (`MIDIIN2 (…)`,
+  `… MIDI`). `utils/midiDeviceNames.ts` cleans each port name to the model name,
+  and all ports with the same model name count as one device. The top bar shows
+  the device last played; Settings lists them all, with *listen to all / only
+  ticked*. The first time a device is ever seen, the Settings window opens on
+  *MIDI Keyboard* (once per device, `seenDevices`).
+- **Note path.** Sound first, display second: the handler calls the engine's
+  `liveNoteOn` straight away, then updates `activeKeys` / `midiHeldKeys`. A
+  store update runs every subscriber synchronously, and none of that should
+  sit between the key and the synth. Touch response, the ignore-light-touches
+  floor and the double-note filter run before the sound; a dropped note-on also
+  swallows its matching note-off.
+- **Pedals and controls.** CC 64/66/67/1/11/7, pitch bend and both aftertouch
+  kinds are forwarded on the live channel (15) when enabled. Each one is marked
+  *detected* the first time it arrives, because Web MIDI exposes no capability
+  list. Unplugging a keyboard or hiding the window releases its keys and
+  returns only the controls the keyboard actually moved to neutral, so a song
+  track that also uses channel 15 isn't cut off.
+- **Live path (Samples).** Every `DynamicsCompressorNode` delays its output by
+  a fixed 6 ms look-ahead, measured even at a 1:1 ratio. The master chain has
+  two (the user compressor and the safety limiter), so routing live notes
+  through it costs 12 ms. The worklet has one output per channel (0 = effects,
+  1–16 = channels 0–15). Output 16 (channel 15) goes to its own gain → tone →
+  zero-delay soft-clip path, unless *Live playing response* is *Balanced* or
+  the loaded song has a real track on channel 15 (`applyLiveRouting`). The
+  AudioContext is created with `latencyHint: 'interactive'` explicitly;
+  *Stable* uses `'playback'`, measured at +10 ms, from the next start.
+- **What can't be lowered in the app.** Chromium on Windows uses shared-mode
+  WASAPI with a 10 ms buffer. Asking for less (`latencyHint` numbers,
+  `--audio-buffer-size`, low-latency feature flags) measured no change, and the
+  rest of `outputLatency` is the Windows mixer and the driver. *Audio delay
+  offset* adds to the measured output delay for alignment only (key lights,
+  count-in, tap reading). It never claims to make sound earlier.
+- **Diagnostics.** `utils/midiDiagnostics.ts` records, per note, the event's
+  receive timestamp → handler start, and handler start → synth call. Settings
+  combines these with the synth block (128 samples), the chain delay and the
+  measured output into *Key → speaker*. *Save log…* downloads all of it as JSON
+  for bug reports.
+- **Simulator (dev builds only).** `utils/midiSimulator.ts`, imported first in
+  `main.tsx`, wraps `requestMIDIAccess` so every caller sees real ports plus
+  simulated S88 MK3 / MPK mini Plus / Launchkey MK4 ports. These can be plugged,
+  unplugged and played from *Settings → MIDI Keyboard → Keyboards*, or from
+  `window.__orfeoSimMidi`, through the exact same handler, sound and lights as a
+  real key.
 
 ---
 
@@ -326,7 +385,7 @@ so nothing is duplicated.
 
 ```text
 src/components/Settings/
-  catalog.ts        Words only: the 8 groups (name, intro, manual URL), every
+  catalog.ts        Words only: the 9 groups (name, intro, manual URL), every
                     setting's name, one-line summary (Setup) and description
                     (window), search keywords, and QUICK_LAYOUT — which
                     settings Setup shows, in what order

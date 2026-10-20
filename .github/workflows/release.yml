@@ -6,8 +6,13 @@
 # docs/CONTRIBUTING.md → "Releasing a new version".
 #
 # 1. Check   — version, tag, package.json and changelog all agree; builds the notes
-# 2. Build   — on Windows, from the tag: installer, portable, latest.yml → draft release
+# 2. Build   — on Windows, from the tag: installer, portable, latest.yml → draft release;
+#              the Microsoft Store package (.appx) is kept as a run artifact, not on GitHub
 # 3. Publish — adds the notes and publishes (or keeps it a draft / marks it a pre-release)
+# 4. Store   — uploads the .appx to the Microsoft Store and submits it for certification
+#              (never for a pre-release; a draft run only stages a Store draft). Needs the
+#              one-time setup in docs/CONTRIBUTING.md → "Microsoft Store"; until then it
+#              just says so and skips.
 name: Release
 
 on:
@@ -25,6 +30,11 @@ on:
         description: "Test run: build everything but keep the release as a draft"
         type: boolean
         default: false
+      store:
+        description: "Microsoft Store: submit the update, only stage it as a draft in Partner Center, or skip"
+        type: choice
+        options: [submit, draft, skip]
+        default: submit
 
 permissions:
   contents: write
@@ -144,9 +154,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           npm run build
-          npx electron-builder --win --publish always \
+          npx electron-builder --win nsis portable --publish always \
             '-c.nsis.artifactName=Orfeo-Setup-${version}.${ext}' \
             '-c.portable.artifactName=Orfeo-${version}-portable.${ext}'
+
+      # The Store package is unsigned here — the Store signs it — so it is no
+      # use on the GitHub release page; it only travels on to step 4. Built
+      # from the app folder step above already made, so it's the same app.
+      # A pre-release version (1.5.0-beta.1) can't be a Store version at all.
+      - name: Build the Microsoft Store package
+        if: ${{ !inputs.prerelease && inputs.store != 'skip' }}
+        shell: bash
+        run: npx electron-builder --win appx --prepackaged release/win-unpacked --publish never
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !inputs.prerelease && inputs.store != 'skip' }}
+        with:
+          name: store-package
+          path: release/*.appx
+          if-no-files-found: error
 
   publish:
     name: 3. Publish
@@ -180,3 +206,72 @@ jobs:
             echo "Installed copies of Orfeo will offer the update the next time they start." >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  store:
+    name: 4. Microsoft Store
+    needs: [check, publish]
+    if: ${{ !inputs.prerelease && inputs.store != 'skip' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check the Store setup
+        id: setup
+        shell: bash
+        env:
+          TENANT: ${{ secrets.AZURE_AD_TENANT_ID }}
+          CLIENT: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          SELLER: ${{ secrets.SELLER_ID }}
+          PRODUCT: ${{ vars.MS_STORE_PRODUCT_ID }}
+        run: |
+          if [ -z "$TENANT" ] || [ -z "$CLIENT" ] || [ -z "$SECRET" ] || [ -z "$SELLER" ] || [ -z "$PRODUCT" ]; then
+            echo "### Microsoft Store skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "The Store secrets or the MS_STORE_PRODUCT_ID variable aren't set up yet — see docs/CONTRIBUTING.md → Microsoft Store. Upload release/Orfeo-*.appx in Partner Center by hand this time (it's also in this run's store-package artifact)." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v8
+        if: steps.setup.outputs.ready == 'true'
+        with:
+          name: store-package
+          path: store
+
+      - name: Set up the Microsoft Store Developer CLI
+        if: steps.setup.outputs.ready == 'true'
+        uses: microsoft/microsoft-store-apppublisher@v1.1
+
+      - name: Sign in to Partner Center
+        if: steps.setup.outputs.ready == 'true'
+        run: >
+          msstore reconfigure
+          --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}"
+          --sellerId "${{ secrets.SELLER_ID }}"
+          --clientId "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}"
+          --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+
+      # 'publish' starts a new submission from the last published one (same
+      # listing, screenshots, price), swaps in the new package, and commits it
+      # for certification. A GitHub test run, or Store = draft, only uploads and
+      # leaves the submission as a draft in Partner Center (--noCommit).
+      - name: Upload to the Store
+        if: steps.setup.outputs.ready == 'true'
+        shell: pwsh
+        env:
+          PRODUCT: ${{ vars.MS_STORE_PRODUCT_ID }}
+          MODE: ${{ (inputs.draft || inputs.store == 'draft') && 'draft' || 'submit' }}
+        run: |
+          $pkg = Get-ChildItem store -Filter *.appx | Select-Object -First 1
+          if (-not $pkg) { throw "No .appx in the store-package artifact." }
+          if ($env:MODE -eq 'draft') {
+            msstore publish $pkg.FullName -id $env:PRODUCT --noCommit
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            "### Microsoft Store: draft staged" >> $env:GITHUB_STEP_SUMMARY
+            "$($pkg.Name) is uploaded to a draft submission. Review and submit it in Partner Center." >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            msstore publish $pkg.FullName -id $env:PRODUCT
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            "### Microsoft Store: submitted" >> $env:GITHUB_STEP_SUMMARY
+            "$($pkg.Name) is submitted for certification (usually hours, up to 3 business days). Store users get the update automatically once it passes." >> $env:GITHUB_STEP_SUMMARY
+          }
