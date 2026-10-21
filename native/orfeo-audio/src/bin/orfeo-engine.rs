@@ -81,10 +81,13 @@ fn main() {
                 format!(" | live keys {} : wait avg {:.2} max {:.2} ms, queued {:.2} ms, KEY->SPEAKER ~{:.1} ms",
                     notes, wait / notes / 1000.0, wmax / 1000.0, queued / notes / 1000.0, wait / notes / 1000.0 + queued / notes / 1000.0 + s.reported_latency_ms())
             } else { String::new() };
-            println!("pos {:>6.2} s {} | late wake-ups {} | worst render {:.2} ms{}",
-                s.position(), if s.playing.load(Relaxed) { "playing" } else { "stopped" },
-                s.late_wakeups.load(Relaxed), s.worst_render_us.swap(0, Relaxed) as f64 / 1000.0, live);
-            if let Some(e) = s.error.lock().unwrap().as_ref() { println!("ERROR: {e}"); break }
+            let mode = match s.mode.load(Relaxed) { 0 => "exclusive", 1 => "shared", _ => "NO DEVICE - waiting" };
+            println!("{:>5.1} s | song {:>6.2} s {} | {} | {} | {} Hz, {:.1} ms buffer | device changes {} | late {} | worst render {:.2} ms{}",
+                t0.elapsed().as_secs_f64(), s.position(), if s.playing.load(Relaxed) { "playing" } else { "stopped" },
+                s.device_name.lock().unwrap(), mode, s.rate.load(Relaxed),
+                s.period_frames.load(Relaxed) as f64 * 1000.0 / s.rate.load(Relaxed).max(1) as f64,
+                s.reopens.load(Relaxed), s.late_wakeups.load(Relaxed), s.worst_render_us.swap(0, Relaxed) as f64 / 1000.0, live);
+            if let Some(e) = s.error.lock().unwrap().as_ref() { println!("        note: {e}") }
         }
     }
 }
