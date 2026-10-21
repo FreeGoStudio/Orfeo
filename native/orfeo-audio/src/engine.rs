@@ -528,6 +528,11 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                     }
                     replay_state(&mut fluid, &tr, &mut file_cc7, &mix.strips);
                     out_slot = Some(o);
+                    // Unplugging fires twice — the device vanishing, then Windows naming a
+                    // new default a moment later. We just opened that new default: the
+                    // second signal has nothing left to do.
+                    std::thread::sleep(Duration::from_millis(50));
+                    reopen.store(false, Relaxed);
                     *stats.error.lock().unwrap() = None;
                     stats.reopens.fetch_add(1, Relaxed);
                     break;
