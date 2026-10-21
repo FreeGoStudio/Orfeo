@@ -115,3 +115,6 @@ docs/update.md
 docs/Scales explorer rebuild.pdf
 # Rust build output
 native/*/target/
+native/target/
+# Built add-on + FluidSynth DLLs for dev runs (scripts/build-native.mjs)
+native/build/
