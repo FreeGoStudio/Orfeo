@@ -47,6 +47,9 @@ docs/FEATURE_REQUESTS.md
 docs/MIDI settings/
 docs/Orfeo — Growth & Promotion Plan.md
 docs/Website/
+# Native audio latency prototype (measuring tool, not shipped)
+native/latency-prototype/
+native/phase0/
 
 # ── Impeccable design skill — internal planning artifacts, not shipped docs ──
 PRODUCT.md
@@ -110,3 +113,5 @@ docs/Starmap2-01.svg
 docs/Facethemusic-01.svg
 docs/update.md
 docs/Scales explorer rebuild.pdf
+# Rust build output
+native/*/target/

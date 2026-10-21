@@ -1,0 +1,108 @@
+//! WASAPI output: exclusive (bypasses the Windows mixer, ~3 ms periods) with
+//! automatic fallback to shared mode when the device refuses or is busy.
+
+use wasapi::*;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OutputMode { Exclusive, Shared }
+
+#[derive(Clone, Copy)]
+pub enum SampleFmt { F32, I32, I24, I16 }
+
+pub struct Output {
+    pub client: AudioClient,
+    pub render: AudioRenderClient,
+    pub event: Handle,
+    pub mode: OutputMode,
+    pub rate: u32,
+    pub fmt: SampleFmt,
+    pub bytes_per_frame: usize,
+    pub period_frames: u32,
+    pub buffer_frames: u32,
+    pub device_name: String,
+    /// Delay the device reports for the stream (exclusive: the buffer itself)
+    pub reported_latency_ms: f64,
+    pub fallback_reason: Option<String>,
+}
+
+fn fmt_of(f: &WaveFormat) -> SampleFmt {
+    match (f.get_subformat().ok(), f.get_bitspersample()) {
+        (Some(SampleType::Float), _) => SampleFmt::F32,
+        (_, 32) => SampleFmt::I32,
+        (_, 24) => SampleFmt::I24,
+        _ => SampleFmt::I16,
+    }
+}
+
+fn open_exclusive(client: &mut AudioClient, rate: u32) -> Result<(WaveFormat, u32), String> {
+    let candidates = [(32usize, 32usize, SampleType::Float), (32, 24, SampleType::Int), (24, 24, SampleType::Int), (16, 16, SampleType::Int), (32, 32, SampleType::Int)];
+    let fmt = candidates.iter()
+        .find_map(|(s, v, t)| client.is_supported_exclusive_with_quirks(&WaveFormat::new(*s, *v, t, rate as usize, 2, None)).ok())
+        .ok_or("the device accepts no usual exclusive format")?;
+    let (_, min) = client.get_device_period().map_err(|e| e.to_string())?;
+    let period = client.calculate_aligned_period_near(min, Some(128), &fmt).unwrap_or(min);
+    client.initialize_client(&fmt, &Direction::Render, &StreamMode::EventsExclusive { period_hns: period })
+        .map_err(|e| format!("exclusive mode refused ({e}) — another app may be using the device, or exclusive control is disabled for it"))?;
+    Ok((fmt, (period as f64 / 1e7 * rate as f64).round() as u32))
+}
+
+impl Output {
+    /// Must be called on the thread that will render (COM is initialised there).
+    pub fn open(want: OutputMode) -> Result<Output, String> {
+        let en = DeviceEnumerator::new().map_err(|e| e.to_string())?;
+        let dev = en.get_default_device(&Direction::Render).map_err(|e| format!("no output device: {e}"))?;
+        let device_name = dev.get_friendlyname().unwrap_or_default();
+        let mut client = dev.get_iaudioclient().map_err(|e| e.to_string())?;
+        let mix = client.get_mixformat().map_err(|e| e.to_string())?;
+        let rate = mix.get_samplespersec();
+
+        let mut fallback_reason = None;
+        let mut mode = want;
+        let (fmt, period_frames) = if want == OutputMode::Exclusive {
+            match open_exclusive(&mut client, rate) {
+                Ok(x) => x,
+                Err(e) => {
+                    fallback_reason = Some(e);
+                    mode = OutputMode::Shared;
+                    // A failed Initialize leaves the client unusable — start from a fresh one
+                    client = dev.get_iaudioclient().map_err(|e| e.to_string())?;
+                    Self::init_shared(&mut client, rate)?
+                }
+            }
+        } else {
+            Self::init_shared(&mut client, rate)?
+        };
+        let event = client.set_get_eventhandle().map_err(|e| e.to_string())?;
+        let render = client.get_audiorenderclient().map_err(|e| e.to_string())?;
+        let buffer_frames = client.get_buffer_size().map_err(|e| e.to_string())?;
+        let reported_latency_ms = unsafe { client.as_iaudioclient().GetStreamLatency() }.map(|h| h as f64 / 1e4).unwrap_or(0.0);
+        Ok(Output {
+            bytes_per_frame: fmt.get_blockalign() as usize, fmt: fmt_of(&fmt),
+            client, render, event, mode, rate, period_frames, buffer_frames, device_name, reported_latency_ms, fallback_reason,
+        })
+    }
+
+    fn init_shared(client: &mut AudioClient, rate: u32) -> Result<(WaveFormat, u32), String> {
+        let fmt = WaveFormat::new(32, 32, &SampleType::Float, rate as usize, 2, None);
+        let (def, _) = client.get_device_period().map_err(|e| e.to_string())?;
+        client.initialize_client(&fmt, &Direction::Render, &StreamMode::EventsShared { autoconvert: true, buffer_duration_hns: def })
+            .map_err(|e| format!("shared mode failed: {e}"))?;
+        Ok((fmt, (def as f64 / 1e7 * rate as f64).round() as u32))
+    }
+
+    /// Interleaves and converts to the device format, then hands it over
+    pub fn write(&self, l: &[f32], r: &[f32], scratch: &mut Vec<u8>) -> Result<(), String> {
+        scratch.clear();
+        for i in 0..l.len() {
+            for s in [l[i], r[i]] {
+                match self.fmt {
+                    SampleFmt::F32 => scratch.extend_from_slice(&s.to_le_bytes()),
+                    SampleFmt::I32 => scratch.extend_from_slice(&((s.clamp(-1.0, 1.0) as f64 * 2147483647.0) as i32).to_le_bytes()),
+                    SampleFmt::I24 => { let v = (s.clamp(-1.0, 1.0) * 8388607.0) as i32; scratch.extend_from_slice(&v.to_le_bytes()[0..3]) }
+                    SampleFmt::I16 => scratch.extend_from_slice(&((s.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes()),
+                }
+            }
+        }
+        self.render.write_to_device(l.len(), scratch, None).map_err(|e| e.to_string())
+    }
+}
