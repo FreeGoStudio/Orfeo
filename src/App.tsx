@@ -45,6 +45,7 @@ import { NES, confirmDiscardDirtyNoteEdits } from './utils/noteEditorState'
 import { confirmDiscardDirtyTempoKey, saveTempoKeyChanges } from './utils/tempoKeySave'
 import { isTapCapturing, registerTap, cancelTap } from './utils/tapTempoSession'
 import { isCountingIn, cancelCountIn } from './utils/countInRunner'
+import { stepEvents } from './utils/stepThrough'
 import { useCountIn } from './hooks/useCountIn'
 import { CountInOverlay } from './components/CountInOverlay'
 
@@ -398,6 +399,19 @@ export default function App() {
           if (playbackState === 'playing') pause()
           else play()
           break
+        case 'ArrowRight':
+        case 'ArrowLeft': {
+          // → / ← step to the next / previous played event (Shift: a bar).
+          // A focused fader or knob uses the arrows itself (and has already
+          // handled this press), so leave those alone.
+          if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) break
+          if ((e.target as HTMLElement | null)?.closest?.('[role="slider"], select, [contenteditable="true"]')) break
+          const s = useStore.getState()
+          if (!s.midi || s.chordExplorerOpen || s.scaleExplorerOpen || s.lockedChordModalOpen || s.tapSession || isCountingIn()) break
+          e.preventDefault()
+          stepEvents(e.key === 'ArrowRight' ? 1 : -1, e.shiftKey)
+          break
+        }
         case 'Escape':
           // The Settings window closes itself on Escape — never stop the song
           if (useStore.getState().settingsWindowOpen) break

@@ -18,6 +18,13 @@ export function runCatalogTest(): number {
   check(SETTINGS.every(s => s.name && s.summary && s.description), 'name/summary/description on every setting')
   check(SETTINGS.every(s => !s.summary.includes('\n') && s.summary.length <= 90), 'summaries are one short line')
 
+  // 2b. a tabbed group's tabs hold each of its settings exactly once
+  for (const g of GROUPS.filter(g => g.tabs)) {
+    const inTabs = g.tabs!.flatMap(tb => tb.ids)
+    const own = SETTINGS.filter(s => s.group === g.id).map(s => s.id)
+    check(inTabs.length === own.length && own.every(id => inTabs.includes(id)), `${g.id} tabs cover its settings once`)
+  }
+
   // 3. Quick Settings = exactly the drawing's shortlist, in its order
   const quick = GROUPS.map(g => QUICK_LAYOUT[g.id].map(i => (typeof i === 'string' ? i : `#${i.heading}`)).join('+')).join(' | ')
   check(quick === 'soundEngine | showDemo | focusMode+tapTempo+handAssignment | chordPrompter | displaySystem+accidentals+chordTracking | keyRange+showOctaves+showNoteNames | rollZoom+barNumbers+playbar | appZoom | ', `quick layout: ${quick}`)

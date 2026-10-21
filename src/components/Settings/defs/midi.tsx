@@ -346,7 +346,6 @@ function DelayCheckControl() {
     : (st.avgInputMs ?? 0) + (st.avgHandleMs ?? 0) + b.synthBlockMs + b.chainMs + b.outputMs
   return (
     <div style={{ display: 'grid', gap: 1 }}>
-      {st.notes === 0 && <HelpText>{t`Play a few notes on your keyboard to fill in the first two lines.`}</HelpText>}
       {line(t`Key reaching Orfeo`, st.avgInputMs === null ? '—' : `${ms(st.avgInputMs, 1)} (${t`worst`} ${ms(st.worstInputMs, 1)})`)}
       {line(t`Orfeo handling the key`, st.avgHandleMs === null ? '—' : `${ms(st.avgHandleMs, 1)} (${t`worst`} ${ms(st.worstHandleMs, 1)})`)}
       {line(t`Synth getting its turn`, b.externalOutput ? t`external` : `≤ ${ms(b.synthBlockMs, 1)}`)}

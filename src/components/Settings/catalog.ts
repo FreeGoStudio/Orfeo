@@ -5,7 +5,10 @@ import type { SettingsGroupId } from '../../types'
 // Setup (the drawer) shows `summary` under each name; search reads name + description +
 // keywords. Controls live in defs/*.tsx, keyed by the same ids. ──────────
 
-export interface GroupInfo { id: SettingsGroupId; name: string; intro: string; manualUrl: string }
+// `tabs`: a big group can split its cards into tabs in the Settings window
+// (two cards across instead of three, so each has room). Search ignores tabs.
+export interface GroupTab { name: string; ids: SettingId[] }
+export interface GroupInfo { id: SettingsGroupId; name: string; intro: string; manualUrl: string; tabs?: GroupTab[] }
 
 export type SettingId =
   | 'soundEngine' | 'soundFonts' | 'autoLevel'
@@ -37,7 +40,12 @@ export const GROUPS: GroupInfo[] = [
   { id: 'keyboard', name: t`Keyboard`, intro: t`The on-screen keyboard: its size and what's printed on the keys.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
   { id: 'piano-roll', name: t`Piano Roll`, intro: t`The falling-notes view: zoom, bar lines, the playbar and visual effects.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll' },
   { id: 'appearance', name: t`Appearance`, intro: t`How Orfeo looks: theme, the size of everything on screen, and the Starmap view.`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
-  { id: 'midi', name: t`MIDI Keyboard`, intro: t`Your own MIDI keyboard: which ones Orfeo listens to, how quickly your playing is heard, touch, pedals, and a delay check.`, manualUrl: 'https://orfeo.cc/docs/settings/midi-keyboard-settings' },
+  { id: 'midi', name: t`MIDI Keyboard`, intro: t`Your own MIDI keyboard: which ones Orfeo listens to, how quickly your playing is heard, touch, pedals, and a delay check.`, manualUrl: 'https://orfeo.cc/docs/settings/midi-keyboard-settings',
+    tabs: [
+      { name: t`Keyboards`, ids: ['midiKeyboards', 'midiTools'] },
+      { name: t`Sound & delay`, ids: ['liveResponse', 'delayCheck', 'latencyOffset', 'gmOutput'] },
+      { name: t`Touch & pedals`, ids: ['touchResponse', 'pedalsControls', 'duplicateFilter'] },
+    ] },
 ]
 
 export const SETTINGS: SettingInfo[] = [

@@ -27,11 +27,30 @@ function CardGrid({ ids, width, layoutCount = ids.length }: { ids: SettingId[]; 
   )
 }
 
+// Tabbed groups: two independent columns (cards alternate left/right in
+// catalog order), so a short card never stretches to match a tall neighbour
+function ColumnCards({ ids, width }: { ids: SettingId[]; width: number }) {
+  const cols = gridColumns(2, width)
+  const columns = Array.from({ length: cols }, (_, c) => ids.filter((_, i) => i % cols === c))
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: CARD_GAP, alignItems: 'start' }}>
+      {columns.map((col, c) => (
+        <div key={c} style={{ display: 'grid', gap: CARD_GAP, minWidth: 0 }}>
+          {col.map(id => <SettingCard key={id} id={id} />)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function SettingsWindow() {
   const open = useStore(s => s.settingsWindowOpen)
   const group = useStore(s => s.settingsWindowGroup)
   const [query, setQuery] = useState('')
   const [width, setWidth] = useState(0)
+  // Tab within a tabbed group — back to the first tab whenever the group changes
+  const [tab, setTab] = useState(0)
+  useEffect(() => { setTab(0) }, [group, open])
   const contentRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   // ── Drag by the header, like the other floating windows — an offset from
@@ -78,7 +97,7 @@ export default function SettingsWindow() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, query])
-  useEffect(() => { contentRef.current?.scrollTo({ top: 0 }) }, [group, query])
+  useEffect(() => { contentRef.current?.scrollTo({ top: 0 }) }, [group, query, tab])
 
   if (!open) return null
   const close = () => useStore.getState().closeSettingsWindow()
@@ -150,7 +169,30 @@ export default function SettingsWindow() {
               {results === null ? (
                 <>
                   <p style={{ margin: '0 0 16px', fontSize: 'var(--text-lg)', color: 'var(--text-default)', lineHeight: 1.45, fontFamily: 'var(--font-ui)' }}>{g.intro}</p>
-                  <CardGrid ids={SETTINGS.filter(s => s.group === g.id).map(s => s.id)} width={width} />
+                  {g.tabs ? (
+                    <>
+                      <div role="tablist" aria-label={g.name} style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border2)' }}>
+                        {g.tabs.map((tb, i) => {
+                          const on = i === Math.min(tab, g.tabs!.length - 1)
+                          return (
+                            <button key={tb.name} role="tab" aria-selected={on} onClick={() => setTab(i)}
+                              style={{ padding: '7px 14px', marginBottom: -1, background: 'none', border: 'none', cursor: 'pointer',
+                                borderBottom: `2px solid ${on ? 'var(--text-amber)' : 'transparent'}`,
+                                color: on ? 'var(--text-amber)' : 'var(--text-inactive)',
+                                fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-ui)' }}
+                              onMouseEnter={e => { if (!on) e.currentTarget.style.color = 'var(--text-default)' }}
+                              onMouseLeave={e => { if (!on) e.currentTarget.style.color = 'var(--text-inactive)' }}>
+                              {tb.name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {/* Two across: tabbed groups have the busier cards */}
+                      <ColumnCards ids={g.tabs[Math.min(tab, g.tabs.length - 1)].ids} width={width} />
+                    </>
+                  ) : (
+                    <CardGrid ids={SETTINGS.filter(s => s.group === g.id).map(s => s.id)} width={width} />
+                  )}
                 </>
               ) : results.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-ui)' }}>{t`No settings match “${query.trim()}”.`}</p>

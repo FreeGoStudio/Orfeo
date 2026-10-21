@@ -201,25 +201,34 @@ certification. Store users get the update automatically once it passes.
 
 One-time setup (Partner Center + GitHub):
 
-1. Partner Center → **Account settings → Tenants**: associate (or create) a
-   Microsoft Entra ID tenant.
-2. [Entra admin center](https://entra.microsoft.com) → **App registrations →
-   New registration** (e.g. `orfeo-store-publisher`). Note its **Application
-   (client) ID** and the **Directory (tenant) ID**; under **Certificates &
-   secrets** create a client secret and copy its value.
+1. Partner Center → **Account settings → Tenants**: associate an existing
+   Microsoft Entra ID tenant, or **Create Microsoft Entra ID** (free; it makes a
+   new admin sign-in such as `you@yourname.onmicrosoft.com`).
+2. **Sign out of Partner Center and sign back in with that tenant's admin
+   account** (the `…onmicrosoft.com` one), not the personal Microsoft account.
+   The *Microsoft Entra applications* tab only appears for a Manager who is
+   also the tenant's global administrator; signed in any other way, *User
+   management* offers users only.
 3. Partner Center → **Account settings → User management → Microsoft Entra
-   applications → Add**: add that app with the **Manager** role.
+   applications → Add Microsoft Entra application**:
+   - **Create Microsoft Entra application** (simplest): any display name
+     (e.g. `orfeo-store-publisher`), any unique Reply URL (e.g.
+     `https://orfeo.cc/store-publisher`), role **Manager**. Or **Add Microsoft
+     Entra application** to pick one already registered in the
+     [Entra admin center](https://entra.microsoft.com), also as **Manager**.
+   - Click the application's name: it shows the **Tenant ID** and **Client ID**.
+     **Add new key** shows the key (the client secret) once — copy it then.
 4. Partner Center → **Account settings → Legal info** (or *Identifiers*): copy
    the **Seller ID**. The app's **Store ID** (12 characters, starts with `9`) is
-   under *Product management → Product identity*.
+   under *Apps and games → Orfeo → Product management → Product identity*.
 5. GitHub → **Settings → Secrets and variables → Actions**:
    - Secrets: `AZURE_AD_TENANT_ID`, `AZURE_AD_APPLICATION_CLIENT_ID`,
-     `AZURE_AD_APPLICATION_SECRET`, `SELLER_ID`.
+     `AZURE_AD_APPLICATION_SECRET` (the key), `SELLER_ID`.
    - Variable: `MS_STORE_PRODUCT_ID` = the Store ID.
 
-The client secret expires (the Entra default is 6 months to 2 years): renew it
-in Entra and update `AZURE_AD_APPLICATION_SECRET` before it does, or the Store
-job fails at *Sign in to Partner Center*.
+The key expires (Partner Center shows the date next to it): add a new key and
+update `AZURE_AD_APPLICATION_SECRET` before it does, or the Store job fails at
+*Sign in to Partner Center*.
 
 <details>
 <summary><b>Contributing a macOS / Linux build (community)</b></summary>

@@ -385,7 +385,9 @@ so nothing is duplicated.
 
 ```text
 src/components/Settings/
-  catalog.ts        Words only: the 9 groups (name, intro, manual URL), every
+  catalog.ts        Words only: the 9 groups (name, intro, manual URL, and
+                    optional tabs: MIDI Keyboard splits its cards into three,
+                    two columns across), every
                     setting's name, one-line summary (Setup) and description
                     (window), search keywords, and QUICK_LAYOUT — which
                     settings Setup shows, in what order

@@ -13,6 +13,7 @@
 - General MIDI no longer goes silent when a USB keyboard is plugged in.
 - The MIDI icon names the keyboard you're actually playing. Click it to open its settings.
 - Orfeo is now in the Microsoft Store.
+- Step through any song one note or chord at a time with → and ←, at your own pace.
 
 ### New
 - **Settings › MIDI Keyboard**, at the bottom of the Settings window:
@@ -26,9 +27,14 @@
   - **Delay check** — how long each part of the trip from your key to the speaker takes on your computer, plus *Save log…* to send with a bug report.
   - **Reset & repair** — clear stuck notes, reset MIDI input, reset these settings.
 - The first time you connect a new keyboard, Settings opens on its page.
+- **Step through a song with → and ←.** Each press jumps to the next moment something is played, a single note or a whole chord, sounds it, lights it on the keyboard and moves the playhead there. ← goes back one, and Shift jumps a whole bar. No tempo, no loop to set up: made for learning fast solos and writing them down in notation software.
+  - Notes that start within 30 ms of each other count as one step, so MIDI files made from audio recordings, where a chord's notes never start at exactly the same time, step chord by chord.
+  - Muted tracks and drums are skipped, so if another instrument leaks into the part you're following, mute it and step through just yours.
+  - Press → while the song is playing and it stops on the next note; Space plays on from there.
 
 ### Changed
 - **Keys you play on the Samples sound are heard 12 ms sooner.** They used to pass through the song's compressor and safety limiter, which hold every note back 6 ms each even when switched off. Songs still go through both.
+- **The MIDI Keyboard settings** are split into three tabs, *Keyboards*, *Sound & delay* and *Touch & pedals*, with two roomier columns.
 - **The MIDI icon in the top bar** shows the keyboard you're playing, not the first entry in Windows' device list. Its tooltip lists any other keyboards, and clicking it opens the MIDI Keyboard settings.
 - Unplugging a keyboard mid-note, or minimising Orfeo while holding keys, no longer leaves notes or the sustain pedal hanging.
 
