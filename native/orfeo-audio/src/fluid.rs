@@ -22,6 +22,7 @@ pub struct Fluid {
     all_notes_off: unsafe extern "C" fn(Ptr, c_int) -> c_int,
     all_sounds_off: unsafe extern "C" fn(Ptr, c_int) -> c_int,
     write_float: unsafe extern "C" fn(Ptr, c_int, Ptr, c_int, c_int, Ptr, c_int, c_int) -> c_int,
+    process: unsafe extern "C" fn(Ptr, c_int, c_int, *mut *mut c_float, c_int, *mut *mut c_float) -> c_int,
     set_gain: unsafe extern "C" fn(Ptr, c_float),
     sfload: unsafe extern "C" fn(Ptr, *const c_char, c_int) -> c_int,
     sfunload: unsafe extern "C" fn(Ptr, c_int, c_int) -> c_int,
@@ -56,6 +57,15 @@ impl Fluid {
             setnum(settings, c("synth.gain").as_ptr(), 1.0);
             setint(settings, c("synth.polyphony").as_ptr(), 256);
             setint(settings, c("synth.cpu-cores").as_ptr(), 1);
+            // One stereo output per MIDI channel, so Orfeo mixes the channels
+            // itself: pan, mute fades, real level meters, and the live channel
+            // kept out of the compressor. (Reverb/chorus stay one shared unit —
+            // one per channel measured 16 reverbs' worth of CPU for little gain.)
+            // NB: FluidSynth's glib-free ("cpp11") Windows builds crash with 8 or
+            // more audio groups (2.5.7 and 2.6.x, also in fluidsynth.exe itself);
+            // the glib build of 2.5.7 is fine. Use a glib build until fixed upstream.
+            setint(settings, c("synth.audio-groups").as_ptr(), 16);
+            setint(settings, c("synth.audio-channels").as_ptr(), 16);
             // Effects stay on; their amount is set per channel (CC91 / CC93),
             // which starts at 0 — same as the current Samples engine
             setint(settings, c("synth.reverb.active").as_ptr(), 1);
@@ -75,6 +85,7 @@ impl Fluid {
                 all_notes_off: sym!(b"fluid_synth_all_notes_off"),
                 all_sounds_off: sym!(b"fluid_synth_all_sounds_off"),
                 write_float: sym!(b"fluid_synth_write_float"),
+                process: sym!(b"fluid_synth_process"),
                 set_gain: sym!(b"fluid_synth_set_gain"),
                 sfload: sym!(b"fluid_synth_sfload"),
                 sfunload: sym!(b"fluid_synth_sfunload"),
@@ -120,6 +131,17 @@ impl Fluid {
         unsafe {
             (self.write_float)(self.synth, l.len() as c_int, l.as_mut_ptr() as Ptr, 0, 1, r.as_mut_ptr() as Ptr, 0, 1);
         }
+    }
+}
+
+impl Fluid {
+    /// Renders `len` frames at `offset`, ADDING into 32 dry buffers (channel c →
+    /// out[2c], out[2c+1]) and 4 effect buffers (reverb L/R, chorus L/R).
+    /// Callers zero them first.
+    pub fn process(&mut self, len: usize, fx: &mut [Vec<f32>; 4], out: &mut [Vec<f32>; 32], offset: usize) {
+        let mut fxp: [*mut c_float; 4] = std::array::from_fn(|i| unsafe { fx[i].as_mut_ptr().add(offset) });
+        let mut outp: [*mut c_float; 32] = std::array::from_fn(|i| unsafe { out[i].as_mut_ptr().add(offset) });
+        unsafe { (self.process)(self.synth, len as c_int, 4, fxp.as_mut_ptr(), 32, outp.as_mut_ptr()); }
     }
 }
 

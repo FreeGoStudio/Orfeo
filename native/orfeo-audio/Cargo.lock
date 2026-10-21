@@ -425,6 +425,7 @@ dependencies = [
  "midly",
  "rtrb",
  "wasapi",
+ "windows",
 ]
 
 [[package]]

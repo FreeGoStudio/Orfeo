@@ -1,10 +1,14 @@
 //! The audio thread: owns the output device and FluidSynth, plays the song
-//! sample-accurately (each period is split at event times), mixes in live
-//! keys, applies the master chain, and reports position/stats via atomics.
+//! sample-accurately (each period is split at event times), mixes the 16 MIDI
+//! channels itself (volume, pan, mute fades, level meters), keeps the live
+//! channel out of the compressor, adds metronome / count-in clicks, and
+//! survives the device going away (reopens the new default and carries on).
 
+use crate::clicks::Clicks;
 use crate::dsp::{soft_clip, HighShelf};
+use crate::dynamics::{AutoLevel, Compressor};
 use crate::fluid::Fluid;
-use crate::output::{Output, OutputMode};
+use crate::output::{Output, OutputMode, EXCLUSIVE_STEPS};
 use crate::song::Song;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering::Relaxed};
@@ -22,21 +26,46 @@ pub struct EngineConfig {
     pub midi_inputs: bool,
 }
 
+/// Live keys and previews play on MIDI channel 16 (index 15)
+pub const LIVE_CH: usize = 15;
+
 pub enum Command {
     LoadSong(Box<Song>),
     Play,
     Pause,
     Seek(f64),
+    /// Start playing after `delay` seconds — the count-in's last beat, sample-exact
+    PlayAfter(f64),
     /// Playback speed relative to the file (1.0 = as written)
     SetTempoRatio(f64),
     SetTranspose(i32),
-    /// One flag per track; a muted track's notes are skipped
+    /// One flag per song track; a muted track's notes are skipped and a
+    /// channel whose tracks are all muted fades out
     SetAudibleTracks(Box<Vec<bool>>),
+    /// Mixer strip for one MIDI channel: volume 0..1, pan -1..1, sends 0..1
+    SetChannel { ch: u8, volume: f32, pan: f32, reverb: f32, chorus: f32 },
+    /// Instrument chosen in Orfeo for a channel; the file's own program changes
+    /// on that channel are then ignored (None = follow the file)
+    SetChannelProgram { ch: u8, program: Option<u8> },
     SetMasterGain(f32),
     SetToneDb(f32),
-    /// A message played right now (previews, live keys arriving from the UI)
+    SetCompressor { enabled: bool, preset: usize },
+    /// Metronome: on/off, volume 0..1, and every click of the song as (file time, accent)
+    SetMetronome { enabled: bool, volume: f32 },
+    SetSongClicks(Box<Vec<(f64, bool)>>),
+    /// A click `delay` seconds from now (count-in), regardless of playback
+    ClickAfter { delay: f64, accent: bool },
+    CancelPendingClicks,
+    /// A message played right now (live keys arriving from the UI, controllers)
     Midi { status: u8, d1: u8, d2: u8, at: Instant },
+    /// A note that stops by itself after `dur` seconds (previews, step-through)
+    NoteFor { ch: u8, key: u8, vel: u8, dur: f64 },
     AllNotesOff,
+    /// Switch exclusive/shared: the device is reopened, the music carries on
+    SetOutputMode(OutputMode),
+    /// Test only: block the audio thread for this many ms (a device that
+    /// signals late looks exactly like this to the engine)
+    DebugStall(u64),
     Shutdown,
 }
 
@@ -45,17 +74,24 @@ pub enum Command {
 pub struct Stats {
     pub position_bits: AtomicU64, // f64 file seconds
     pub playing: AtomicBool,
-    pub mode: AtomicU8,           // 0 exclusive, 1 shared
+    pub mode: AtomicU8,           // 0 exclusive, 1 shared, 255 no device
     pub rate: AtomicU32,
     pub period_frames: AtomicU32,
     pub buffer_frames: AtomicU32,
     pub reported_latency_bits: AtomicU64,
     pub late_wakeups: AtomicU32,
     pub worst_render_us: AtomicU32,
+    pub reopens: AtomicU32,
+    /// Exclusive buffer step in use (0 = smallest); raised when the device can't keep up
+    pub period_step: AtomicU8,
     pub live_notes: AtomicU32,
     pub live_wait_sum_us: AtomicU64,
     pub live_wait_max_us: AtomicU32,
     pub live_queued_sum_us: AtomicU64,
+    /// Peak level per MIDI channel since the caller last swapped it to 0 (f32 bits)
+    pub channel_peaks: [AtomicU32; 16],
+    pub master_peak: AtomicU32,
+    pub comp_reduction_db: AtomicU32,
     pub device_name: Mutex<String>,
     pub fallback_reason: Mutex<Option<String>>,
     pub error: Mutex<Option<String>>,
@@ -64,6 +100,8 @@ pub struct Stats {
 impl Stats {
     pub fn position(&self) -> f64 { f64::from_bits(self.position_bits.load(Relaxed)) }
     pub fn reported_latency_ms(&self) -> f64 { f64::from_bits(self.reported_latency_bits.load(Relaxed)) }
+    pub fn take_channel_peak(&self, ch: usize) -> f32 { f32::from_bits(self.channel_peaks[ch].swap(0, Relaxed)) }
+    pub fn take_master_peak(&self) -> f32 { f32::from_bits(self.master_peak.swap(0, Relaxed)) }
 }
 
 struct LiveMsg { status: u8, d1: u8, d2: u8, at: Instant }
@@ -74,25 +112,31 @@ pub struct Engine {
     /// Every live key/pedal message, for the UI (lights, chord display)
     pub live_out: Mutex<Receiver<(u8, u8, u8)>>,
     _midi: Vec<midir::MidiInputConnection<()>>,
+    stop_watch: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
 
 impl Engine {
     pub fn start(cfg: EngineConfig) -> Result<Engine, String> {
-        let (prod, cons) = rtrb::RingBuffer::<Command>::new(4096);
+        let (prod, cons) = rtrb::RingBuffer::<Command>::new(8192);
         let (live_tx, live_rx) = mpsc::channel::<LiveMsg>();
         let (ui_tx, ui_rx) = mpsc::channel::<(u8, u8, u8)>();
         let stats = Arc::new(Stats::default());
         let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
+        let reopen = Arc::new(AtomicBool::new(false));
+        let stop_watch = Arc::new(AtomicBool::new(false));
 
         let st = stats.clone();
+        let ro = reopen.clone();
+        let stop = stop_watch.clone();
         let thread = std::thread::Builder::new().name("orfeo-audio".into()).spawn(move || {
-            audio_thread(cfg.fluid_dir, cfg.soundfonts, cfg.mode, cons, live_rx, st, ready_tx)
+            audio_thread(cfg.fluid_dir, cfg.soundfonts, cfg.mode, cons, live_rx, st, ready_tx, ro, stop)
         }).map_err(|e| e.to_string())?;
         ready_rx.recv().map_err(|_| "audio thread ended during start-up".to_string())??;
+        spawn_default_device_watcher(reopen, stop_watch.clone());
 
         let midi = if cfg.midi_inputs { open_midi_inputs(live_tx, ui_tx) } else { Vec::new() };
-        Ok(Engine { commands: Mutex::new(prod), stats, live_out: Mutex::new(ui_rx), _midi: midi, thread: Some(thread) })
+        Ok(Engine { commands: Mutex::new(prod), stats, live_out: Mutex::new(ui_rx), _midi: midi, stop_watch, thread: Some(thread) })
     }
 
     /// False if the queue is full (the audio thread has stopped draining it)
@@ -101,6 +145,7 @@ impl Engine {
 
 impl Drop for Engine {
     fn drop(&mut self) {
+        self.stop_watch.store(true, Relaxed);
         self.send(Command::Shutdown);
         if let Some(t) = self.thread.take() { let _ = t.join(); }
     }
@@ -123,165 +168,418 @@ fn open_midi_inputs(tx: Sender<LiveMsg>, ui: Sender<(u8, u8, u8)>) -> Vec<midir:
     conns
 }
 
-// Live keys always play on channel 16 (index 15), Orfeo's live/preview channel
-const LIVE_CH: u8 = 15;
+// The user picking another default output in Windows (headphones plugged in,
+// a USB interface chosen) → follow it. Checked once a second on its own thread
+// so the audio thread never makes these slow calls.
+fn spawn_default_device_watcher(reopen: Arc<AtomicBool>, stop: Arc<AtomicBool>) {
+    std::thread::spawn(move || {
+        if wasapi::initialize_mta().ok().is_err() { return }
+        let id = || wasapi::DeviceEnumerator::new().ok()
+            .and_then(|en| en.get_default_device(&wasapi::Direction::Render).ok())
+            .and_then(|d| d.get_id().ok());
+        let mut last = id();
+        while !stop.load(Relaxed) {
+            std::thread::sleep(Duration::from_secs(1));
+            let now = id();
+            if now != last { last = now; reopen.store(true, Relaxed); }
+        }
+    });
+}
+
+#[inline] fn fmax_atomic(a: &AtomicU32, v: f32) {
+    let mut cur = a.load(Relaxed);
+    while v > f32::from_bits(cur) {
+        match a.compare_exchange_weak(cur, v.to_bits(), Relaxed, Relaxed) { Ok(_) => break, Err(x) => cur = x }
+    }
+}
+
+/// Everything about the music that must survive a device change
+struct Transport {
+    song: Box<Song>,
+    idx: usize,
+    pos: f64,
+    playing: bool,
+    ratio: f64,
+    transpose: i32,
+    audible: Box<Vec<bool>>,
+    track_channels: Vec<u16>, // bit per MIDI channel each track uses
+    channel_muted: [bool; 16],
+    program_override: [Option<u8>; 16],
+    song_clicks: Box<Vec<(f64, bool)>>,
+    click_idx: usize,
+}
+
+impl Transport {
+    fn recompute_channel_mutes(&mut self) {
+        let mut used = [false; 16];
+        let mut any_audible = [false; 16];
+        for (t, mask) in self.track_channels.iter().enumerate() {
+            let on = self.audible.get(t).copied().unwrap_or(true);
+            for ch in 0..16 { if mask & (1 << ch) != 0 { used[ch] = true; if on { any_audible[ch] = true } } }
+        }
+        for ch in 0..16 { self.channel_muted[ch] = used[ch] && !any_audible[ch] }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Strip { volume: f32, pan: f32, gain: f32 /* smoothed actual */ }
+
+struct Mix {
+    strips: [Strip; 16],
+    master: f32,
+    tone_db: f32,
+    metronome_on: bool,
+}
 
 #[allow(clippy::too_many_arguments)]
-fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mode: OutputMode, mut cmds: rtrb::Consumer<Command>,
-    live: Receiver<LiveMsg>, stats: Arc<Stats>, ready: Sender<Result<(), String>>) {
+fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMode, mut cmds: rtrb::Consumer<Command>,
+    live: Receiver<LiveMsg>, stats: Arc<Stats>, ready: Sender<Result<(), String>>, reopen: Arc<AtomicBool>, stop: Arc<AtomicBool>) {
     if let Err(e) = wasapi::initialize_mta().ok() { let _ = ready.send(Err(format!("COM: {e}"))); return }
-    let out = match Output::open(mode) { Ok(o) => o, Err(e) => { let _ = ready.send(Err(e)); return } };
-    let mut fluid = match Fluid::new(&fluid_dir, out.rate as f64) { Ok(f) => f, Err(e) => { let _ = ready.send(Err(e)); return } };
-    for sf in &soundfonts { if let Err(e) = fluid.load_soundfont(sf) { let _ = ready.send(Err(e)); return } }
-    for ch in 0..16u8 { fluid.midi(0xB0 | ch, 91, 0); fluid.midi(0xB0 | ch, 93, 0); }
-    fluid.midi(0xC0 | LIVE_CH, 0, 0);
-
-    stats.mode.store(if out.mode == OutputMode::Exclusive { 0 } else { 1 }, Relaxed);
-    stats.rate.store(out.rate, Relaxed);
-    stats.period_frames.store(out.period_frames, Relaxed);
-    stats.buffer_frames.store(out.buffer_frames, Relaxed);
-    stats.reported_latency_bits.store(out.reported_latency_ms.to_bits(), Relaxed);
-    *stats.device_name.lock().unwrap() = out.device_name.clone();
-    *stats.fallback_reason.lock().unwrap() = out.fallback_reason.clone();
+    // Windows' "Pro Audio" scheduling class (MMCSS), as audio software uses: this
+    // thread runs on time even while the screen, Orfeo's UI or other programs are busy
+    let _mmcss = pro_audio_priority();
+    let mut step = 0usize;
+    let mut out_slot = match Output::open(mode, step) { Ok(o) => Some(o), Err(e) => { let _ = ready.send(Err(e)); return } };
+    let make_fluid = |rate: u32| -> Result<Fluid, String> {
+        let mut f = Fluid::new(&fluid_dir, rate as f64)?;
+        for sf in &soundfonts { f.load_soundfont(sf)?; }
+        for ch in 0..16u8 { f.midi(0xB0 | ch, 91, 0); f.midi(0xB0 | ch, 93, 0); }
+        f.midi(0xC0 | LIVE_CH as u8, 0, 0);
+        Ok(f)
+    };
+    let mut fluid = match make_fluid(out_slot.as_ref().unwrap().rate) { Ok(f) => f, Err(e) => { let _ = ready.send(Err(e)); return } };
     let _ = ready.send(Ok(()));
 
-    let rate = out.rate as f64;
-    let n = out.buffer_frames as usize;
-    let (mut l, mut r) = (vec![0f32; n], vec![0f32; n]);
-    let mut scratch = Vec::with_capacity(n * 8);
-
-    // Transport state
-    let mut song = Box::<Song>::default();
-    let mut idx = 0usize;
-    let mut pos = 0f64;
-    let mut playing = false;
-    let mut ratio = 1f64;
-    let mut transpose = 0i32;
-    let mut audible: Box<Vec<bool>> = Box::default();
-    let mut gain = 1f32;
-    let mut tone_db = 0f32;
-    let mut tone = HighShelf::new(rate as f32, 3000.0, 0.0);
-
-    // Prime with silence, start
-    let avail = out.client.get_available_space_in_frames().unwrap_or(0) as usize;
-    let _ = out.write(&l[..avail], &r[..avail], &mut scratch);
-    if let Err(e) = out.client.start_stream() { *stats.error.lock().unwrap() = Some(e.to_string()); return }
-
-    let period_ms = out.period_frames as f64 * 1000.0 / rate;
-    let started = Instant::now();
-    let mut last_wake = Instant::now();
-
-    let transpose_note = |status: u8, key: u8, t: i32| -> u8 {
-        if status & 0x0F == 9 { key } else { (key as i32 + t).clamp(0, 127) as u8 }
+    let mut tr = Transport {
+        song: Box::default(), idx: 0, pos: 0.0, playing: false, ratio: 1.0, transpose: 0,
+        audible: Box::default(), track_channels: Vec::new(), channel_muted: [false; 16],
+        program_override: [None; 16], song_clicks: Box::default(), click_idx: 0,
     };
+    let mut mix = Mix { strips: [Strip { volume: 1.0, pan: 0.0, gain: 1.0 }; 16], master: 1.0, tone_db: 0.0, metronome_on: false };
+    let mut comp_enabled = false;
+    let mut comp_preset = 0usize;
+    let mut sends = [(0f32, 0f32); 16];
+    // Each channel's volume as the song file sets it (CC7, GM default 100)
+    let mut file_cc7 = [100u8; 16];
+    let mut clicks_volume = 0.6f32;
+    // (frames from now, accent) — count-in clicks and a pending start
+    let mut pending_clicks: Vec<(u64, bool)> = Vec::new();
+    let mut pending_play: Option<u64> = None;
+    // (frames left, channel, key) — timed preview notes
+    let mut timed_offs: Vec<(u64, u8, u8)> = Vec::new();
 
-    'run: loop {
-        if out.event.wait_for_event(1000).is_err() {
-            *stats.error.lock().unwrap() = Some("the output device stopped responding".into());
-            break;
-        }
-        let now = Instant::now();
-        let gap = now.duration_since(last_wake).as_secs_f64() * 1000.0;
-        last_wake = now;
-        if gap > period_ms * 1.8 && started.elapsed() > Duration::from_millis(500) { stats.late_wakeups.fetch_add(1, Relaxed); }
+    'device: loop {
+        let out = out_slot.as_ref().unwrap();
+        let rate = out.rate as f64;
+        stats.mode.store(if out.mode == OutputMode::Exclusive { 0 } else { 1 }, Relaxed);
+        stats.rate.store(out.rate, Relaxed);
+        stats.period_frames.store(out.period_frames, Relaxed);
+        stats.buffer_frames.store(out.buffer_frames, Relaxed);
+        stats.reported_latency_bits.store(out.reported_latency_ms.to_bits(), Relaxed);
+        *stats.device_name.lock().unwrap() = out.device_name.clone();
+        *stats.fallback_reason.lock().unwrap() = out.fallback_reason.clone();
 
-        // ── Commands ──────────────────────────────────────────────────────
-        while let Ok(c) = cmds.pop() {
-            match c {
-                Command::LoadSong(s) => { fluid.all_sounds_off(); song = s; idx = 0; pos = 0.0; playing = false; }
-                Command::Play => {
-                    if !playing { for &(s, a, b) in &song.state_before(pos) { fluid.midi(s, a, b) } }
-                    playing = true;
-                }
-                Command::Pause => { playing = false; fluid.all_sounds_off(); }
-                Command::Seek(t) => {
-                    fluid.all_sounds_off();
-                    pos = t.max(0.0); idx = song.index_at(pos);
-                    for &(s, a, b) in &song.state_before(pos) { fluid.midi(s, a, b) }
-                }
-                Command::SetTempoRatio(x) => ratio = x.clamp(0.05, 8.0),
-                Command::SetTranspose(t) => { if t != transpose { fluid.all_notes_off(); transpose = t } }
-                Command::SetAudibleTracks(a) => audible = a,
-                Command::SetMasterGain(g) => gain = g,
-                Command::SetToneDb(db) => { tone_db = db; tone.set(rate as f32, 3000.0, db) }
-                Command::Midi { status, d1, d2, at } => {
-                    // Same timing record as a key from a MIDI port
-                    if status & 0xF0 == 0x90 && d2 > 0 {
-                        let wait = now.duration_since(at).as_micros() as u64;
-                        let padding = out.client.get_current_padding().unwrap_or(0) as f64;
-                        stats.live_notes.fetch_add(1, Relaxed);
-                        stats.live_wait_sum_us.fetch_add(wait, Relaxed);
-                        stats.live_wait_max_us.fetch_max(wait as u32, Relaxed);
-                        stats.live_queued_sum_us.fetch_add((padding * 1e6 / rate) as u64, Relaxed);
-                    }
-                    fluid.midi(status, d1, d2)
-                }
-                Command::AllNotesOff => fluid.all_sounds_off(),
-                Command::Shutdown => break 'run,
-            }
-        }
-
-        let padding = out.client.get_current_padding().unwrap_or(0) as f64;
-        // ── Live keys: straight into the synth, at the start of this period ──
-        while let Ok(m) = live.try_recv() {
-            let kind = m.status & 0xF0;
-            if kind == 0x90 && m.d2 > 0 {
-                let wait = now.duration_since(m.at).as_micros() as u64;
-                stats.live_notes.fetch_add(1, Relaxed);
-                stats.live_wait_sum_us.fetch_add(wait, Relaxed);
-                stats.live_wait_max_us.fetch_max(wait as u32, Relaxed);
-                stats.live_queued_sum_us.fetch_add((padding * 1e6 / rate) as u64, Relaxed);
-            }
-            fluid.midi(kind | LIVE_CH, m.d1, m.d2);
-        }
+        let n = out.buffer_frames as usize;
+        let mut chans: [Vec<f32>; 32] = std::array::from_fn(|_| vec![0f32; n]);
+        let mut fx: [Vec<f32>; 4] = std::array::from_fn(|_| vec![0f32; n]);
+        let (mut sl, mut sr) = (vec![0f32; n], vec![0f32; n]); // song bus
+        let (mut ll, mut lr) = (vec![0f32; n], vec![0f32; n]); // live bus
+        let mut scratch = Vec::with_capacity(n * 8);
+        let mut tone = HighShelf::new(rate as f32, 3000.0, mix.tone_db);
+        let mut comp = Compressor::new(rate as f32);
+        comp.set(comp_enabled, comp_preset);
+        let mut agc = AutoLevel::new(rate as f32);
+        let mut clicks = Clicks::new(rate as f32);
+        clicks.volume = clicks_volume;
+        let smooth = 1.0 - (-1.0 / (0.005 * rate as f32)).exp(); // ~5 ms gain ramps
 
         let avail = out.client.get_available_space_in_frames().unwrap_or(0) as usize;
-        if avail == 0 { continue }
-        let r0 = Instant::now();
+        let _ = out.write(&sl[..avail], &sr[..avail], &mut scratch);
+        if let Err(e) = out.client.start_stream() { *stats.error.lock().unwrap() = Some(e.to_string()); }
 
-        // ── Render, split at song event times ───────────────────────────
-        let mut done = 0usize;
-        while done < avail {
-            let mut chunk = avail - done;
-            if playing {
-                while idx < song.events.len() && song.events[idx].time <= pos + 1e-9 {
-                    let e = song.events[idx];
-                    idx += 1;
-                    let kind = e.status & 0xF0;
-                    let is_note = kind == 0x90 || kind == 0x80 || kind == 0xA0;
-                    let muted = audible.get(e.track as usize).map(|a| !a).unwrap_or(false);
-                    if is_note && muted && kind == 0x90 && e.d2 > 0 { continue }
-                    let d1 = if is_note { transpose_note(e.status, e.d1, transpose) } else { e.d1 };
-                    fluid.midi(e.status, d1, e.d2);
-                }
-                if let Some(next) = song.events.get(idx) {
-                    let frames = ((next.time - pos) / ratio * rate).ceil().max(1.0) as usize;
-                    chunk = chunk.min(frames);
-                } else if pos > song.duration + 2.0 {
-                    playing = false;
+        let period_ms = out.period_frames as f64 * 1000.0 / rate;
+        let started = Instant::now();
+        let mut last_wake = Instant::now();
+        let mut silent_waits = 0u32;
+        // late wake-ups in the last two seconds → step up the buffer
+        let mut late_window: (Instant, u32) = (Instant::now(), 0);
+        let mut step_up = false;
+        stats.period_step.store(step as u8, Relaxed);
+
+        let transpose_note = |status: u8, key: u8, t: i32| -> u8 {
+            if status & 0x0F == 9 { key } else { (key as i32 + t).clamp(0, 127) as u8 }
+        };
+
+        let device_lost: bool = 'run: loop {
+            if reopen.swap(false, Relaxed) { break 'run true }
+            if out.event.wait_for_event(200).is_err() {
+                silent_waits += 1;
+                if silent_waits >= 2 { break 'run true } // 400 ms without the device asking for audio
+                continue;
+            }
+            silent_waits = 0;
+            let now = Instant::now();
+            let gap = now.duration_since(last_wake).as_secs_f64() * 1000.0;
+            last_wake = now;
+            if gap > period_ms * 1.8 && started.elapsed() > Duration::from_millis(500) {
+                stats.late_wakeups.fetch_add(1, Relaxed);
+                if now.duration_since(late_window.0) > Duration::from_secs(2) { late_window = (now, 0) }
+                late_window.1 += 1;
+                // A few misses in two seconds: this buffer is too small for the device — the
+                // way a pianist would hear it is crackling, so trade a few ms for steadiness
+                if late_window.1 >= 4 && out.mode == OutputMode::Exclusive && step + 1 < EXCLUSIVE_STEPS { step_up = true; break 'run true }
+            }
+            let padding = match out.client.get_current_padding() { Ok(p) => p as f64, Err(_) => break 'run true };
+
+            // ── Commands ──────────────────────────────────────────────────
+            while let Ok(c) = cmds.pop() {
+                match c {
+                    Command::LoadSong(s) => {
+                        fluid.all_sounds_off();
+                        let mut tc = vec![0u16; s.track_count as usize];
+                        for e in &s.events { if let Some(m) = tc.get_mut(e.track as usize) { *m |= 1 << (e.status & 0x0F) } }
+                        tr.song = s; tr.track_channels = tc; tr.idx = 0; tr.pos = 0.0; tr.playing = false; tr.click_idx = 0;
+                        tr.recompute_channel_mutes();
+                    }
+                    Command::Play => {
+                        if !tr.playing { replay_state(&mut fluid, &tr, &mut file_cc7, &mix.strips); tr.click_idx = tr.song_clicks.partition_point(|c| c.0 < tr.pos); }
+                        tr.playing = true; pending_play = None;
+                    }
+                    Command::PlayAfter(d) => pending_play = Some((d * rate).round() as u64),
+                    Command::Pause => { tr.playing = false; pending_play = None; fluid.all_sounds_off(); }
+                    Command::Seek(t) => {
+                        fluid.all_sounds_off();
+                        tr.pos = t.max(0.0); tr.idx = tr.song.index_at(tr.pos);
+                        tr.click_idx = tr.song_clicks.partition_point(|c| c.0 < tr.pos);
+                        replay_state(&mut fluid, &tr, &mut file_cc7, &mix.strips);
+                    }
+                    Command::SetTempoRatio(x) => tr.ratio = x.clamp(0.05, 8.0),
+                    Command::SetTranspose(t) => { if t != tr.transpose { fluid.all_notes_off(); tr.transpose = t } }
+                    Command::SetAudibleTracks(a) => { tr.audible = a; tr.recompute_channel_mutes(); }
+                    Command::SetChannel { ch, volume, pan, reverb, chorus } => {
+                        let c = (ch & 0x0F) as usize;
+                        mix.strips[c].volume = volume.clamp(0.0, 2.0);
+                        send_volume(&mut fluid, c, &file_cc7, &mix.strips);
+                        mix.strips[c].pan = pan.clamp(-1.0, 1.0);
+                        let (rv, cv) = ((reverb.clamp(0.0, 1.0) * 127.0) as u8, (chorus.clamp(0.0, 1.0) * 127.0) as u8);
+                        if sends[c] != (reverb, chorus) { fluid.midi(0xB0 | c as u8, 91, rv); fluid.midi(0xB0 | c as u8, 93, cv); sends[c] = (reverb, chorus); }
+                    }
+                    Command::SetChannelProgram { ch, program } => {
+                        let c = (ch & 0x0F) as usize;
+                        tr.program_override[c] = program;
+                        if let Some(p) = program { fluid.midi(0xC0 | c as u8, p, 0) }
+                    }
+                    Command::SetMasterGain(g) => mix.master = g.max(0.0),
+                    Command::SetToneDb(db) => { mix.tone_db = db; tone.set(rate as f32, 3000.0, db) }
+                    Command::SetCompressor { enabled, preset } => { comp_enabled = enabled; comp_preset = preset; comp.set(enabled, preset) }
+                    Command::SetMetronome { enabled, volume } => { mix.metronome_on = enabled; clicks_volume = volume; clicks.volume = volume }
+                    Command::SetSongClicks(c) => { tr.song_clicks = c; tr.click_idx = tr.song_clicks.partition_point(|x| x.0 < tr.pos) }
+                    Command::ClickAfter { delay, accent } => pending_clicks.push(((delay * rate).round() as u64, accent)),
+                    Command::CancelPendingClicks => { pending_clicks.clear(); pending_play = None }
+                    Command::Midi { status, d1, d2, at } => {
+                        if status & 0xF0 == 0x90 && d2 > 0 { record_live(&stats, now, at, padding, rate) }
+                        fluid.midi(status, d1, d2)
+                    }
+                    Command::NoteFor { ch, key, vel, dur } => {
+                        let c = ch & 0x0F;
+                        // re-striking a ringing preview note: release it first
+                        timed_offs.retain(|&(_, tc, tk)| { if tc == c && tk == key { fluid.midi(0x80 | c, key, 0); false } else { true } });
+                        fluid.midi(0x90 | c, key, vel.max(1));
+                        timed_offs.push(((dur.max(0.01) * rate) as u64, c, key));
+                    }
+                    Command::AllNotesOff => { fluid.all_sounds_off(); timed_offs.clear() }
+                    Command::SetOutputMode(m) => { if m != mode { mode = m; reopen.store(true, Relaxed) } }
+                    Command::DebugStall(ms) => std::thread::sleep(Duration::from_millis(ms)),
+                    Command::Shutdown => break 'device,
                 }
             }
-            fluid.render(&mut l[done..done + chunk], &mut r[done..done + chunk]);
-            if playing { pos += chunk as f64 * ratio / rate; }
-            done += chunk;
-        }
 
-        // ── Master chain: gain → tone → soft clip (no look-ahead, no delay) ──
-        let use_tone = tone_db.abs() > 0.01;
-        for i in 0..avail {
-            let (mut a, mut b) = (l[i] * gain, r[i] * gain);
-            if use_tone { a = tone.process(0, a); b = tone.process(1, b); }
-            l[i] = soft_clip(a);
-            r[i] = soft_clip(b);
-        }
-        stats.worst_render_us.fetch_max(r0.elapsed().as_micros() as u32, Relaxed);
+            // ── Live keys: straight into the synth, at the start of this period ──
+            while let Ok(m) = live.try_recv() {
+                let kind = m.status & 0xF0;
+                if kind == 0x90 && m.d2 > 0 { record_live(&stats, now, m.at, padding, rate) }
+                fluid.midi(kind | LIVE_CH as u8, m.d1, m.d2);
+            }
 
-        if let Err(e) = out.write(&l[..avail], &r[..avail], &mut scratch) {
-            *stats.error.lock().unwrap() = Some(format!("write failed: {e}"));
-            break;
+            let avail = match out.client.get_available_space_in_frames() { Ok(a) => a as usize, Err(_) => break 'run true };
+            if avail == 0 { continue }
+            let r0 = Instant::now();
+            for b in chans.iter_mut() { b[..avail].fill(0.0) }
+            for b in fx.iter_mut() { b[..avail].fill(0.0) }
+
+            // ── Render, split at song events, clicks, a pending start and note-offs ──
+            let mut done = 0usize;
+            while done < avail {
+                let mut chunk = avail - done;
+                if tr.playing {
+                    while tr.idx < tr.song.events.len() && tr.song.events[tr.idx].time <= tr.pos + 1e-9 {
+                        let e = tr.song.events[tr.idx];
+                        tr.idx += 1;
+                        let kind = e.status & 0xF0;
+                        let ch = (e.status & 0x0F) as usize;
+                        if kind == 0xC0 && tr.program_override[ch].is_some() { continue }
+                        // Reverb/chorus amounts belong to Orfeo's mixer (as in the Web Audio engine)
+                        if kind == 0xB0 && (e.d1 == 91 || e.d1 == 93) { continue }
+                        // The file's own volume, scaled by Orfeo's fader
+                        if kind == 0xB0 && e.d1 == 7 { file_cc7[ch] = e.d2; send_volume(&mut fluid, ch, &file_cc7, &mix.strips); continue }
+                        let is_note = kind == 0x90 || kind == 0x80 || kind == 0xA0;
+                        let muted = tr.audible.get(e.track as usize).map(|a| !a).unwrap_or(false);
+                        if is_note && muted && kind == 0x90 && e.d2 > 0 { continue }
+                        let d1 = if is_note { transpose_note(e.status, e.d1, tr.transpose) } else { e.d1 };
+                        fluid.midi(e.status, d1, e.d2);
+                    }
+                    while tr.click_idx < tr.song_clicks.len() && tr.song_clicks[tr.click_idx].0 <= tr.pos + 1e-9 {
+                        if mix.metronome_on { clicks.trigger(tr.song_clicks[tr.click_idx].1) }
+                        tr.click_idx += 1;
+                    }
+                    let next_ev = tr.song.events.get(tr.idx).map(|e| e.time);
+                    let next_click = tr.song_clicks.get(tr.click_idx).map(|c| c.0);
+                    if let Some(t) = [next_ev, next_click].into_iter().flatten().reduce(f64::min) {
+                        chunk = chunk.min(((t - tr.pos) / tr.ratio * rate).ceil().max(1.0) as usize);
+                    } else if tr.pos > tr.song.duration + 2.0 {
+                        tr.playing = false;
+                    }
+                }
+                // frame-counted things (count-in clicks, delayed start, preview note-offs)
+                for (f, accent) in pending_clicks.iter_mut() { if *f == 0 { clicks.trigger(*accent); *f = u64::MAX } }
+                pending_clicks.retain(|c| c.0 != u64::MAX);
+                if pending_play == Some(0) { pending_play = None; replay_state(&mut fluid, &tr, &mut file_cc7, &mix.strips); tr.playing = true; continue }
+                timed_offs.retain(|&(f, c, k)| { if f == 0 { fluid.midi(0x80 | c, k, 0); false } else { true } });
+                for f in pending_clicks.iter().map(|c| c.0).chain(pending_play).chain(timed_offs.iter().map(|t| t.0)) {
+                    chunk = chunk.min(f.max(1) as usize);
+                }
+
+                fluid.process(chunk, &mut fx, &mut chans, done);
+                if tr.playing { tr.pos += chunk as f64 * tr.ratio / rate; }
+                for c in pending_clicks.iter_mut() { c.0 -= chunk as u64 }
+                if let Some(p) = pending_play.as_mut() { *p -= chunk as u64 }
+                for t in timed_offs.iter_mut() { t.0 -= chunk as u64 }
+                // clicks render into the live bus: never compressed, never auto-levelled
+                clicks.render(&mut ll[done..done + chunk], &mut lr[done..done + chunk]);
+                done += chunk;
+            }
+
+            // ── Mix the 16 channels into the song bus and the live bus ──────
+            sl[..avail].fill(0.0); sr[..avail].fill(0.0);
+            // (clicks already sit in ll/lr for this period)
+            for ch in 0..16 {
+                let st = &mut mix.strips[ch];
+                let target = if tr.channel_muted[ch] { 0.0 } else { 1.0 };
+                let theta = (st.pan + 1.0) * std::f32::consts::FRAC_PI_4; // equal-power pan
+                let (pl, pr) = (theta.cos() * std::f32::consts::SQRT_2, theta.sin() * std::f32::consts::SQRT_2);
+                let (pl, pr) = (pl.min(1.0), pr.min(1.0));
+                let (bl, br) = if ch == LIVE_CH && !song_uses_channel(&tr, LIVE_CH) { (&mut ll, &mut lr) } else { (&mut sl, &mut sr) };
+                let (cl, cr) = (&chans[2 * ch], &chans[2 * ch + 1]);
+                let mut peak = 0f32;
+                for i in 0..avail {
+                    st.gain += (target - st.gain) * smooth;
+                    let (a, b) = (cl[i] * st.gain * pl, cr[i] * st.gain * pr);
+                    bl[i] += a; br[i] += b;
+                    peak = peak.max(a.abs()).max(b.abs());
+                }
+                fmax_atomic(&stats.channel_peaks[ch], peak);
+            }
+
+            for i in 0..avail { sl[i] += fx[0][i] + fx[2][i]; sr[i] += fx[1][i] + fx[3][i]; }
+
+            // ── Song bus: master → tone → auto-level → compressor;  live bus: master → tone ──
+            let use_tone = mix.tone_db.abs() > 0.01;
+            let mut mpeak = 0f32;
+            for i in 0..avail {
+                let (mut a, mut b) = (sl[i] * mix.master, sr[i] * mix.master);
+                agc.process(comp.enabled, &mut a, &mut b);
+                comp.process(&mut a, &mut b);
+                // live keys and clicks join after the dynamics; tone shapes the sum
+                let (mut a, mut b) = (a + ll[i] * mix.master, b + lr[i] * mix.master);
+                if use_tone { a = tone.process(0, a); b = tone.process(1, b); }
+                let (o1, o2) = (soft_clip(a), soft_clip(b));
+                sl[i] = o1; sr[i] = o2;
+                mpeak = mpeak.max(o1.abs()).max(o2.abs());
+            }
+            ll[..avail].fill(0.0); lr[..avail].fill(0.0);
+            fmax_atomic(&stats.master_peak, mpeak);
+            stats.comp_reduction_db.store(comp.reduction_db.to_bits(), Relaxed);
+            stats.worst_render_us.fetch_max(r0.elapsed().as_micros() as u32, Relaxed);
+
+            if out.write(&sl[..avail], &sr[..avail], &mut scratch).is_err() { break 'run true }
+            stats.position_bits.store(tr.pos.to_bits(), Relaxed);
+            stats.playing.store(tr.playing, Relaxed);
+        };
+
+        // ── The device went away or the default changed: reopen and carry on ──
+        let _ = out.client.stop_stream();
+        if !device_lost { break }
+        let old_rate = out.rate;
+        // Release the device first — an exclusive stream we still hold would
+        // make our own reopen fail with "device in use"
+        drop(out_slot.take());
+        if step_up { step += 1 }
+        stats.mode.store(255, Relaxed);
+        fluid.all_sounds_off();
+        loop {
+            // closing Orfeo must never wait for a device that isn't coming back
+            if stop.load(Relaxed) || matches!(cmds.peek(), Ok(Command::Shutdown)) { break 'device }
+            match Output::open(mode, step) {
+                Ok(o) => {
+                    if o.rate != old_rate {
+                        // FluidSynth is built for one sample rate: rebuild it, then restore the song state
+                        match make_fluid(o.rate) { Ok(f) => fluid = f, Err(e) => { *stats.error.lock().unwrap() = Some(e); break 'device } }
+                        for (c, s) in sends.iter().enumerate() { fluid.midi(0xB0 | c as u8, 91, (s.0 * 127.0) as u8); fluid.midi(0xB0 | c as u8, 93, (s.1 * 127.0) as u8); }
+                    }
+                    replay_state(&mut fluid, &tr, &mut file_cc7, &mix.strips);
+                    out_slot = Some(o);
+                    *stats.error.lock().unwrap() = None;
+                    stats.reopens.fetch_add(1, Relaxed);
+                    break;
+                }
+                Err(e) => { *stats.error.lock().unwrap() = Some(format!("waiting for an output device: {e}")); std::thread::sleep(Duration::from_millis(500)) }
+            }
         }
-        stats.position_bits.store(pos.to_bits(), Relaxed);
-        stats.playing.store(playing, Relaxed);
     }
-    let _ = out.client.stop_stream();
+}
+
+/// Registers the calling thread with MMCSS "Pro Audio" at high priority;
+/// the registration lasts as long as the returned guard
+struct Mmcss(Option<windows::Win32::Foundation::HANDLE>);
+impl Drop for Mmcss {
+    fn drop(&mut self) { if let Some(h) = self.0 { unsafe { let _ = windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(h); } } }
+}
+fn pro_audio_priority() -> Mmcss {
+    use windows::Win32::System::Threading::{AvSetMmThreadCharacteristicsW, AvSetMmThreadPriority, AVRT_PRIORITY_HIGH};
+    let mut index = 0u32;
+    match unsafe { AvSetMmThreadCharacteristicsW(windows::core::w!("Pro Audio"), &mut index) } {
+        Ok(h) => { unsafe { let _ = AvSetMmThreadPriority(h, AVRT_PRIORITY_HIGH); } Mmcss(Some(h)) }
+        Err(_) => Mmcss(None),
+    }
+}
+
+fn song_uses_channel(tr: &Transport, ch: usize) -> bool { tr.track_channels.iter().any(|m| m & (1 << ch) != 0) }
+
+/// Synth volume for a channel = the file's CC7 × Orfeo's fader, so the
+/// channel's reverb and chorus follow the fader too
+fn send_volume(fluid: &mut Fluid, ch: usize, file_cc7: &[u8; 16], strips: &[Strip; 16]) {
+    let v = (file_cc7[ch] as f32 * strips[ch].volume).round().clamp(0.0, 127.0) as u8;
+    fluid.midi(0xB0 | ch as u8, 7, v);
+}
+
+/// Instruments, banks, controllers and pedals as they stand at the playhead
+fn replay_state(fluid: &mut Fluid, tr: &Transport, file_cc7: &mut [u8; 16], strips: &[Strip; 16]) {
+    *file_cc7 = [100; 16];
+    for &(s, a, b) in &tr.song.state_before(tr.pos) {
+        let ch = (s & 0x0F) as usize;
+        if s & 0xF0 == 0xC0 && tr.program_override[ch].is_some() { continue }
+        if s & 0xF0 == 0xB0 && (a == 91 || a == 93) { continue }
+        if s & 0xF0 == 0xB0 && a == 7 { file_cc7[ch] = b; continue }
+        fluid.midi(s, a, b);
+    }
+    for (ch, p) in tr.program_override.iter().enumerate() { if let Some(p) = p { fluid.midi(0xC0 | ch as u8, *p, 0) } }
+    for ch in 0..16 { send_volume(fluid, ch, file_cc7, strips) }
+}
+
+fn record_live(stats: &Stats, now: Instant, at: Instant, padding: f64, rate: f64) {
+    let wait = now.saturating_duration_since(at).as_micros() as u64;
+    stats.live_notes.fetch_add(1, Relaxed);
+    stats.live_wait_sum_us.fetch_add(wait, Relaxed);
+    stats.live_wait_max_us.fetch_max(wait as u32, Relaxed);
+    stats.live_queued_sum_us.fetch_add((padding * 1e6 / rate) as u64, Relaxed);
 }

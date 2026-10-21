@@ -5,12 +5,14 @@
 //! statistics come back through atomics — nothing the audio thread does ever
 //! waits on the caller.
 
+pub mod clicks;
 pub mod dsp;
+pub mod dynamics;
 pub mod engine;
 pub mod fluid;
 pub mod output;
 pub mod song;
 
-pub use engine::{Command, Engine, EngineConfig, Stats};
+pub use engine::{Command, Engine, EngineConfig, Stats, LIVE_CH};
 pub use output::OutputMode;
 pub use song::{Song, SongEvent};

@@ -34,13 +34,18 @@ fn fmt_of(f: &WaveFormat) -> SampleFmt {
     }
 }
 
-fn open_exclusive(client: &mut AudioClient, rate: u32) -> Result<(WaveFormat, u32), String> {
+/// Exclusive period steps: the device minimum, about 6 ms, then 10 ms. The
+/// engine moves up a step when the device can't keep the smaller one on time.
+pub const EXCLUSIVE_STEPS: usize = 3;
+
+fn open_exclusive(client: &mut AudioClient, rate: u32, step: usize) -> Result<(WaveFormat, u32), String> {
     let candidates = [(32usize, 32usize, SampleType::Float), (32, 24, SampleType::Int), (24, 24, SampleType::Int), (16, 16, SampleType::Int), (32, 32, SampleType::Int)];
     let fmt = candidates.iter()
         .find_map(|(s, v, t)| client.is_supported_exclusive_with_quirks(&WaveFormat::new(*s, *v, t, rate as usize, 2, None)).ok())
         .ok_or("the device accepts no usual exclusive format")?;
     let (_, min) = client.get_device_period().map_err(|e| e.to_string())?;
-    let period = client.calculate_aligned_period_near(min, Some(128), &fmt).unwrap_or(min);
+    let desired = match step { 0 => min, 1 => min.max(60_000), _ => min.max(100_000) }; // 100 ns units
+    let period = client.calculate_aligned_period_near(desired, Some(128), &fmt).unwrap_or(desired);
     client.initialize_client(&fmt, &Direction::Render, &StreamMode::EventsExclusive { period_hns: period })
         .map_err(|e| format!("exclusive mode refused ({e}) — another app may be using the device, or exclusive control is disabled for it"))?;
     Ok((fmt, (period as f64 / 1e7 * rate as f64).round() as u32))
@@ -48,7 +53,7 @@ fn open_exclusive(client: &mut AudioClient, rate: u32) -> Result<(WaveFormat, u3
 
 impl Output {
     /// Must be called on the thread that will render (COM is initialised there).
-    pub fn open(want: OutputMode) -> Result<Output, String> {
+    pub fn open(want: OutputMode, step: usize) -> Result<Output, String> {
         let en = DeviceEnumerator::new().map_err(|e| e.to_string())?;
         let dev = en.get_default_device(&Direction::Render).map_err(|e| format!("no output device: {e}"))?;
         let device_name = dev.get_friendlyname().unwrap_or_default();
@@ -59,7 +64,7 @@ impl Output {
         let mut fallback_reason = None;
         let mut mode = want;
         let (fmt, period_frames) = if want == OutputMode::Exclusive {
-            match open_exclusive(&mut client, rate) {
+            match open_exclusive(&mut client, rate, step) {
                 Ok(x) => x,
                 Err(e) => {
                     fallback_reason = Some(e);
