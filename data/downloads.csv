@@ -96,6 +96,10 @@ date,tag,published,asset,kind,downloads
 2026-10-22,v1.4.4,2026-10-15,Orfeo-Setup-1.4.4.exe.blockmap,update,14
 2026-10-22,v1.4.4,2026-10-15,latest.yml,launch,218
 2026-10-22,v1.5.0,2026-10-22,Orfeo-1.5.0-portable.exe,portable,2
-2026-10-22,v1.5.0,2026-10-22,Orfeo-Setup-1.5.0.exe,installer,5
+2026-10-22,v1.5.0,2026-10-22,Orfeo-Setup-1.5.0.exe,installer,6
 2026-10-22,v1.5.0,2026-10-22,Orfeo-Setup-1.5.0.exe.blockmap,update,2
-2026-10-22,v1.5.0,2026-10-22,latest.yml,launch,5
+2026-10-22,v1.5.0,2026-10-22,latest.yml,launch,6
+2026-10-22,v1.5.1,2026-10-22,Orfeo-1.5.1-portable.exe,portable,3
+2026-10-22,v1.5.1,2026-10-22,Orfeo-Setup-1.5.1.exe,installer,5
+2026-10-22,v1.5.1,2026-10-22,Orfeo-Setup-1.5.1.exe.blockmap,update,0
+2026-10-22,v1.5.1,2026-10-22,latest.yml,launch,0
