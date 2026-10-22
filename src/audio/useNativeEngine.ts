@@ -101,6 +101,30 @@ function sendTrackState(tracks: Tracks) {
   }
 }
 
+// Metronome: every beat of the song's grid (Tap Tempo corrections included),
+// accented on bar starts — the engine clicks them itself, sample-exact
+function sendSongClicks() {
+  const m = activeMidiData() as any
+  const beats: number[] = m?._beatTimes ?? []
+  const bars = new Set<number>(m?._barTimes ?? [])
+  nativeCall('setSongClicks', new Float64Array(beats), Uint8Array.from(beats, b => (bars.has(b) ? 1 : 0)))
+}
+function sendMetronome() {
+  const s = useStore.getState()
+  nativeCall('setMetronome', s.metronomeEnabled, s.metronomeVolume)
+}
+
+// ── Count-in: the clicks and the song start are both on the engine's clock.
+// The runner arms the start here; when the UI then flips to 'playing' the
+// engine is already playing — it must not be re-seeked. ─────────────────
+let _armed: { songTime: number; until: number } | null = null
+export function nativeArmStart(songTime: number, delaySec: number) {
+  nativeCall('seek', songTime)
+  nativeCall('playAfter', Math.max(0, delaySec))
+  _armed = { songTime, until: performance.now() + delaySec * 1000 + 1000 }
+}
+export function nativeCancelArmedStart() { _armed = null; nativeCall('cancelPendingClicks') }
+
 function sendTransportSettings() {
   const s = useStore.getState()
   nativeCall('setTempoRatio', s.bpm / s.originalBpm || 1)
@@ -198,6 +222,8 @@ async function startEngine() {
   }
   sendTransportSettings()
   sendSong()
+  sendSongClicks()
+  sendMetronome()
   const s = useStore.getState()
   if (s.playbackState === 'playing') { nativeCall('seek', s.currentTime); nativeCall('play'); startVisuals(s.currentTime) }
 }
@@ -221,7 +247,8 @@ export function useNativeEngine() {
       }
       if (s.audioEngine !== 'native' || !isNativeRunning()) return
 
-      if (s.midi !== p.midi) { sendSong(); if (s.playbackState !== 'playing') nativeCall('seek', s.currentTime) }
+      if (s.midi !== p.midi) { sendSong(); sendSongClicks(); if (s.playbackState !== 'playing') nativeCall('seek', s.currentTime) }
+      if (s.metronomeEnabled !== p.metronomeEnabled || s.metronomeVolume !== p.metronomeVolume) sendMetronome()
       if (s.selectedSoundfont !== p.selectedSoundfont) { void startEngine(); return }
       if (s.masterVolume !== p.masterVolume) nativeCall('setMasterGain', s.masterVolume * NATIVE_BOOST)
       if (s.masterCompEnabled !== p.masterCompEnabled || s.masterCompPreset !== p.masterCompPreset) nativeCall('setCompressor', s.masterCompEnabled, s.masterCompPreset)
@@ -245,7 +272,11 @@ export function useNativeEngine() {
 
       const ps = s.playbackState, pp = p.playbackState
       if (ps === 'playing' && pp !== 'playing') {
-        nativeCall('seek', s.currentTime); nativeCall('play'); startVisuals(s.currentTime)
+        const armed = _armed && performance.now() < _armed.until
+        _armed = null
+        // after a count-in the engine started itself, on the beat — leave it be
+        if (!armed) { nativeCall('seek', s.currentTime); nativeCall('play') }
+        startVisuals(s.currentTime)
       } else if (ps === 'paused' && pp === 'playing') {
         nativeCall('pause'); clearVisuals()
       } else if (ps === 'stopped' && pp !== 'stopped') {
@@ -258,7 +289,7 @@ export function useNativeEngine() {
       }
     })
     const offRestart = onNativeRestart(() => {
-      sendTransportSettings(); sendSong()
+      sendTransportSettings(); sendSong(); sendSongClicks(); sendMetronome()
       const s = useStore.getState()
       if (s.playbackState === 'playing') { nativeCall('seek', s.currentTime); nativeCall('play'); startVisuals(s.currentTime) }
     })

@@ -89,7 +89,7 @@ export function useMetronome() {
 
     intervalRef.current = setInterval(() => {
       const { metronomeEnabled, playbackState, currentTime, midi, bpm, originalBpm } = useStore.getState()
-      if (!metronomeEnabled || playbackState !== 'playing') { stopScheduler(); return }
+      if (!metronomeEnabled || playbackState !== 'playing' || useStore.getState().audioEngine === 'native') { stopScheduler(); return }
 
       const ctx     = getCtx()
       const now     = ctx.currentTime
@@ -145,7 +145,8 @@ export function useMetronome() {
 
   useEffect(() => {
     const unsub = useStore.subscribe((state) => {
-      if (state.metronomeEnabled && state.playbackState === 'playing') {
+      // Native engine: it clicks the song's beats itself (useNativeEngine)
+      if (state.metronomeEnabled && state.playbackState === 'playing' && state.audioEngine !== 'native') {
         // Cancel any pending stop (e.g. from wheel-scrub pause)
         if (stopTimer.current) { clearTimeout(stopTimer.current); stopTimer.current = null }
         if (!intervalRef.current) startScheduler()

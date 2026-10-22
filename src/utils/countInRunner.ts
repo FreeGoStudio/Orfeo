@@ -22,6 +22,9 @@ export interface CountInDeps {
   engine: () => string               // 'gm' | 'samples'
   engineStartedAt: () => number | null  // performance.now() when the engine really started playing
   prepare: () => void                 // get the engine ready to start instantly (during the clicks)
+  // Engines that click and start on their own clock (Native): arm the song
+  // start `delay` s from now; true = armed, the timer then only updates the UI
+  armStart?: (songTime: number, delay: number) => boolean
 }
 
 const LEAD = 0.1   // s between pressing Play and the first click (scheduling headroom)
@@ -83,7 +86,8 @@ export function startCountIn(): boolean {
   // Metronome on: click the song's first beat here too, on the same clock as
   // the count-in, so it can't be late or dropped by the playback start
   let clickedSongTime: number | null = null
-  if (s.metronomeEnabled) {
+  // (an engine with its own clock clicks the song's first beat itself)
+  if (s.metronomeEnabled && !d.armStart) {
     const beats: number[] = m._beatTimes ?? [], bars: number[] = m._barTimes ?? []
     const first = beats.find(b => b >= plan.startAt - 1e-6)
     if (first !== undefined) {
@@ -103,6 +107,7 @@ export function startCountIn(): boolean {
   const engLat = d.engineLatency()
   const outputSkew = engLat > 0 ? d.ctxLatency() - engLat : 0
   const delay = Math.max(0, (musicAt - d.now()) + outputSkew - (startLag[engine] ?? 0))
+  d.armStart?.(plan.startAt, musicAt - d.now())
   const timer = d.setTimer(() => {
     const st = useStore.getState()
     const ok = active !== null && st.songKey === key && st.countIn !== null

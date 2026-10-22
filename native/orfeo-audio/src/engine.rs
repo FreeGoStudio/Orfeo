@@ -284,6 +284,8 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         let mut fx: [Vec<f32>; 4] = std::array::from_fn(|_| vec![0f32; n]);
         let (mut sl, mut sr) = (vec![0f32; n], vec![0f32; n]); // song bus
         let (mut ll, mut lr) = (vec![0f32; n], vec![0f32; n]); // live bus
+        // metronome clicks: their own volume, not the master's (as in the Web Audio metronome)
+        let (mut kl, mut kr) = (vec![0f32; n], vec![0f32; n]);
         let mut scratch = Vec::with_capacity(n * 8);
         let mut tone = HighShelf::new(rate as f32, 3000.0, mix.tone_db);
         let mut comp = Compressor::new(rate as f32);
@@ -454,14 +456,14 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                 for c in pending_clicks.iter_mut() { c.0 -= chunk as u64 }
                 if let Some(p) = pending_play.as_mut() { *p -= chunk as u64 }
                 for t in timed_offs.iter_mut() { t.0 -= chunk as u64 }
-                // clicks render into the live bus: never compressed, never auto-levelled
-                clicks.render(&mut ll[done..done + chunk], &mut lr[done..done + chunk]);
+                // clicks: never compressed, never auto-levelled, not on the master fader
+                clicks.render(&mut kl[done..done + chunk], &mut kr[done..done + chunk]);
                 done += chunk;
             }
 
             // ── Mix the 16 channels into the song bus and the live bus ──────
             sl[..avail].fill(0.0); sr[..avail].fill(0.0);
-            // (clicks already sit in ll/lr for this period)
+            // (metronome clicks for this period already sit in kl/kr)
             for ch in 0..16 {
                 let st = &mut mix.strips[ch];
                 let target = if tr.channel_muted[ch] { 0.0 } else { 1.0 };
@@ -492,11 +494,12 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                 // live keys and clicks join after the dynamics; tone shapes the sum
                 let (mut a, mut b) = (a + ll[i] * mix.master, b + lr[i] * mix.master);
                 if use_tone { a = tone.process(0, a); b = tone.process(1, b); }
-                let (o1, o2) = (soft_clip(a), soft_clip(b));
+                let (o1, o2) = (soft_clip(a + kl[i]), soft_clip(b + kr[i]));
                 sl[i] = o1; sr[i] = o2;
                 mpeak = mpeak.max(o1.abs()).max(o2.abs());
             }
             ll[..avail].fill(0.0); lr[..avail].fill(0.0);
+            kl[..avail].fill(0.0); kr[..avail].fill(0.0);
             fmax_atomic(&stats.master_peak, mpeak);
             stats.comp_reduction_db.store(comp.reduction_db.to_bits(), Relaxed);
             stats.worst_render_us.fetch_max(r0.elapsed().as_micros() as u32, Relaxed);
