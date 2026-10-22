@@ -23,7 +23,6 @@ export interface MidiPrefs {
   autoReconnect: boolean          // a re-plugged keyboard is listened to again without a click
   liveResponse: LiveResponse
   latencyOffsetMs: number         // manual alignment on top of the measured output delay
-  nativeExclusive: boolean        // Native engine: exclusive (lowest delay) vs shared with other apps
   velocityCurve: VelocityCurve
   fixedVelocity: number           // 1-127, used by the 'fixed' curve
   minVelocity: number             // notes played softer than this are ignored (1 = none ignored)
@@ -41,7 +40,6 @@ export const MIDI_DEFAULTS: MidiPrefs = {
   autoReconnect: true,
   liveResponse: 'low',
   latencyOffsetMs: 0,
-  nativeExclusive: true,
   velocityCurve: 'normal',
   fixedVelocity: 100,
   minVelocity: 1,
@@ -77,6 +75,9 @@ interface MidiLive {
   detected: Partial<Record<ControlKind, boolean>> // seen at least once this session
   sustainDown: boolean
   diagVersion: number                           // bumped (throttled) when new timing samples arrive
+  // Native engine: exclusive (Low latency) vs shared with other apps. Not saved:
+  // off by default, on while a keyboard is connected (useNativeEngine.ts)
+  nativeExclusive: boolean
 }
 
 type MidiState = MidiPrefs & MidiLive & {
@@ -95,6 +96,7 @@ export const useMidiSettings = create<MidiState>((set) => ({
   detected: {},
   sustainDown: false,
   diagVersion: 0,
+  nativeExclusive: false,
   set: (p) => set(p),
   // Keeps which keyboards already had their first-connection pop-up
   resetPrefs: () => set(s => ({ ...MIDI_DEFAULTS, seenDevices: s.seenDevices, lastDevice: s.lastDevice })),

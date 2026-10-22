@@ -5,6 +5,11 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
+## [Unreleased]
+
+### Fixed
+- **The Native sound engine took over the sound card even with no keyboard plugged in**, so a website or video playing alongside Orfeo went silent. *Low latency* is now off unless a MIDI keyboard is connected: plugging one in turns it on, unplugging the last one turns it off, and switching it by hand holds until then. Every start begins from that rule.
+
 ## [1.5] — 22. 10. 2026 — Play your own keyboard, without the lag
 
 **In short**

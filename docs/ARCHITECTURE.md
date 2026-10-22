@@ -226,8 +226,8 @@ channel set to the wrong instrument for the rest of the session.
   16 channels itself (fader = file CC7 × Orfeo volume, pan, mute fades, meters),
   runs auto-level → compressor (no look-ahead) on the song bus only, adds live
   keys, metronome clicks (own bus, not on the master fader) and count-in clicks
-  on its own clock, and soft-clips. Exclusive mode (default, ~3–4 ms periods)
-  with automatic shared fallback; follows the default device, survives unplugs,
+  on its own clock, and soft-clips. Exclusive mode (~3–4 ms periods; *Low latency*, on only
+  while a MIDI keyboard is connected, not saved) with automatic shared fallback; follows the default device, survives unplugs,
   steps its buffer up if the device signals late; MMCSS "Pro Audio" priority.
 - **Renderer:** `useNativeEngine.ts` turns store changes into commands
   (song, transport, tempo, transpose, mute/solo, programs, mixer, metronome) and

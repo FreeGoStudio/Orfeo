@@ -7,7 +7,7 @@
 
 import { useEffect } from 'react'
 import { useStore } from '../store'
-import { useMidiSettings, latencyOffsetSec, midiPrefsReady } from '../store/midiSettings'
+import { useMidiSettings, latencyOffsetSec } from '../store/midiSettings'
 import { NES } from '../utils/noteEditorState'
 import { pushHitEffect, amberHex } from '../utils/hitEffectQueue'
 import { isHomogeneousHandTrack, resolveHandAwareColor } from '../utils/handColors'
@@ -40,20 +40,24 @@ export const nativeSetMasterTone = (v: number) => nativeCall('setToneDb', v * 12
 export const nativeSetMasterCompressor = (enabled: boolean, preset: number) => nativeCall('setCompressor', enabled, preset)
 export const nativeSetMasterPan = (_v: number) => { /* master pan: not in the native mixer yet */ }
 
-// ── A MIDI keyboard was just connected (or found at startup): Low latency on.
-// Someone playing wants the shortest delay; switching it off by hand holds
-// until the next keyboard connects. With no keyboard nothing changes. ──────
+// ── Low latency follows the keyboards: off (sharing the sound card, so a
+// browser or video call keeps playing) unless a MIDI keyboard is connected.
+// A keyboard connecting (or found at startup) turns it on, the last one
+// unplugged turns it off; switching it by hand holds until the next of
+// those. Never saved, so every start begins from that rule. ───────────────
 let _keyboards = new Set<string>()
 useMidiSettings.subscribe((m) => {
   const now = new Set(m.devices.filter(d => d.connected).map(d => d.key))
   const fresh = [...now].some(k => !_keyboards.has(k))
+  const allGone = _keyboards.size > 0 && now.size === 0
   _keyboards = now
-  if (!fresh) return
-  void midiPrefsReady.then(() => {
-    useMidiSettings.getState().set({ nativeExclusive: true })
-    nativeCall('setExclusive', true)
-  })
+  if (fresh) setLowLatency(true)
+  else if (allGone) setLowLatency(false)
 })
+export function setLowLatency(on: boolean) {
+  if (useMidiSettings.getState().nativeExclusive !== on) useMidiSettings.setState({ nativeExclusive: on })
+  nativeCall('setExclusive', on)
+}
 
 /** Real delay from "told to play" to "heard" + the user's offset (seconds) */
 export function nativeOutputLatencySec(): number {

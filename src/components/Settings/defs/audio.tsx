@@ -7,7 +7,8 @@ import {
   downloadSoundfont, deleteSoundfont, importSoundfont, allSoundfonts,
 } from '../../../hooks/useSoundfonts'
 import type { SettingDef } from '../types'
-import { useNativeAudio, stopNative, nativeCall } from '../../../audio/nativeClient'
+import { useNativeAudio, stopNative } from '../../../audio/nativeClient'
+import { setLowLatency } from '../../../audio/useNativeEngine'
 import { useMidiSettings } from '../../../store/midiSettings'
 
 // Native engine (beta): Windows only for now
@@ -98,7 +99,7 @@ function SoundEngineDelay() {
 // is connected (useNativeEngine.ts); switching it off stays off until then.
 function NativeOutputChoice() {
   const exclusive = useMidiSettings((s) => s.nativeExclusive)
-  const pick = (v: boolean) => { useMidiSettings.getState().set({ nativeExclusive: v }); nativeCall('setExclusive', v) }
+  const pick = (v: boolean) => setLowLatency(v)
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', marginTop: 10 }}>
@@ -108,7 +109,7 @@ function NativeOutputChoice() {
       <HelpText>{exclusive
         ? t`On: Orfeo talks to your sound card directly, past Windows' mixer — the shortest delay from key to sound. Other apps stay silent while Orfeo is open; if one is already using the sound card, Orfeo shares it instead.`
         : t`Off: other apps (a browser lesson, a video call) keep playing alongside Orfeo, at the cost of Windows' usual delay.`}</HelpText>
-      <HelpText>{t`Turns on by itself when a MIDI keyboard is connected. Switch it off to share the sound card while you play.`}</HelpText>
+      <HelpText>{t`Off unless a MIDI keyboard is connected: plugging one in turns it on, unplugging the last one turns it off. Switching it by hand holds until then.`}</HelpText>
     </>
   )
 }
