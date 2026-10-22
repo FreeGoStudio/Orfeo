@@ -59,7 +59,9 @@ fn open_exclusive(client: &mut AudioClient, rate: u32, step: usize) -> Result<(W
 
 impl Output {
     /// Must be called on the thread that will render (COM is initialised there).
-    pub fn open(want: OutputMode, step: usize) -> Result<Output, String> {
+    /// `rate_for`: sound cards found to really run at another rate than Windows
+    /// reports for them; their exclusive stream opens at that rate instead.
+    pub fn open(want: OutputMode, step: usize, rate_for: &[(String, u32)]) -> Result<Output, String> {
         let en = DeviceEnumerator::new().map_err(|e| e.to_string())?;
         // Testing aid: ORFEO_AUDIO_DEVICE=<part of a device's name> picks that output
         // instead of Windows' default (the app never sets it)
@@ -71,7 +73,8 @@ impl Output {
         let device_name = dev.get_friendlyname().unwrap_or_default();
         let mut client = dev.get_iaudioclient().map_err(|e| e.to_string())?;
         let mix = client.get_mixformat().map_err(|e| e.to_string())?;
-        let rate = mix.get_samplespersec();
+        let shared_rate = mix.get_samplespersec();
+        let mut rate = rate_for.iter().find(|(d, _)| *d == device_name).map(|x| x.1).unwrap_or(shared_rate);
 
         let mut fallback_reason = None;
         let mut mode = want;
@@ -83,10 +86,12 @@ impl Output {
                     mode = OutputMode::Shared;
                     // A failed Initialize leaves the client unusable — start from a fresh one
                     client = dev.get_iaudioclient().map_err(|e| e.to_string())?;
+                    rate = shared_rate;
                     Self::init_shared(&mut client, rate)?
                 }
             }
         } else {
+            rate = shared_rate;
             Self::init_shared(&mut client, rate)?
         };
         let event = client.set_get_eventhandle().map_err(|e| e.to_string())?;

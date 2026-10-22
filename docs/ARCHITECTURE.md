@@ -235,9 +235,11 @@ channel set to the wrong instrument for the rest of the session.
   Speed check: an exclusive stream counts the frames the device frees on
   on-time wake-ups over 2 s against the clock (`Stats.measured_rate`); more than
   3 % off the nominal rate (a pro interface clocked at another rate than
-  Windows' format), or still late at the largest buffer, and that device gets
-  the shared stream for the rest of the session, with `fallback_reason` shown
-  in Settings › Audio and in the MIDI keyboard log.
+  Windows' format) and within 1 % of a standard rate, the device is reopened
+  exclusive at that rate (`synced`, FluidSynth rebuilt) and checked again. A
+  second miss, no standard rate, or still late at the largest buffer, and that
+  device gets the shared stream for the rest of the session, with
+  `fallback_reason` shown in Settings › Audio and in the MIDI keyboard log.
 - **Renderer:** `useNativeEngine.ts` turns store changes into commands
   (song, transport, tempo, transpose, mute/solo, programs, mixer, metronome) and
   schedules only the visuals (key lights, hit effects) delayed by the engine's

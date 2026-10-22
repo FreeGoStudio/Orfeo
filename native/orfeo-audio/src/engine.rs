@@ -247,10 +247,14 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
     // thread runs on time even while the screen, Orfeo's UI or other programs are busy
     let _mmcss = pro_audio_priority();
     let mut step = 0usize;
+    // Sound cards found running at another rate than Windows reports for them
+    // (a studio interface whose own control app sets it): Low latency opens them
+    // at the rate they really play
+    let mut synced: Vec<(String, u32)> = Vec::new();
     // Sound cards whose Low latency stream proved unusable this session, with why:
     // they get the shared stream instead (Windows' mixer handles them correctly)
     let mut refused: Vec<(String, String)> = Vec::new();
-    let mut out_slot = match open_output(mode, step, &refused) { Ok(o) => Some(o), Err(e) => { let _ = ready.send(Err(e)); return } };
+    let mut out_slot = match open_output(mode, step, &synced, &refused) { Ok(o) => Some(o), Err(e) => { let _ = ready.send(Err(e)); return } };
     let make_fluid = |rate: u32| -> Result<Fluid, String> {
         let mut f = Fluid::new(&fluid_dir, rate as f64)?;
         for sf in &soundfonts { f.load_soundfont(sf)?; }
@@ -450,7 +454,14 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                     let measured = speed.0 as f64 / speed.1;
                     stats.measured_rate.store(measured.round() as u32, Relaxed);
                     if (measured / rate - 1.0).abs() > 0.03 {
-                        refuse = Some(format!("the sound card plays at about {} Hz, not the {} Hz it reported, so Low latency would sound slowed down or sped up — its own control app and Windows' sound settings may be set to different sample rates", (measured / 100.0).round() * 100.0, out.rate));
+                        // Running at a standard rate other than the one it reported: play at
+                        // that rate (checked again); anything else, or a second miss, → shared
+                        let real = [44_100u32, 48_000, 88_200, 96_000, 176_400, 192_000].into_iter()
+                            .find(|r| (measured / *r as f64 - 1.0).abs() < 0.01);
+                        match real {
+                            Some(r) if !synced.iter().any(|(d, _)| *d == out.device_name) => synced.push((out.device_name.clone(), r)),
+                            _ => refuse = Some(format!("the sound card plays at about {} Hz, not the {} Hz it reported, and Orfeo couldn't match it", (measured / 100.0).round() * 100.0, out.rate)),
+                        }
                         break 'run true
                     }
                 }
@@ -585,7 +596,7 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         loop {
             // closing Orfeo must never wait for a device that isn't coming back
             if stop.load(Relaxed) || matches!(cmds.peek(), Ok(Command::Shutdown)) { break 'device }
-            match open_output(mode, step, &refused) {
+            match open_output(mode, step, &synced, &refused) {
                 Ok(o) => {
                     if o.rate != old_rate {
                         // FluidSynth is built for one sample rate: rebuild it, then restore the song state
@@ -611,12 +622,12 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
 
 /// Opens the default sound card; one whose Low latency stream proved unusable
 /// this session gets the shared stream, with the reason to show
-fn open_output(mode: OutputMode, step: usize, refused: &[(String, String)]) -> Result<Output, String> {
-    let o = Output::open(mode, step)?;
+fn open_output(mode: OutputMode, step: usize, synced: &[(String, u32)], refused: &[(String, String)]) -> Result<Output, String> {
+    let o = Output::open(mode, step, synced)?;
     match refused.iter().find(|(d, _)| *d == o.device_name) {
         Some((_, why)) if o.mode == OutputMode::Exclusive => {
             drop(o); // release the card before asking for it again
-            let mut s = Output::open(OutputMode::Shared, 0)?;
+            let mut s = Output::open(OutputMode::Shared, 0, &[])?;
             s.fallback_reason = Some(why.clone());
             Ok(s)
         }
