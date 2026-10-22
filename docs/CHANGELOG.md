@@ -12,6 +12,8 @@
 
 ### Fixed
 - **Parts that change instrument mid-song now do, on both sound engines.** Some arrangers switch a part's instrument partway through, as Kate Bush's "Wuthering Heights" does: its lead melody is a nylon guitar in the intro, an oboe in the verse, then a guitar again. Orfeo shows such a part as one track per instrument in the Tracks panel, but they all share one MIDI channel, and both engines played that channel with a single instrument for the whole song: Samples the last one (oboe throughout), Native the first one (guitar throughout). Both now switch at the right moment, exactly as the file intends. An instrument you change in the Tracks panel is heard straight away, even mid-song.
+- **Native's *Low latency* could play slowed down and distorted on some studio interfaces.** Some audio interfaces (Universal Audio's Apollo, for example) accept Orfeo's sound at one speed while really running at another. This happens when the interface's own control app and Windows' sound settings are set to different sample rates. Everything then played too slow and too low, and crackled. Native now checks how fast the sound card really plays during its first two seconds. If the speed is off, it switches to sharing the sound card through Windows, which converts it correctly. *Settings › Audio* says why. Sound cards that play at the right speed keep *Low latency* as before.
+- **The MIDI keyboard log (*Save log…*) now includes the sound card connection.** It records the sound card, its sample rate and format, the buffer, how fast the card really plays, and why it isn't in *Low latency*, if it isn't. One saved file is now enough to diagnose a sound problem.
 
 ## [1.5.1] — 22. 10. 2026 — Native sound, safe on every sound card
 

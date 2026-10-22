@@ -26,6 +26,8 @@ export interface NativeStatus {
   masterPeak: number
   compReductionDb: number
   windowsGain?: number | null  // Windows volume the engine applies itself (Low latency without hardware volume)
+  measuredRate?: number | null // how fast the card really plays in Low latency (Hz), once measured
+  format?: string              // e.g. "48000 Hz · 32-bit float"
   liveNotes: number
   liveWaitAvgMs: number
   liveWaitMaxMs: number

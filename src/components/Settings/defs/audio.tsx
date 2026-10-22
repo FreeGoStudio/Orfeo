@@ -65,14 +65,21 @@ function NativeGlance() {
   const phase = useNativeAudio((s) => s.phase)
   const status = useNativeAudio((s) => s.status)
   const error = useNativeAudio((s) => s.error)
+  const lowLatency = useMidiSettings((s) => s.nativeExclusive)
   const line = { marginTop: 5, fontSize: 9, fontFamily: 'var(--font-ui)', color: 'var(--text-muted)' } as const
   if (phase === 'failed') return <div style={{ ...line, color: 'var(--status-error)' }}>{t`Native engine unavailable:`} {error}</div>
   if (phase !== 'running' || !status) return <div style={line}>{t`Starting the native engine…`}</div>
   if (status.mode === 'none') return <div style={line}>{t`Waiting for a sound card…`}</div>
   return (
-    <div style={line}>
-      {status.deviceName} · <span style={{ color: 'var(--text-amber)' }}>{status.mode === 'exclusive' ? t`exclusive` : t`shared`}</span> · {Math.round(status.bufferFrames * 1000 / status.rate * 10) / 10} ms {t`buffer`}
-    </div>
+    <>
+      <div style={line}>
+        {status.deviceName} · <span style={{ color: 'var(--text-amber)' }}>{status.mode === 'exclusive' ? t`exclusive` : t`shared`}</span> · {Math.round(status.rate / 100) / 10} kHz · {Math.round(status.bufferFrames * 1000 / status.rate * 10) / 10} ms {t`buffer`}
+      </div>
+      {/* Low latency asked for, but the card couldn't do it: say why */}
+      {lowLatency && status.mode === 'shared' && status.fallbackReason && (
+        <div style={{ ...line, color: 'var(--text-amber)' }}>{t`Sharing the sound card instead of Low latency:`} {status.fallbackReason}.</div>
+      )}
+    </>
   )
 }
 

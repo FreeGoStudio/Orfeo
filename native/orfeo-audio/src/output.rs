@@ -110,6 +110,12 @@ impl Output {
 
     pub fn has_software_volume(&self) -> bool { self.volume.is_some() }
 
+    /// e.g. "48000 Hz · 32-bit float", for reports
+    pub fn format_name(&self) -> String {
+        let f = match self.fmt { SampleFmt::F32 => "32-bit float", SampleFmt::I32 => "32-bit", SampleFmt::I24 => "24-bit", SampleFmt::I16 => "16-bit" };
+        format!("{} Hz · {f}", self.rate)
+    }
+
     /// Windows' volume for this stream as a gain (0 when muted), or 1 when
     /// Windows applies it anyway (shared mode, or a sound card with hardware volume)
     pub fn windows_gain(&self) -> f32 {

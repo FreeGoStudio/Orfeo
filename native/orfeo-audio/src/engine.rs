@@ -95,6 +95,11 @@ pub struct Stats {
     /// Windows' volume the engine applies itself (exclusive, software volume), as
     /// f32 gain bits; u32::MAX = not applied (Windows or the sound card does it)
     pub windows_gain: AtomicU32,
+    /// How fast the sound card really takes audio (frames per second, measured
+    /// over the first seconds of a Low latency stream); 0 = not measured
+    pub measured_rate: AtomicU32,
+    /// The stream format, e.g. "48000 Hz · 32-bit float"
+    pub format: Mutex<String>,
     pub device_name: Mutex<String>,
     pub fallback_reason: Mutex<Option<String>>,
     pub error: Mutex<Option<String>>,
@@ -242,7 +247,10 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
     // thread runs on time even while the screen, Orfeo's UI or other programs are busy
     let _mmcss = pro_audio_priority();
     let mut step = 0usize;
-    let mut out_slot = match Output::open(mode, step) { Ok(o) => Some(o), Err(e) => { let _ = ready.send(Err(e)); return } };
+    // Sound cards whose Low latency stream proved unusable this session, with why:
+    // they get the shared stream instead (Windows' mixer handles them correctly)
+    let mut refused: Vec<(String, String)> = Vec::new();
+    let mut out_slot = match open_output(mode, step, &refused) { Ok(o) => Some(o), Err(e) => { let _ = ready.send(Err(e)); return } };
     let make_fluid = |rate: u32| -> Result<Fluid, String> {
         let mut f = Fluid::new(&fluid_dir, rate as f64)?;
         for sf in &soundfonts { f.load_soundfont(sf)?; }
@@ -281,6 +289,8 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         stats.reported_latency_bits.store(out.reported_latency_ms.to_bits(), Relaxed);
         *stats.device_name.lock().unwrap() = out.device_name.clone();
         *stats.fallback_reason.lock().unwrap() = out.fallback_reason.clone();
+        *stats.format.lock().unwrap() = out.format_name();
+        if out.mode == OutputMode::Exclusive { stats.measured_rate.store(0, Relaxed) } // a new measurement follows
 
         let n = out.buffer_frames as usize;
         let mut chans: [Vec<f32>; 32] = std::array::from_fn(|_| vec![0f32; n]);
@@ -319,6 +329,14 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         let mut late_window: (Instant, u32) = (Instant::now(), 0);
         let mut step_up = false;
         stats.period_step.store(step as u8, Relaxed);
+        // The speed check (Low latency only): some cards accept a stream at one
+        // sample rate while really running at another (a pro interface whose own
+        // control app is set to a different rate than Windows). Everything then
+        // plays slowed down or sped up, and distorted. Count the audio the card
+        // takes on time, over 2 s of wake-ups, against the clock.
+        let mut speed = (0u64, 0f64); // (frames, seconds) from on-time wake-ups
+        let mut speed_checked = out.mode != OutputMode::Exclusive;
+        let mut refuse: Option<String> = None;
 
         let transpose_note = |status: u8, key: u8, t: i32| -> u8 {
             if status & 0x0F == 9 { key } else { (key as i32 + t).clamp(0, 127) as u8 }
@@ -335,13 +353,19 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
             let now = Instant::now();
             let gap = now.duration_since(last_wake).as_secs_f64() * 1000.0;
             last_wake = now;
-            if gap > period_ms * 1.8 && started.elapsed() > Duration::from_millis(500) {
+            let late = gap > period_ms * 1.8;
+            if late && started.elapsed() > Duration::from_millis(500) {
                 stats.late_wakeups.fetch_add(1, Relaxed);
                 if now.duration_since(late_window.0) > Duration::from_secs(2) { late_window = (now, 0) }
                 late_window.1 += 1;
                 // A few misses in two seconds: this buffer is too small for the device — the
-                // way a pianist would hear it is crackling, so trade a few ms for steadiness
-                if late_window.1 >= 4 && out.mode == OutputMode::Exclusive && step + 1 < EXCLUSIVE_STEPS { step_up = true; break 'run true }
+                // way a pianist would hear it is crackling, so trade a few ms for steadiness;
+                // already at the largest one, the card can't do Low latency here at all
+                if late_window.1 >= 4 && out.mode == OutputMode::Exclusive {
+                    if step + 1 < EXCLUSIVE_STEPS { step_up = true }
+                    else { refuse = Some("the sound card couldn't keep up with Low latency, even with the largest buffer".into()) }
+                    break 'run true
+                }
             }
             let padding = match out.client.get_current_padding() { Ok(p) => p as f64, Err(_) => break 'run true };
 
@@ -417,6 +441,20 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
             }
 
             let avail = match out.client.get_available_space_in_frames() { Ok(a) => a as usize, Err(_) => break 'run true };
+            // what the card freed since an on-time wake-up is what it played in that time
+            if !speed_checked && !late && started.elapsed() > Duration::from_millis(500) {
+                speed.0 += avail as u64;
+                speed.1 += gap / 1000.0;
+                if speed.1 >= 2.0 {
+                    speed_checked = true;
+                    let measured = speed.0 as f64 / speed.1;
+                    stats.measured_rate.store(measured.round() as u32, Relaxed);
+                    if (measured / rate - 1.0).abs() > 0.03 {
+                        refuse = Some(format!("the sound card plays at about {} Hz, not the {} Hz it reported, so Low latency would sound slowed down or sped up — its own control app and Windows' sound settings may be set to different sample rates", (measured / 100.0).round() * 100.0, out.rate));
+                        break 'run true
+                    }
+                }
+            }
             if avail == 0 { continue }
             let r0 = Instant::now();
             for b in chans.iter_mut() { b[..avail].fill(0.0) }
@@ -537,6 +575,7 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         let _ = out.client.stop_stream();
         if !device_lost { break }
         let old_rate = out.rate;
+        if let Some(why) = refuse.take() { refused.push((out.device_name.clone(), why)); step = 0 }
         // Release the device first — an exclusive stream we still hold would
         // make our own reopen fail with "device in use"
         drop(out_slot.take());
@@ -546,7 +585,7 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         loop {
             // closing Orfeo must never wait for a device that isn't coming back
             if stop.load(Relaxed) || matches!(cmds.peek(), Ok(Command::Shutdown)) { break 'device }
-            match Output::open(mode, step) {
+            match open_output(mode, step, &refused) {
                 Ok(o) => {
                     if o.rate != old_rate {
                         // FluidSynth is built for one sample rate: rebuild it, then restore the song state
@@ -567,6 +606,21 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                 Err(e) => { *stats.error.lock().unwrap() = Some(format!("waiting for an output device: {e}")); std::thread::sleep(Duration::from_millis(500)) }
             }
         }
+    }
+}
+
+/// Opens the default sound card; one whose Low latency stream proved unusable
+/// this session gets the shared stream, with the reason to show
+fn open_output(mode: OutputMode, step: usize, refused: &[(String, String)]) -> Result<Output, String> {
+    let o = Output::open(mode, step)?;
+    match refused.iter().find(|(d, _)| *d == o.device_name) {
+        Some((_, why)) if o.mode == OutputMode::Exclusive => {
+            drop(o); // release the card before asking for it again
+            let mut s = Output::open(OutputMode::Shared, 0)?;
+            s.fallback_reason = Some(why.clone());
+            Ok(s)
+        }
+        _ => Ok(o),
     }
 }
 

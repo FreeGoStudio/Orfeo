@@ -39,6 +39,10 @@ pub struct Status {
     pub comp_reduction_db: f64,
     /// Windows' volume the engine applies itself in exclusive mode (gain), or null
     pub windows_gain: Option<f64>,
+    /// How fast the sound card really takes audio in exclusive mode (Hz), or null
+    pub measured_rate: Option<u32>,
+    /// e.g. "48000 Hz · 32-bit float"
+    pub format: String,
     pub live_notes: u32,
     pub live_wait_avg_ms: f64,
     pub live_wait_max_ms: f64,
@@ -150,6 +154,8 @@ impl NativeEngine {
             master_peak: s.take_master_peak() as f64,
             comp_reduction_db: f32::from_bits(s.comp_reduction_db.load(Relaxed)) as f64,
             windows_gain: match s.windows_gain.load(Relaxed) { u32::MAX => None, b => Some(f32::from_bits(b) as f64) },
+            measured_rate: match s.measured_rate.load(Relaxed) { 0 => None, r => Some(r) },
+            format: s.format.lock().unwrap().clone(),
             live_notes: notes,
             live_wait_avg_ms: wait / n / 1000.0,
             live_wait_max_ms: s.live_wait_max_us.swap(0, Relaxed) as f64 / 1000.0,

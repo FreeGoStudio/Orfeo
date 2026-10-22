@@ -232,6 +232,12 @@ channel set to the wrong instrument for the rest of the session.
   volume, so when the device has no hardware volume the engine applies the
   endpoint volume and mute itself (polled ~20×/s, before the soft clip); follows the default device, survives unplugs,
   steps its buffer up if the device signals late; MMCSS "Pro Audio" priority.
+  Speed check: an exclusive stream counts the frames the device frees on
+  on-time wake-ups over 2 s against the clock (`Stats.measured_rate`); more than
+  3 % off the nominal rate (a pro interface clocked at another rate than
+  Windows' format), or still late at the largest buffer, and that device gets
+  the shared stream for the rest of the session, with `fallback_reason` shown
+  in Settings › Audio and in the MIDI keyboard log.
 - **Renderer:** `useNativeEngine.ts` turns store changes into commands
   (song, transport, tempo, transpose, mute/solo, programs, mixer, metronome) and
   schedules only the visuals (key lights, hit effects) delayed by the engine's

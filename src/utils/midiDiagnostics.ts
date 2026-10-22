@@ -101,6 +101,7 @@ export function buildPerformanceLog() {
     platform: navigator.userAgent,
     audioEngine: useStore.getState().audioEngine,
     sampleRate: getSamplesSampleRate() || null,
+    nativeOutput: nativeOutputReport(),
     delay: getDelayBreakdown(),
     timing: getStats(),
     counters: { ...counters },
@@ -110,6 +111,15 @@ export function buildPerformanceLog() {
     settings: prefs,
     notes: _samples.map(s => ({ ...s, at: Math.round(s.at), inputMs: s.inputMs === null ? null : +s.inputMs.toFixed(2), handleMs: +s.handleMs.toFixed(2) })),
   }
+}
+
+// The native engine's sound card connection: which card, mode, format, buffer,
+// how fast the card really plays, and why it isn't in Low latency if it isn't
+function nativeOutputReport() {
+  const s = useNativeAudio.getState().status
+  if (!s) return null
+  const { channelPeaks: _p, masterPeak: _m, position: _pos, playing: _pl, ...rest } = s
+  return { ...rest, lowLatencyOn: useMidiSettings.getState().nativeExclusive }
 }
 
 export function exportPerformanceLog() {
