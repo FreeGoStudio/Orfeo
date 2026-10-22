@@ -300,7 +300,8 @@ each key press.
   On in `npm run dev` and in test portables (`npm run dist:portable` builds in
   Vite mode `test-build`); off in releases, which GitHub builds in the normal
   mode. In any build, the hidden **Ctrl+Alt+Shift+D** turns the dev tools on or
-  off and reloads the window (stored in `localStorage` as `orfeo-dev-tools`).
+  off and reloads the window (stored in `localStorage` as `orfeo-dev-tools`);
+  while they're on, the top bar shows **DEV MODE** next to the version.
   Deliberately not in the manual or SHORTCUTS.md.
 
 ---

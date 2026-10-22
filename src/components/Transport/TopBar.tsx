@@ -25,6 +25,7 @@ import { t } from '../../utils/i18n'
 import { useMidiSettings } from '../../store/midiSettings'
 import { shortName } from '../../utils/midiDeviceNames'
 import { confirmDiscardDirtyNoteEdits } from '../../utils/noteEditorState'
+import { simAvailable } from '../../utils/midiSimulator'
 import { confirmDiscardDirtyTempoKey } from '../../utils/tempoKeySave'
 
 // NOTE: no more `C` shorthand object — every color below is a literal
@@ -286,7 +287,11 @@ export default function TopBar() {
         <Tooltip title="Reset" description={"Closes the file and resets tempo,\ntranspose, and playback to defaults."} placement="bottom">
           <span onClick={handleReset} className="app-no-drag" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
             <OrfeoLogo />
-            <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>v{__APP_VERSION__}</span>
+            <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+              v{__APP_VERSION__}
+              {/* dev tools on: dev run, test portable, or Ctrl+Alt+Shift+D */}
+              {simAvailable && <span style={{ color: 'var(--text-amber)', marginLeft: 6, letterSpacing: '0.05em' }}>DEV MODE</span>}
+            </span>
           </span>
         </Tooltip>
         <Tooltip title="Open a file (Ctrl+O)" description={"Loads a supported file from\ndisk to start a new session."} placement="bottom">
