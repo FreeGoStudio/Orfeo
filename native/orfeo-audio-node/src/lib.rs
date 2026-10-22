@@ -43,8 +43,12 @@ pub struct Status {
     pub live_queued_avg_ms: f64,
 }
 
+/// `e` is None after `shutdown()` — JS garbage collection decides when an
+/// object is freed, but the sound card must be released NOW (an exclusive
+/// stream still open would make the next engine's open fail), so shutting
+/// down is explicit.
 #[napi]
-pub struct NativeEngine { e: Engine }
+pub struct NativeEngine { e: Option<Engine> }
 
 #[napi]
 impl NativeEngine {
@@ -58,10 +62,14 @@ impl NativeEngine {
             // settings) and forwards live keys with `midi()`
             midi_inputs: false,
         }).map_err(Error::from_reason)?;
-        Ok(NativeEngine { e })
+        Ok(NativeEngine { e: Some(e) })
     }
 
-    fn send(&self, c: Command) { self.e.send(c); }
+    fn send(&self, c: Command) { if let Some(e) = &self.e { e.send(c); } }
+
+    /// Stops the audio thread and releases the sound card immediately
+    #[napi]
+    pub fn shutdown(&mut self) { self.e = None; }
 
     /// One flattened song: per event its file time, track and 3 MIDI bytes
     #[napi]
@@ -114,13 +122,14 @@ impl NativeEngine {
     #[napi] pub fn set_exclusive(&self, exclusive: bool) { self.send(Command::SetOutputMode(if exclusive { OutputMode::Exclusive } else { OutputMode::Shared })) }
 
     #[napi]
-    pub fn status(&self) -> Status {
-        let s = &self.e.stats;
+    pub fn status(&self) -> Result<Status> {
+        let Some(e) = &self.e else { return Err(Error::from_reason("engine is shut down")) };
+        let s = &e.stats;
         let notes = s.live_notes.swap(0, Relaxed);
         let wait = s.live_wait_sum_us.swap(0, Relaxed) as f64;
         let queued = s.live_queued_sum_us.swap(0, Relaxed) as f64;
         let n = notes.max(1) as f64;
-        Status {
+        Ok(Status {
             position: s.position(),
             playing: s.playing.load(Relaxed),
             mode: match s.mode.load(Relaxed) { 0 => "exclusive", 1 => "shared", _ => "none" }.into(),
@@ -142,6 +151,6 @@ impl NativeEngine {
             live_wait_avg_ms: wait / n / 1000.0,
             live_wait_max_ms: s.live_wait_max_us.swap(0, Relaxed) as f64 / 1000.0,
             live_queued_avg_ms: queued / n / 1000.0,
-        }
+        })
     }
 }

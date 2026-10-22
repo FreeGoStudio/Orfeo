@@ -41,6 +41,7 @@ let port: MessagePort | null = null
 let portWaiter: ((p: MessagePort) => void) | null = null
 let startOpts: { soundfonts: string[]; exclusive: boolean } | null = null
 let startedWaiters: Array<(ok: boolean) => void> = []
+let stoppedWaiters: Array<() => void> = []
 const restartListeners = new Set<() => void>()
 
 window.addEventListener('message', (e) => {
@@ -53,7 +54,8 @@ window.addEventListener('message', (e) => {
 
 function onHostMessage(e: MessageEvent) {
   const m = e.data
-  if (m.t === 'status') useNativeAudio.setState({ status: m.status })
+  if (m.t === 'status') { if (useNativeAudio.getState().phase === 'running') useNativeAudio.setState({ status: m.status }) }
+  else if (m.t === 'stopped') { stoppedWaiters.forEach(w => w()); stoppedWaiters = [] }
   else if (m.t === 'started') {
     useNativeAudio.setState({ phase: 'running', status: m.status, error: null })
     startedWaiters.forEach(w => w(true)); startedWaiters = []
@@ -85,9 +87,18 @@ export async function startNative(opts: { soundfonts: string[]; exclusive: boole
   return started
 }
 
-export function stopNative() {
-  port?.postMessage({ t: 'stop' })
+/** Stops the engine; resolves once the sound card is released (in exclusive
+ *  mode nothing else can play until then — the Web Audio engines included) */
+export function stopNative(): Promise<void> {
+  const wasOn = useNativeAudio.getState().phase !== 'off'
   useNativeAudio.setState({ phase: 'off', status: null })
+  if (!port || !wasOn) return Promise.resolve()
+  const done = new Promise<void>(res => {
+    stoppedWaiters.push(res)
+    setTimeout(res, 1500) // never hang on a stuck audio process
+  })
+  port.postMessage({ t: 'stop' })
+  return done
 }
 
 /** One engine call; silently dropped while the engine isn't running */

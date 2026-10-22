@@ -24,6 +24,7 @@ import {
   liveReset as samplesReset,
 } from './useSamplesEngine'
 import { liveNoteOn as gmNoteOn, liveSend as gmSend, liveReset as gmReset } from './useAudioEngine'
+import { nativeCall } from '../audio/nativeClient'
 
 const HARDWARE_COLOR = 'var(--text-amber)'
 
@@ -41,6 +42,9 @@ const _swallow = new Map<string, number>()              // note-offs to ignore f
 const _waitingForRescan = new Set<string>()
 
 const isSamples = () => useStore.getState().audioEngine === 'samples'
+const isNative = () => useStore.getState().audioEngine === 'native'
+// Native engine: every live message goes to its live channel (16) as-is
+const nativeLive = (status: number, d1: number, d2 = 0) => nativeCall('midi', (status & 0xF0) | 0x0F, d1, d2)
 
 // Last value the keyboard sent per controller (cc number; -1 = pitch bend,
 // -2 = keyboard aftertouch) — so an automatic reset only puts back what the
@@ -49,9 +53,9 @@ const isSamples = () => useStore.getState().audioEngine === 'samples'
 const _ctrlNow = new Map<number, number>()
 const NEUTRAL: Record<number, number> = { 64: 0, 66: 0, 67: 0, 1: 0, 11: 127, 7: 127, [-1]: 8192, [-2]: 0 }
 function sendCtrl(cc: number, value: number) {
-  if (cc === -1) { if (isSamples()) samplesBend(value); else gmSend([0xEF, value & 0x7F, value >> 7]) }
-  else if (cc === -2) { if (isSamples()) samplesChanPressure(value); else gmSend([0xDF, value]) }
-  else if (isSamples()) samplesControl(cc, value); else gmSend([0xBF, cc, value])
+  if (cc === -1) { if (isNative()) nativeLive(0xE0, value & 0x7F, value >> 7); else if (isSamples()) samplesBend(value); else gmSend([0xEF, value & 0x7F, value >> 7]) }
+  else if (cc === -2) { if (isNative()) nativeLive(0xD0, value); else if (isSamples()) samplesChanPressure(value); else gmSend([0xDF, value]) }
+  else if (isNative()) nativeLive(0xB0, cc, value); else if (isSamples()) samplesControl(cc, value); else gmSend([0xBF, cc, value])
 }
 function settleControls() {
   for (const [cc, v] of _ctrlNow) if (NEUTRAL[cc] !== undefined && v !== NEUTRAL[cc]) sendCtrl(cc, NEUTRAL[cc])
@@ -80,8 +84,8 @@ function markActivity(key: string, t: number) {
 }
 
 // ── Sound + light for one key ─────────────────────────────────────────────────
-function soundOn(note: number, vel: number) { if (isSamples()) samplesNoteOn(note, vel); else gmNoteOn(note, vel) }
-function soundOff(note: number) { if (isSamples()) samplesNoteOff(note); else gmSend([0x8F, note, 0]) }
+function soundOn(note: number, vel: number) { if (isNative()) nativeLive(0x90, note, vel); else if (isSamples()) samplesNoteOn(note, vel); else gmNoteOn(note, vel) }
+function soundOff(note: number) { if (isNative()) nativeLive(0x80, note); else if (isSamples()) samplesNoteOff(note); else gmSend([0x8F, note, 0]) }
 
 function lightOn(note: number) {
   const { activeKeys, activeKeyColors, midiHeldKeys } = useStore.getState()
@@ -196,7 +200,7 @@ function channelPressure(value: number) {
 function polyPressure(note: number, value: number) {
   detect('polyPressure')
   if (!useMidiSettings.getState().controls.polyPressure) return
-  if (isSamples()) samplesPolyPressure(note, value); else gmSend([0xAF, note, value])
+  if (isNative()) nativeLive(0xA0, note, value); else if (isSamples()) samplesPolyPressure(note, value); else gmSend([0xAF, note, value])
 }
 
 // ── One incoming MIDI message ────────────────────────────────────────────────
@@ -333,6 +337,8 @@ export function clearStuckNotes(): void {
   _swallow.clear()
   _ctrlNow.clear()
   samplesReset(); gmReset()
+  // Native: the live channel only — every key up, pedals up, wheels centred
+  if (isNative()) { for (const [cc, v] of [[64, 0], [66, 0], [67, 0], [1, 0], [11, 127], [123, 0]]) nativeLive(0xB0, cc, v); nativeLive(0xE0, 0, 64) }
   const { activeKeyColors, midiHeldKeys } = useStore.getState()
   const hw = [...activeKeyColors].filter(([, c]) => c === HARDWARE_COLOR).map(([n]) => n)
   if (hw.length || midiHeldKeys.size) lightOff([...hw, ...midiHeldKeys])

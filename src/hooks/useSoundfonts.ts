@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { useStore } from '../store'
 import type { SoundfontId, SoundfontInfo } from '../types'
-import { initSamplesEngine, loadSelectedSoundfont, getMeasuredOutputLatencySec as getSamplesOutputLatencySec } from './useSamplesEngine'
-import { getMeasuredOutputLatencySec as getGmOutputLatencySec } from './useAudioEngine'
+import { initSamplesEngine, loadSelectedSoundfont } from './useSamplesEngine'
+import { measuredOutputLatencySec } from '../audio/engine'
+import { stopNative } from '../audio/nativeClient'
 
 // ── Sound sets + Samples loading — one shared copy for the drawer's Quick
 // Settings and the Settings window (both show the same status). ──────────
@@ -29,6 +30,8 @@ export const allSoundfonts = (extra: SoundfontInfo[]): SoundfontInfo[] => [
 export async function startSamples(): Promise<boolean> {
   const sf = useSoundfontState.getState()
   const st = useStore.getState()
+  // The native engine may hold the sound card exclusively — let go of it first
+  if (st.audioEngine === 'native') await stopNative()
   if (sf.samplesStatus === 'ready') { st.setAudioEngine('samples'); st.setSamplesIntroduced(true); return true }
   if (sf.samplesStatus === 'loading') return false
   setSf({ samplesStatus: 'loading', samplesProgress: 0 })
@@ -111,7 +114,7 @@ export function useOutputLatency(): number {
   const [sec, setSec] = useState(0)
   useEffect(() => {
     let attempts = 0
-    const read = () => (audioEngine === 'samples' ? getSamplesOutputLatencySec() : getGmOutputLatencySec())
+    const read = () => measuredOutputLatencySec()
     const id = setInterval(() => {
       const v = read(); setSec(v); attempts++
       if (v > 0 || attempts >= 5) clearInterval(id)

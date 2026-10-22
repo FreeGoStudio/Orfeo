@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from '../store'
 import { interruptTapping, tappingInterrupted, setTapLatencyProvider, noteClockTick } from '../utils/tapTempoSession'
-import { getOutputLatencySec as getSamplesOutputLatencySec } from './useSamplesEngine'
-import { getOutputLatencySec as getGmOutputLatencySec } from './useAudioEngine'
+import { outputLatencySec } from '../audio/engine'
 
 // ── Tap Tempo watcher — supplies the output-device delay for tap stamping,
 // and ends the tapping phase on any
@@ -10,8 +9,7 @@ import { getOutputLatencySec as getGmOutputLatencySec } from './useAudioEngine'
 // never fitted together. Mounted once (TapTempoPad). ─────────────────────
 export function useTapTempo() {
   useEffect(() => {
-    setTapLatencyProvider(() =>
-      useStore.getState().audioEngine === 'samples' ? getSamplesOutputLatencySec() : getGmOutputLatencySec())
+    setTapLatencyProvider(() => outputLatencySec())
     const unsub = useStore.subscribe((st, prev) => {
       if (st.currentTime !== prev.currentTime) noteClockTick()
       const ses = st.tapSession

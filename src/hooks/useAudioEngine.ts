@@ -11,6 +11,8 @@ import { isHomogeneousHandTrack, resolveHandAwareColor } from '../utils/handColo
 import { NES } from '../utils/noteEditorState'
 import { editableCopyToBuffer } from '../utils/noteEditorCommands'
 import { useMidiSettings, latencyOffsetSec, midiPrefsReady } from '../store/midiSettings'
+import { useNativeEngine, nativeLightKey } from '../audio/useNativeEngine'
+import { nativeCall } from '../audio/nativeClient'
 
 let _jzzReady = false
 let _jzzInitP: Promise<void> | null = null
@@ -465,6 +467,8 @@ const _clickNoteOffs = new Map<number, ReturnType<typeof setTimeout>>()
 export function useAudioEngine() {
   // Always mount Samples engine (it self-gates on audioEngine !== 'samples')
   useSamplesEngine()
+  // …and the Native engine (beta), which self-gates on audioEngine !== 'native'
+  useNativeEngine()
 
   const prevStateRef = useRef('stopped')
   const prevBpmRef = useRef(120)
@@ -483,6 +487,12 @@ export function useAudioEngine() {
     // instead of relying on this note-duration-based ring.
     const playNote = async (midiNum: number, vel = 90, durMs = 500, channel?: number, visual = true, color?: string) => {
       const { audioEngine } = useStore.getState()
+      if (audioEngine === 'native') {
+        // channel undefined = the live/preview channel (16), as in Samples
+        nativeCall('noteFor', channel ?? 15, midiNum, Math.max(1, Math.round(vel * 127)), durMs / 1000)
+        if (visual) nativeLightKey(midiNum, color ?? amberHex(), durMs + 100)
+        return
+      }
       if (audioEngine === 'samples') {
         const fn = (window as any).__orfeoPlayNoteSamples
         if (fn) { fn(midiNum, vel, durMs, channel, visual, color); return }

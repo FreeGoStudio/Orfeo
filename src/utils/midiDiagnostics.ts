@@ -13,6 +13,8 @@ import {
   getMeasuredOutputLatencySec as samplesOut, getLiveChainDelaySec, getSynthBlockSec, getSamplesSampleRate,
 } from '../hooks/useSamplesEngine'
 import { getMeasuredOutputLatencySec as gmOut, getGmOutputName } from '../hooks/useAudioEngine'
+import { useNativeAudio } from '../audio/nativeClient'
+import { nativeMeasuredLatencySec } from '../audio/useNativeEngine'
 
 interface NoteSample { at: number; inputMs: number | null; handleMs: number; note: number; vel: number; device: string }
 
@@ -64,7 +66,7 @@ export function getStats(): TimingStats {
 
 // ── The fixed parts of key → ear for the current engine, in ms ──────────────
 export interface DelayBreakdown {
-  engine: 'gm' | 'samples'
+  engine: 'gm' | 'samples' | 'native'
   synthBlockMs: number      // waiting for the synth's next 128-sample block (worst case)
   chainMs: number           // Orfeo's own processing (Samples: 0 on the live path, 12 through the compressors)
   outputMs: number | null   // the sound card / Windows output; null = can't be measured for this output
@@ -72,6 +74,12 @@ export interface DelayBreakdown {
 }
 export function getDelayBreakdown(): DelayBreakdown {
   const engine = useStore.getState().audioEngine
+  if (engine === 'native') {
+    // a key waits at most one engine period for its turn; nothing in Orfeo's chain delays it
+    const s = useNativeAudio.getState().status
+    const out = nativeMeasuredLatencySec()
+    return { engine, synthBlockMs: s?.rate ? s.periodFrames * 1000 / s.rate : 0, chainMs: 0, outputMs: out > 0 ? out * 1000 : null, externalOutput: '' }
+  }
   if (engine === 'samples') {
     const out = samplesOut()
     return { engine, synthBlockMs: getSynthBlockSec() * 1000, chainMs: getLiveChainDelaySec() * 1000, outputMs: out > 0 ? out * 1000 : null, externalOutput: '' }

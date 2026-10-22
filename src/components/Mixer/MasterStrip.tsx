@@ -11,7 +11,7 @@ import {
   setMasterTone,
   setMasterCompressor,
   COMPRESSOR_PRESETS,
-} from '../../hooks/useSamplesEngine'
+} from '../../audio/engine'
 import { useDevicePixelRatio } from '../../hooks/useDevicePixelRatio'
 
 // ── VU meter constants ────────────────────────────────────────────────────────

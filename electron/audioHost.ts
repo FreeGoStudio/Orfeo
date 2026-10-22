@@ -20,8 +20,9 @@ function post(msg: any) { try { port?.postMessage(msg) } catch {} }
 
 function stopEngine() {
   if (statusTimer) { clearInterval(statusTimer); statusTimer = null }
-  try { engine?.allNotesOff() } catch {}
-  engine = null // the engine's Drop shuts its audio thread down
+  // Release the sound card now, not whenever garbage collection gets to it
+  try { engine?.shutdown() } catch {}
+  engine = null
 }
 
 function startEngine(opts: { soundfonts: string[]; exclusive: boolean }) {
@@ -36,7 +37,7 @@ function onMessage(e: Electron.MessageEvent) {
   const m = e.data
   try {
     if (m.t === 'start') return startEngine(m)
-    if (m.t === 'stop') return stopEngine()
+    if (m.t === 'stop') { stopEngine(); post({ t: 'stopped' }); return }
     if (m.t === 'call') {
       if (!engine) return
       const fn = engine[m.m]
@@ -53,7 +54,9 @@ process.parentPort.on('message', (e) => {
   if (m?.t !== 'init') return
   addonPath = m.addon
   fluidDir = m.fluidDir
-  // A new renderer connection replaces the old one (reload, new window)
+  // A new renderer connection replaces the old one (reload, new window):
+  // its engine goes too, so the new page starts from a clean sound card
+  stopEngine()
   try { port?.close() } catch {}
   port = e.ports[0]
   port.on('message', onMessage)

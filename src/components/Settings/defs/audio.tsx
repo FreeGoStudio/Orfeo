@@ -7,13 +7,21 @@ import {
   downloadSoundfont, deleteSoundfont, importSoundfont, allSoundfonts,
 } from '../../../hooks/useSoundfonts'
 import type { SettingDef } from '../types'
+import { useNativeAudio, stopNative } from '../../../audio/nativeClient'
+
+// Native engine (beta): Windows only for now
+const NATIVE_AVAILABLE = navigator.userAgent.includes('Windows')
 
 function SoundEngineControl() {
   const audioEngine = useStore((s) => s.audioEngine)
   return (
     <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-      <OptionBtn active={audioEngine === 'gm'} onClick={() => useStore.getState().setAudioEngine('gm')}>General MIDI</OptionBtn>
+      <OptionBtn active={audioEngine === 'gm'} onClick={async () => { if (useStore.getState().audioEngine === 'native') await stopNative(); useStore.getState().setAudioEngine('gm') }}>General MIDI</OptionBtn>
       <OptionBtn active={audioEngine === 'samples'} onClick={chooseSamplesFromQuick}>Samples</OptionBtn>
+      {NATIVE_AVAILABLE && (
+        <OptionBtn active={audioEngine === 'native'} onClick={() => useStore.getState().setAudioEngine('native')}
+          title={t`Orfeo's own low-latency engine: the Samples sound, played straight to your sound card`}>{t`Native (beta)`}</OptionBtn>
+      )}
     </div>
   )
 }
@@ -25,6 +33,7 @@ function SoundEngineGlance() {
   const samplesStatus = useSoundfontState((s) => s.samplesStatus)
   const extra = useSoundfontState((s) => s.extra)
   const active = allSoundfonts(extra).find(sf => sf.id === selectedSoundfont)
+  if (audioEngine === 'native') return <NativeGlance />
   return (
     <>
       {samplesStatus === 'ready' && (
@@ -49,6 +58,22 @@ function SoundEngineGlance() {
   )
 }
 
+// Native engine: which card, which mode, or why it couldn't start
+function NativeGlance() {
+  const phase = useNativeAudio((s) => s.phase)
+  const status = useNativeAudio((s) => s.status)
+  const error = useNativeAudio((s) => s.error)
+  const line = { marginTop: 5, fontSize: 9, fontFamily: 'var(--font-ui)', color: 'var(--text-muted)' } as const
+  if (phase === 'failed') return <div style={{ ...line, color: 'var(--status-error)' }}>{t`Native engine unavailable:`} {error}</div>
+  if (phase !== 'running' || !status) return <div style={line}>{t`Starting the native engine…`}</div>
+  if (status.mode === 'none') return <div style={line}>{t`Waiting for a sound card…`}</div>
+  return (
+    <div style={line}>
+      {status.deviceName} · <span style={{ color: 'var(--text-amber)' }}>{status.mode === 'exclusive' ? t`exclusive` : t`shared`}</span> · {Math.round(status.bufferFrames * 1000 / status.rate * 10) / 10} ms {t`buffer`}
+    </div>
+  )
+}
+
 // Measured output delay (Samples only): "output delay 32 ms", value in amber
 function DelayReadout({ upper }: { upper?: boolean }) {
   const outputLatencySec = useOutputLatency()
@@ -59,7 +84,7 @@ function DelayReadout({ upper }: { upper?: boolean }) {
 // Setup: at the right end of the "Sound engine" name line
 function SoundEngineDelay() {
   const audioEngine = useStore((s) => s.audioEngine)
-  if (audioEngine !== 'samples') return null
+  if (audioEngine === 'gm') return null
   return (
     <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>
       <DelayReadout />
@@ -73,7 +98,7 @@ function SoundEngineExtra() {
   return (
     <>
       <SoundEngineLoading />
-      {audioEngine === 'samples' && (
+      {audioEngine !== 'gm' && (
         <>
           <div style={{ marginTop: 10, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}><DelayReadout upper /></div>
           <HelpText>{t`The real gap between your sound card being told to play a note and it actually reaching the speakers — every machine answers this differently.`}</HelpText>

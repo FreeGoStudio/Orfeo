@@ -310,8 +310,8 @@ interface OrfeoStore {
   autoLevelOnLoad: boolean
   setAutoLevelOnLoad: (v: boolean) => void
 
-  audioEngine: 'gm' | 'samples'
-  setAudioEngine: (engine: 'gm' | 'samples') => void
+  audioEngine: 'gm' | 'samples' | 'native'
+  setAudioEngine: (engine: 'gm' | 'samples' | 'native') => void
 
   chordPrompterEnabled: boolean
   chordPrompterOpen: boolean
@@ -1151,6 +1151,8 @@ async function restoreLibraryPrefs() {
     if (typeof prefs.masterCompPreset === 'number') store.setMasterCompPreset(prefs.masterCompPreset)
     if (typeof prefs.autoLevelOnLoad === 'boolean') store.setAutoLevelOnLoad(prefs.autoLevelOnLoad)
     if (prefs.audioEngine === 'samples') store.setAudioEngine('samples')
+    // Native (beta) is Windows-only; elsewhere fall back to Samples
+    if (prefs.audioEngine === 'native') store.setAudioEngine(navigator.userAgent.includes('Windows') ? 'native' : 'samples')
     applySamplesIntroducedPref(prefs, store)
     if (typeof prefs.showBarNumbers === 'boolean') store.setShowBarNumbers(prefs.showBarNumbers)
     if (typeof prefs.noteEditorEnabled === 'boolean') store.setNoteEditorEnabled(prefs.noteEditorEnabled)

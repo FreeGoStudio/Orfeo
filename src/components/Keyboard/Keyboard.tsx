@@ -10,8 +10,7 @@ import { buildPitchHandIndex, lookupNoteHandAtTime, detectPerformanceBoundary } 
 import type { Hand } from '../../types'
 import Tooltip, { useTooltip } from '../Tooltip'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu'
-import { getOutputLatencySec as getSamplesOutputLatencySec } from '../../hooks/useSamplesEngine'
-import { getOutputLatencySec as getGmOutputLatencySec } from '../../hooks/useAudioEngine'
+import { outputLatencySec } from '../../audio/engine'
 
 const HAND_LH = 'var(--hand-lh)'
 const HAND_RH = 'var(--hand-rh)'
@@ -84,7 +83,7 @@ export default function Keyboard() {
   // any real audio clock at all, there's nothing to lag behind. ───────────
   const currentChordIndex = useStore((s) => {
     const latency = s.playbackState === 'playing'
-      ? (s.audioEngine === 'samples' ? getSamplesOutputLatencySec() : getGmOutputLatencySec())
+      ? outputLatencySec()
       : 0
     return resolveCurrentIndex(s.chordSequence, s.currentTime - latency)
   })

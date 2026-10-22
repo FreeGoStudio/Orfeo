@@ -23,6 +23,7 @@ export interface MidiPrefs {
   autoReconnect: boolean          // a re-plugged keyboard is listened to again without a click
   liveResponse: LiveResponse
   latencyOffsetMs: number         // manual alignment on top of the measured output delay
+  nativeExclusive: boolean        // Native engine: exclusive (lowest delay) vs shared with other apps
   velocityCurve: VelocityCurve
   fixedVelocity: number           // 1-127, used by the 'fixed' curve
   minVelocity: number             // notes played softer than this are ignored (1 = none ignored)
@@ -40,6 +41,7 @@ export const MIDI_DEFAULTS: MidiPrefs = {
   autoReconnect: true,
   liveResponse: 'low',
   latencyOffsetMs: 0,
+  nativeExclusive: true,
   velocityCurve: 'normal',
   fixedVelocity: 100,
   minVelocity: 1,

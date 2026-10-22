@@ -11,7 +11,7 @@ import {
   setChannelReverb,
   setChannelPan,
   setChannelVolume,
-} from '../../hooks/useSamplesEngine'
+} from '../../audio/engine'
 
 // ── VU meter constants ────────────────────────────────────────────────────────
 const SEG_H    = 4    // segment height in CSS px
