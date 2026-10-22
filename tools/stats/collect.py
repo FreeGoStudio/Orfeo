@@ -31,9 +31,13 @@ import re
 import sys
 import urllib.error
 import urllib.request
+from zoneinfo import ZoneInfo
 
 API = "https://api.github.com"
-TODAY = dt.datetime.now(dt.timezone.utc).date()
+# Days and the "Last updated" time are Ljubljana time (CET/CEST), the developer's own
+LOCAL_TZ = ZoneInfo("Europe/Ljubljana")
+NOW = dt.datetime.now(LOCAL_TZ)
+TODAY = NOW.date()
 PERIOD_DAYS = 14  # GitHub's traffic window
 
 
@@ -95,6 +99,11 @@ def fmt(v):
 
 def d(s):
     return dt.date.fromisoformat(s)
+
+
+def hi(s):
+    """Highlighted cell: the numbers closest to real people (downloads, unique visitors)"""
+    return f"<mark>{s}</mark>"
 
 
 # ---------------------------------------------------------------- Downloads
@@ -251,15 +260,17 @@ def build_report(repo, info, dl_rows, traffic, traffic_error, own):
 
     L = []
     L.append(f"# Orfeo on GitHub: downloads and traffic\n")
+    zone = "CEST" if NOW.utcoffset() == dt.timedelta(hours=2) else "CET"
+    L.append(f"**Last updated: {NOW.day}. {NOW.month}. {NOW.year} at {NOW:%H:%M}** Ljubljana time ({zone}) · updates daily at about 09:00\n")
     L.append(
-        f"Updated **{TODAY.isoformat()}** (daily, automatically) · "
         f"[{repo}](https://github.com/{repo}) · "
         f"★ {info.get('stargazers_count', 0)} stars · {info.get('forks_count', 0)} forks · "
         f"{info.get('subscribers_count', 0)} watching\n"
     )
     L.append(
         "> Orfeo is a free, open-source (GPL-3.0) Windows app for learning piano with MIDI files. "
-        "It is distributed only through GitHub Releases, as an installer and a portable version. "
+        "It is distributed through GitHub Releases, as an installer and a portable version, and through the Microsoft Store "
+        "(Store installs aren't counted here). "
         "Download totals come straight from GitHub's release statistics and cover every release since the first one; "
         "traffic is recorded daily from GitHub's traffic API and kept permanently, because GitHub itself keeps only 14 days.\n"
     )
@@ -268,7 +279,8 @@ def build_report(repo, info, dl_rows, traffic, traffic_error, own):
     L.append("## At a glance\n")
     L.append(f"| | All time | {base_label.capitalize()} |")
     L.append("|---|---:|---:|")
-    L.append(f"| **Downloads** (installer + portable) | **{fmt(downloads)}** | **{fmt(last7['installer'] + last7['portable'])}** |")
+    dl7 = last7["installer"] + last7["portable"]
+    L.append(f"| **Downloads** (installer + portable) | {hi('**' + fmt(downloads) + '**')} | {hi('**' + fmt(dl7) + '**')} |")
     L.append(f"| — Installer (`Orfeo-Setup-x.y.z.exe`) | {fmt(total['installer'])} | {fmt(last7['installer'])} |")
     L.append(f"| — Portable (`Orfeo-x.y.z-portable.exe`) | {fmt(total['portable'])} | {fmt(last7['portable'])} |")
     L.append(f"| App starts checking for updates (`latest.yml`) | {fmt(total['launch'])} | {fmt(last7['launch'])} |")
@@ -282,15 +294,19 @@ def build_report(repo, info, dl_rows, traffic, traffic_error, own):
         since = traffic["views"][0]["date"] if traffic["views"] else TODAY.isoformat()
         L.append(f"| Repository page views (since {since}) | {fmt(v_all)} | {fmt(v7)} |")
         u_all = sum(n(r["uniques"]) for r in traffic["views"])
-        L.append(f"| Unique visitors (added up per day) | {fmt(u_all)} | {fmt(u7)} |")
+        L.append(f"| Unique visitors (added up per day) | {hi(fmt(u_all))} | {hi(fmt(u7))} |")
         L.append(f"| Repository clones | {fmt(c_all)} | {fmt(c7)} |")
     L.append("")
     if own:
-        L.append(f"Downloads by others, excluding the developer's own test downloads (about {own}): **≈ {fmt(max(0, downloads - own))}**.\n")
+        L.append(f"Downloads by others, excluding the developer's own test downloads (about {own}): {hi(f'**≈ {fmt(max(0, downloads - own))}**')}.\n")
     L.append(
         "*Downloads* count each time a release file was downloaded. *App starts* count installed copies (installer version) "
         "checking GitHub for a newer version when Orfeo starts, so they show the app being used, not just downloaded. "
         "The portable version does not check automatically.\n"
+    )
+    L.append(
+        "Highlighted numbers are the ones closest to real people: downloads of the app and unique visitors. "
+        "Page views and clones also count repeat visits, search-engine crawlers and automated tools.\n"
     )
 
     # Per release
@@ -309,10 +325,10 @@ def build_report(repo, info, dl_rows, traffic, traffic_error, own):
     for tag, x in sorted(rels.items(), key=lambda kv: (kv[1]["published"], ver(kv[0])), reverse=True):
         L.append(
             f"| [{tag}](https://github.com/{repo}/releases/tag/{tag}) | {x['published']} | {fmt(x['installer'])} | "
-            f"{fmt(x['portable'])} | **{fmt(x['installer'] + x['portable'])}** | {fmt(x['launch'])} | {fmt(x['update'])} |"
+            f"{fmt(x['portable'])} | {hi('**' + fmt(x['installer'] + x['portable']) + '**')} | {fmt(x['launch'])} | {fmt(x['update'])} |"
         )
     L.append(
-        f"| **All releases** | | **{fmt(total['installer'])}** | **{fmt(total['portable'])}** | **{fmt(downloads)}** | "
+        f"| **All releases** | | **{fmt(total['installer'])}** | **{fmt(total['portable'])}** | {hi('**' + fmt(downloads) + '**')} | "
         f"**{fmt(total['launch'])}** | **{fmt(total['update'])}** |\n"
     )
 
@@ -336,7 +352,7 @@ def build_report(repo, info, dl_rows, traffic, traffic_error, own):
         c = clones_by_day.get(day.isoformat())
         L.append(
             f"| {day.strftime('%a %d %b')} | {inst} | {port} | {lau} | "
-            f"{v['count'] if v else '–'} | {v['uniques'] if v else '–'} | {c['count'] if c else '–'} |"
+            f"{v['count'] if v else '–'} | {hi(v['uniques']) if v else '–'} | {c['count'] if c else '–'} |"
         )
     L.append(
         "\nDownloads per day start with the second day of tracking (they are the difference between two daily snapshots); "
@@ -375,7 +391,7 @@ def build_report(repo, info, dl_rows, traffic, traffic_error, own):
         cur = {r["referrer"]: r for r in traffic["refs"]}
         for s in names:
             c = cur.get(s)
-            L.append(f"| {s} | {fmt(c['count']) if c else '–'} | {fmt(c['uniques']) if c else '–'} | {fmt(totals.get(s, 0))} |")
+            L.append(f"| {s} | {fmt(c['count']) if c else '–'} | {hi(fmt(c['uniques'])) if c else '–'} | {fmt(totals.get(s, 0))} |")
         L.append(
             f"\nGitHub only reports referring sites as 14-day totals. All-time adds up non-overlapping 14-day periods "
             f"recorded since {first_close}"
@@ -387,7 +403,7 @@ def build_report(repo, info, dl_rows, traffic, traffic_error, own):
         L.append("|---|---:|---:|")
         for p in traffic["paths"][:10]:
             short = p["path"].replace(f"/{repo}", "", 1) or "/"
-            L.append(f"| [{short}](https://github.com{p['path']}) | {fmt(p['count'])} | {fmt(p['uniques'])} |")
+            L.append(f"| [{short}](https://github.com{p['path']}) | {fmt(p['count'])} | {hi(fmt(p['uniques']))} |")
         L.append("")
     else:
         L.append("## Traffic\n")
