@@ -184,7 +184,8 @@ function LiveResponseControl() {
       <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
         {RESPONSES.map(r => <OptionBtn key={r.v} active={v === r.v} onClick={() => set({ liveResponse: r.v })}>{r.label}</OptionBtn>)}
       </div>
-      {engine !== 'samples' && <HelpText>{t`General MIDI has no compressor in the way — this applies when the Samples engine is on.`}</HelpText>}
+      {engine === 'gm' && <HelpText>{t`General MIDI has no compressor in the way — this applies when the Samples engine is on.`}</HelpText>}
+      {engine === 'native' && <HelpText>{t`The Native engine already keeps your keys out of the compressor. Its own choice — Low latency or Share with other apps — is under Settings › Audio › Sound engine.`}</HelpText>}
       {started !== null && (v === 'stable') !== started && <HelpText>{t`The sound buffer size changes the next time Orfeo starts.`}</HelpText>}
     </div>
   )

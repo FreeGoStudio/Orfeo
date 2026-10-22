@@ -51,10 +51,10 @@ export const GROUPS: GroupInfo[] = [
 export const SETTINGS: SettingInfo[] = [
   // ── Audio
   { id: 'soundEngine', group: 'audio', name: t`Sound engine`, summary: t`General MIDI is light and built in; Samples sounds like real instruments.`,
-    description: t`General MIDI uses the simple built-in synth — light and always ready. Samples plays real recorded instruments from a sound set (recommended).`,
-    keywords: 'gm general midi samples synth latency output delay' },
-  { id: 'soundFonts', group: 'audio', name: t`Sound Fonts`, summary: t`Extra sound sets for the Samples engine.`,
-    description: t`Extra sound sets for the Samples engine. GeneralUser GS comes with Orfeo; others download on demand, or import your own .sf2/.sf3.`,
+    description: t`General MIDI uses the simple built-in synth — light and always ready. Samples plays real recorded instruments from a sound set (recommended). Native (beta, Windows) plays the same sound sets with Orfeo's own engine, straight to your sound card, for the shortest delay when you play.`,
+    keywords: 'gm general midi samples native synth latency output delay exclusive shared engine' },
+  { id: 'soundFonts', group: 'audio', name: t`Sound Fonts`, summary: t`Extra sound sets for the Samples and Native engines.`,
+    description: t`Extra sound sets for the Samples and Native engines. GeneralUser GS comes with Orfeo; others download on demand, or import your own .sf2/.sf3.`,
     keywords: 'soundfont sf2 sf3 download import fluid musescore generaluser' },
   { id: 'autoLevel', group: 'audio', name: t`Auto-Level on Load`, summary: t`Balances loud and quiet passages automatically.`,
     description: t`Automatically balances loud and quiet passages in a MIDI file using the Compressor's makeup gain.`,

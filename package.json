@@ -13,8 +13,8 @@
     "build": "npm run copyworklet && npm run check:hand-engine && electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run copyworklet && npm run check:hand-engine && electron-vite build && electron-builder --win nsis portable appx",
-    "dist:portable": "npm run copyworklet && npm run check:hand-engine && electron-vite build && electron-builder --win portable",
+    "dist": "npm run copyworklet && npm run check:hand-engine && npm run native:build && electron-vite build && electron-builder --win nsis portable appx",
+    "dist:portable": "npm run copyworklet && npm run check:hand-engine && npm run native:build && electron-vite build && electron-builder --win portable",
     "release:notes": "node scripts/release-notes.mjs",
     "native:build": "node scripts/build-native.mjs"
   },
@@ -68,10 +68,19 @@
       {
         "from": "public/demo",
         "to": "demo"
+      },
+      {
+        "from": "native/build",
+        "to": "native",
+        "filter": [
+          "orfeo_audio.node",
+          "fluidsynth/*.dll"
+        ]
       }
     ],
     "asarUnpack": [
-      "out/renderer/spessasynth_processor.min.js"
+      "out/renderer/spessasynth_processor.min.js",
+      "out/renderer/GeneralUser-GS.sf2"
     ],
     "win": {
       "target": [

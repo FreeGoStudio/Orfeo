@@ -148,6 +148,16 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      # The Native sound engine: Rust add-on + the pinned FluidSynth DLLs
+      # (scripts/build-native.mjs). Rust and MSVC come with the Windows runner;
+      # the cache keeps the Rust build to a couple of minutes.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native
+
+      - name: Build the native audio engine
+        run: npm run native:build
+
       - name: Build and upload to a draft release
         shell: bash
         env:

@@ -7,7 +7,8 @@ import {
   downloadSoundfont, deleteSoundfont, importSoundfont, allSoundfonts,
 } from '../../../hooks/useSoundfonts'
 import type { SettingDef } from '../types'
-import { useNativeAudio, stopNative } from '../../../audio/nativeClient'
+import { useNativeAudio, stopNative, nativeCall } from '../../../audio/nativeClient'
+import { useMidiSettings } from '../../../store/midiSettings'
 
 // Native engine (beta): Windows only for now
 const NATIVE_AVAILABLE = navigator.userAgent.includes('Windows')
@@ -92,12 +93,30 @@ function SoundEngineDelay() {
   )
 }
 
+// Native engine: exclusive (lowest delay, other apps go quiet) or shared
+function NativeOutputChoice() {
+  const exclusive = useMidiSettings((s) => s.nativeExclusive)
+  const pick = (v: boolean) => { useMidiSettings.getState().set({ nativeExclusive: v }); nativeCall('setExclusive', v) }
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 'var(--space-1)', marginTop: 10 }}>
+        <OptionBtn active={exclusive} onClick={() => pick(true)}>{t`Low latency`}</OptionBtn>
+        <OptionBtn active={!exclusive} onClick={() => pick(false)}>{t`Share with other apps`}</OptionBtn>
+      </div>
+      <HelpText>{exclusive
+        ? t`Orfeo talks to your sound card directly, past Windows' mixer — the shortest delay from key to sound. Other apps stay silent while Orfeo is open; if one is already using the sound card, Orfeo shares it instead.`
+        : t`Other apps (a browser lesson, a video call) keep playing alongside Orfeo, at the cost of Windows' usual delay.`}</HelpText>
+    </>
+  )
+}
+
 // Window only: loading progress, then the output delay and what it means
 function SoundEngineExtra() {
   const audioEngine = useStore((s) => s.audioEngine)
   return (
     <>
       <SoundEngineLoading />
+      {audioEngine === 'native' && <NativeOutputChoice />}
       {audioEngine !== 'gm' && (
         <>
           <div style={{ marginTop: 10, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}><DelayReadout upper /></div>
@@ -123,7 +142,7 @@ function SoundEngineLoading() {
   )
 }
 
-// The sound-set library — dimmed + inert while General MIDI is active
+// The sound-set library (Samples and Native) — dimmed + inert while General MIDI is active
 function SoundFontsControl() {
   const audioEngine = useStore((s) => s.audioEngine)
   const selectedSoundfont = useStore((s) => s.selectedSoundfont)
@@ -133,7 +152,7 @@ function SoundFontsControl() {
   const error = useSoundfontState((s) => s.error)
   const all = allSoundfonts(extra)
   return (
-    <div style={{ opacity: audioEngine === 'samples' ? 1 : 0.4, pointerEvents: audioEngine === 'samples' ? 'auto' : 'none', transition: 'opacity 0.15s' }}>
+    <div style={{ opacity: audioEngine !== 'gm' ? 1 : 0.4, pointerEvents: audioEngine !== 'gm' ? 'auto' : 'none', transition: 'opacity 0.15s' }}>
       <SettingsDropdown
         value={selectedSoundfont}
         onChange={(id) => void selectSoundfont(id)}
@@ -189,7 +208,7 @@ function SoundFontsControl() {
 
 export const AUDIO_DEFS: SettingDef[] = [
   { id: 'soundEngine', icon: Volume2, kind: 'choice',
-    Description: () => <>{t`General MIDI uses the simple built-in synth — light and always ready.`}<br /><br />{t`Samples plays real recorded instruments from a sound set (recommended).`}</>,
+    Description: () => <>{t`General MIDI uses the simple built-in synth — light and always ready.`}<br /><br />{t`Samples plays real recorded instruments from a sound set (recommended).`}{NATIVE_AVAILABLE && <><br /><br />{t`Native (beta) plays the same sound sets with Orfeo's own engine, straight to your sound card — the shortest delay when you play your keyboard.`}</>}</>,
     Control: SoundEngineControl, Glance: SoundEngineGlance, Extra: SoundEngineExtra, NameRight: SoundEngineDelay },
   { id: 'soundFonts', icon: Library, kind: 'choice', Control: SoundFontsControl },
   {

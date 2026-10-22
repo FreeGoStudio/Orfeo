@@ -29,8 +29,14 @@ approach can be agreed first — it saves everyone a wasted round-trip.
 |---|---|---|
 | [Node.js](https://nodejs.org) | 20 LTS or newer | Electron 42 needs Node 20+ |
 | [Git](https://git-scm.com) | any recent | — |
+| [Rust](https://rustup.rs) + MSVC build tools | stable | Windows only, for the Native (beta) sound engine — see below |
 
-No native build tools are required — Orfeo has no compiled native modules.
+The app runs without Rust: General MIDI and Samples need no native code, and
+choosing *Native (beta)* without it built just falls back to Samples. To build
+the Native engine (`native/`): install Rust with `rustup` (MSVC toolchain) and
+Visual Studio Build Tools with *Desktop development with C++*, then run
+`npm run native:build` once — it compiles the add-on and downloads the pinned
+FluidSynth build into `native/build/`. `dist` runs it for you.
 
 ---
 
@@ -58,6 +64,7 @@ npm run dev
 | Command | What it does | Output |
 |---|---|---|
 | `npm run dev` | Development mode, renderer hot-reload | — |
+| `npm run native:build` | Builds the Native engine add-on + fetches FluidSynth (Windows) | `native/build/` |
 | `npm run build` | Compile main + preload + renderer | `out/` |
 | `npm run preview` | Run the last `build` output without packaging | — |
 | `npm run typecheck` | `tsc --noEmit` — type-check only | — |

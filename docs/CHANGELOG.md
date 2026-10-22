@@ -14,6 +14,7 @@
 - The MIDI icon names the keyboard you're actually playing. Click it to open its settings.
 - Orfeo is now in the Microsoft Store.
 - Step through any song one note or chord at a time with → and ←, at your own pace.
+- New Native sound engine (beta, Windows): your keyboard heard in about 10 ms instead of 40+.
 
 ### New
 - **Settings › MIDI Keyboard**, at the bottom of the Settings window:
@@ -31,6 +32,11 @@
   - Notes that start within 30 ms of each other count as one step, so MIDI files made from audio recordings, where a chord's notes never start at exactly the same time, step chord by chord.
   - Muted tracks and drums are skipped, so if another instrument leaks into the part you're following, mute it and step through just yours.
   - Press → while the song is playing and it stops on the next note; Space plays on from there.
+
+- **Native sound engine (beta, Windows).** *Settings › Audio › Sound engine › Native (beta)* plays the same sound sets with Orfeo's own engine, straight to your sound card instead of through Windows' mixer: about 10 ms from key to speaker, against 40 ms or more before.
+  - *Low latency* talks to the sound card directly; *Share with other apps* lets a browser lesson or video call keep playing alongside.
+  - Songs are timed to the sample, the metronome and count-in run on the same clock, and the mixer, compressor, auto-level, tone, previews, step-through and your MIDI keyboard all work as before.
+  - Unplug your headphones or USB interface mid-song and it carries on on the next sound card, without stopping.
 
 ### Changed
 - **Keys you play on the Samples sound are heard 12 ms sooner.** They used to pass through the song's compressor and safety limiter, which hold every note back 6 ms each even when switched off. Songs still go through both.

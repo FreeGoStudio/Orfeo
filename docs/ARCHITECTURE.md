@@ -173,15 +173,19 @@ decoupled from each other.
 
 ---
 
-## Audio — two engines
+## Audio — three engines
 
-Orfeo ships **two independent playback engines**. The user picks one in
+Orfeo ships **three independent playback engines**. The user picks one in
 **Settings → Audio**; the choice and master volume persist across sessions.
+The rest of the app reaches the active one only through `src/audio/engine.ts`
+(output delay, mixer, master section), so no code ever assumes "not Samples
+means General MIDI".
 
 | Engine | Implementation | Sound | Setup | Best for |
 |---|---|---|---|---|
 | **GM Synth** | `useAudioEngine.ts` — lazy-loads `jzz`, `jzz-midi-smf`, `jzz-synth-tiny` | General-MIDI wavetable | Instant, nothing to download | Quick playback, low resource use |
 | **Samples** | `useSamplesEngine.ts` — `spessasynth_lib` `WorkletSynthesizer` running `spessasynth_processor.min.js` as an AudioWorklet | SF2 / SF3 soundfonts | One-time download (~31 MB for GeneralUser GS) | Musical, expressive listening |
+| **Native (beta)**, Windows | `src/audio/useNativeEngine.ts` → `electron/audioHost.ts` (utility process) → `native/orfeo-audio` (Rust: FluidSynth + WASAPI) | Same SF2 / SF3 sets | Built with the app (`npm run native:build`) | Playing a MIDI keyboard: ~10 ms key → speaker |
 
 **GM Synth** plays through JZZ's built-in `Tiny` synth. It opens a hardware
 MIDI-out port only when the user picks one in *Settings → MIDI Keyboard →
@@ -207,6 +211,36 @@ that channel during normal playback and would otherwise leave the preview
 channel set to the wrong instrument for the rest of the session.
 
 </details>
+
+### Native engine
+
+- **Where it runs:** a Rust engine (`native/orfeo-audio`) wrapped as a Node
+  add-on (`native/orfeo-audio-node`, napi-rs), loaded only inside an Electron
+  **utility process** (`electron/audioHost.ts`). A crash there restarts the
+  sound (`nativeClient.ts` re-starts it and re-sends the song); Orfeo itself
+  keeps running. Main only introduces the renderer and the host through a
+  `MessageChannelMain`; commands and ~30 Hz status flow over that port.
+- **Engine:** one audio thread owns WASAPI and FluidSynth (2.5.7 *glib* build —
+  the glib-free builds crash with ≥ 8 audio groups). It plays the song from a
+  flat time-sorted event list, splitting each period at event times, mixes the
+  16 channels itself (fader = file CC7 × Orfeo volume, pan, mute fades, meters),
+  runs auto-level → compressor (no look-ahead) on the song bus only, adds live
+  keys, metronome clicks (own bus, not on the master fader) and count-in clicks
+  on its own clock, and soft-clips. Exclusive mode (default, ~3–4 ms periods)
+  with automatic shared fallback; follows the default device, survives unplugs,
+  steps its buffer up if the device signals late; MMCSS "Pro Audio" priority.
+- **Renderer:** `useNativeEngine.ts` turns store changes into commands
+  (song, transport, tempo, transpose, mute/solo, programs, mixer, metronome) and
+  schedules only the visuals (key lights, hit effects) delayed by the engine's
+  real output delay. Count-in arms the start on the engine clock
+  (`armStart`), so the first note is exactly one beat after the last click.
+- **Keyboard:** Windows MIDI ports are usually single-client, so the renderer
+  keeps Web MIDI (all MIDI Keyboard settings apply) and forwards live keys.
+- **Switching away** awaits `stopNative()` — an exclusive stream must be
+  released before a Web Audio engine can open the device.
+- **Tests:** `native/orfeo-audio` has `orfeo-selftest` (21 numeric checks on
+  the real device) and `orfeo-engine` (plays a file, prints the device every
+  2 s — the unplug test).
 
 ---
 

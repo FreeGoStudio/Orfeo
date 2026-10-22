@@ -103,6 +103,55 @@ THE SOFTWARE.
 
 ---
 
+## Native audio engine (Windows)
+
+Orfeo's *Native (beta)* sound engine (`native/`) plays sound sets with
+FluidSynth and sends the result straight to the sound card.
+
+**FluidSynth and the libraries it needs** are shipped **unmodified, as separate
+DLLs** in `resources/native/fluidsynth/`, loaded at runtime. Under the LGPL you
+may replace them with your own builds of the same libraries. Their source code
+is available from the projects below; FluidSynth's exact version is the official
+2.5.7 Windows build (`fluidsynth-v2.5.7-win10-x64-glib.zip`).
+
+| Component | License | Source |
+|---|---|---|
+| FluidSynth 2.5.7 (`libfluidsynth-3.dll`) | LGPL-2.1-or-later | https://github.com/FluidSynth/fluidsynth |
+| GLib, GObject, GThread (`libglib-2.0-0.dll`, `libgobject-2.0-0.dll`, `libgthread-2.0-0.dll`) | LGPL-2.1-or-later | https://gitlab.gnome.org/GNOME/glib |
+| GNU gettext runtime (`libintl-8.dll`) | LGPL-2.1-or-later | https://www.gnu.org/software/gettext/ |
+| libsndfile (`sndfile.dll`) | LGPL-2.1-or-later | https://github.com/libsndfile/libsndfile |
+| SDL 3 (`SDL3.dll`) | Zlib | https://github.com/libsdl-org/SDL |
+
+<details>
+<summary>Show the GNU LGPL 2.1 notice</summary>
+
+```
+This library is free software; you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option) any
+later version. This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for
+more details: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+```
+
+</details>
+
+**Rust libraries compiled into the engine add-on** (`orfeo_audio.node`), all
+permissive:
+
+| Crate | License |
+|---|---|
+| `wasapi` (Windows audio), `midir`, `napi`, `napi-sys`, `napi-derive`, `convert_case`, `slab` | MIT |
+| `midly` (MIDI files) | Unlicense |
+| `libloading` | ISC |
+| `memchr` | Unlicense OR MIT |
+| `windows` and `windows-*`, `rtrb`, `futures*`, `crossbeam-*`, `rayon*`, `parking_lot*`, `lock_api`, `log`, `bitflags`, `cfg-if`, `either`, `num-*`, `proc-macro2`, `quote`, `syn`, `semver`, `smallvec`, `thiserror*`, `unicode-segmentation`, `scopeguard`, `pin-project-lite` | MIT OR Apache-2.0 |
+| `ctor`, `nohash-hasher`, `rustc-hash` | Apache-2.0 OR MIT |
+| `unicode-ident` | (MIT OR Apache-2.0) AND Unicode-3.0 |
+
+---
+
 ## MIT — [full text](https://opensource.org/license/mit) (100 packages)
 
 <details>
