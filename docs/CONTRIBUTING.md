@@ -205,6 +205,10 @@ certification. Store users get the update automatically once it passes.
   leaves the submission as a draft in Partner Center to review and submit by hand.
 - Until the one-time setup below is done, the job just says so and skips; the
   `.appx` is still in the run's `store-package` artifact for a manual upload.
+- **Retry only the Store upload** (it failed, or you skipped it): GitHub →
+  Actions → **Microsoft Store** → **Run workflow**, with the Release run's
+  number (the end of its address, `…/actions/runs/NUMBER`) and `draft` or
+  `submit`. It sends that run's package again without rebuilding anything.
 
 One-time setup (Partner Center + GitHub):
 

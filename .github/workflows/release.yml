@@ -10,9 +10,10 @@
 #              the Microsoft Store package (.appx) is kept as a run artifact, not on GitHub
 # 3. Publish — adds the notes and publishes (or keeps it a draft / marks it a pre-release)
 # 4. Store   — uploads the .appx to the Microsoft Store and submits it for certification
-#              (never for a pre-release; a draft run only stages a Store draft). Needs the
-#              one-time setup in docs/CONTRIBUTING.md → "Microsoft Store"; until then it
-#              just says so and skips.
+#              (never for a pre-release; a draft run only stages a Store draft). Lives in
+#              store.yml, which can also be run by hand to retry only the Store upload.
+#              Needs the one-time setup in docs/CONTRIBUTING.md → "Microsoft Store";
+#              until then it just says so and skips.
 name: Release
 
 on:
@@ -38,6 +39,7 @@ on:
 
 permissions:
   contents: write
+  actions: read   # the Store step reads this run's store-package artifact
 
 concurrency:
   group: release
@@ -221,67 +223,9 @@ jobs:
     name: 4. Microsoft Store
     needs: [check, publish]
     if: ${{ !inputs.prerelease && inputs.store != 'skip' }}
-    runs-on: windows-latest
-    timeout-minutes: 30
-    steps:
-      - name: Check the Store setup
-        id: setup
-        shell: bash
-        env:
-          TENANT: ${{ secrets.AZURE_AD_TENANT_ID }}
-          CLIENT: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
-          SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
-          SELLER: ${{ secrets.SELLER_ID }}
-          PRODUCT: ${{ vars.MS_STORE_PRODUCT_ID }}
-        run: |
-          if [ -z "$TENANT" ] || [ -z "$CLIENT" ] || [ -z "$SECRET" ] || [ -z "$SELLER" ] || [ -z "$PRODUCT" ]; then
-            echo "### Microsoft Store skipped" >> "$GITHUB_STEP_SUMMARY"
-            echo "The Store secrets or the MS_STORE_PRODUCT_ID variable aren't set up yet — see docs/CONTRIBUTING.md → Microsoft Store. Upload release/Orfeo-*.appx in Partner Center by hand this time (it's also in this run's store-package artifact)." >> "$GITHUB_STEP_SUMMARY"
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: actions/download-artifact@v8
-        if: steps.setup.outputs.ready == 'true'
-        with:
-          name: store-package
-          path: store
-
-      - name: Set up the Microsoft Store Developer CLI
-        if: steps.setup.outputs.ready == 'true'
-        uses: microsoft/microsoft-store-apppublisher@v1.1
-
-      - name: Sign in to Partner Center
-        if: steps.setup.outputs.ready == 'true'
-        run: >
-          msstore reconfigure
-          --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}"
-          --sellerId "${{ secrets.SELLER_ID }}"
-          --clientId "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}"
-          --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
-
-      # 'publish' starts a new submission from the last published one (same
-      # listing, screenshots, price), swaps in the new package, and commits it
-      # for certification. A GitHub test run, or Store = draft, only uploads and
-      # leaves the submission as a draft in Partner Center (--noCommit).
-      - name: Upload to the Store
-        if: steps.setup.outputs.ready == 'true'
-        shell: pwsh
-        env:
-          PRODUCT: ${{ vars.MS_STORE_PRODUCT_ID }}
-          MODE: ${{ (inputs.draft || inputs.store == 'draft') && 'draft' || 'submit' }}
-        run: |
-          $pkg = Get-ChildItem store -Filter *.appx | Select-Object -First 1
-          if (-not $pkg) { throw "No .appx in the store-package artifact." }
-          if ($env:MODE -eq 'draft') {
-            msstore publish $pkg.FullName -id $env:PRODUCT --noCommit
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            "### Microsoft Store: draft staged" >> $env:GITHUB_STEP_SUMMARY
-            "$($pkg.Name) is uploaded to a draft submission. Review and submit it in Partner Center." >> $env:GITHUB_STEP_SUMMARY
-          } else {
-            msstore publish $pkg.FullName -id $env:PRODUCT
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            "### Microsoft Store: submitted" >> $env:GITHUB_STEP_SUMMARY
-            "$($pkg.Name) is submitted for certification (usually hours, up to 3 business days). Store users get the update automatically once it passes." >> $env:GITHUB_STEP_SUMMARY
-          }
+    # store.yml, also runnable on its own to retry just the Store upload
+    uses: ./.github/workflows/store.yml
+    with:
+      run_id: ${{ github.run_id }}
+      mode: ${{ (inputs.draft || inputs.store == 'draft') && 'draft' || 'submit' }}
+    secrets: inherit
