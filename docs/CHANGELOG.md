@@ -5,7 +5,12 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
-## [Unreleased]
+## [1.5.2] — 22. 10. 2026 — Studio interfaces, instrument changes, security
+
+**In short**
+- Orfeo's native mode now matches your sound card's real speed by itself in *Low latency*, so studio interfaces like the UAD Apollo no longer sound slowed down and distorted.
+- Songs whose parts switch instrument mid-song (oboe, then guitar…) now play the right instrument at the right moment, on both sound engines.
+- Security update to a newer Electron, Chromium and Node. *Check for updates* now takes you to orfeo.cc or to Orfeo's page in the Microsoft Store.
 
 ### Changed
 - **Security update.** Orfeo now runs on Electron 44, with Chromium 152 and Node 24.22. The Electron 42 version it was built on stopped receiving security fixes this week. File pickers (Open MIDI file, Import SoundFont, library folder) still open in the folder you last used: Electron 44 would otherwise open them in *Downloads* every time.
@@ -13,7 +18,7 @@
 
 ### Fixed
 - **Parts that change instrument mid-song now do, on both sound engines.** Some arrangers switch a part's instrument partway through, as Kate Bush's "Wuthering Heights" does: its lead melody is a nylon guitar in the intro, an oboe in the verse, then a guitar again. Orfeo shows such a part as one track per instrument in the Tracks panel, but they all share one MIDI channel, and both engines played that channel with a single instrument for the whole song: Samples the last one (oboe throughout), Native the first one (guitar throughout). Both now switch at the right moment, exactly as the file intends. An instrument you change in the Tracks panel is heard straight away, even mid-song.
-- **Native's *Low latency* could play slowed down and distorted on some studio interfaces.** Some audio interfaces (Universal Audio's Apollo, for example) run at the sample rate set in their own control app or your DAW, while telling Windows another one. Orfeo sent its sound at the speed Windows reported, and the interface played it at its own: too slow, too low, and crackling. Orfeo now times how fast the sound card really plays during its first two seconds. If that differs from what it reported, Orfeo switches to the card's real rate and checks again, staying in *Low latency*. You don't need to change any setting. If a card can't be matched, Orfeo shares it through Windows, which converts it correctly, and *Settings › Audio* says why.
+- **Orfeo's native mode could play slowed down and distorted on some studio interfaces in *Low latency*.** Some audio interfaces (Universal Audio's Apollo, for example) run at the sample rate set in their own control app or your DAW, while telling Windows another one. Orfeo sent its sound at the speed Windows reported, and the interface played it at its own: too slow, too low, and crackling. Orfeo now times how fast the sound card really plays during its first two seconds. If that differs from what it reported, Orfeo switches to the card's real rate and checks again, staying in *Low latency*. You don't need to change any setting. If a card can't be matched, Orfeo shares it through Windows, which converts it correctly, and *Settings › Audio* says why.
 - **The MIDI keyboard log (*Save log…*) now includes the sound card connection.** It records the sound card, its sample rate and format, the buffer, how fast the card really plays, and why it isn't in *Low latency*, if it isn't. One saved file is now enough to diagnose a sound problem.
 
 ## [1.5.1] — 22. 10. 2026 — Native sound, safe on every sound card
