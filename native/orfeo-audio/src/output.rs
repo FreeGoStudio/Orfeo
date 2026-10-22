@@ -2,6 +2,8 @@
 //! automatic fallback to shared mode when the device refuses or is busy.
 
 use wasapi::*;
+use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+use windows::Win32::System::Com::CLSCTX_ALL;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutputMode { Exclusive, Shared }
@@ -23,6 +25,10 @@ pub struct Output {
     /// Delay the device reports for the stream (exclusive: the buffer itself)
     pub reported_latency_ms: f64,
     pub fallback_reason: Option<String>,
+    /// Exclusive streams skip Windows' own volume (the taskbar slider, the
+    /// volume keys) unless the sound card does it in hardware: then this is the
+    /// device's volume control, which the engine applies itself
+    volume: Option<IAudioEndpointVolume>,
 }
 
 fn fmt_of(f: &WaveFormat) -> SampleFmt {
@@ -55,7 +61,13 @@ impl Output {
     /// Must be called on the thread that will render (COM is initialised there).
     pub fn open(want: OutputMode, step: usize) -> Result<Output, String> {
         let en = DeviceEnumerator::new().map_err(|e| e.to_string())?;
-        let dev = en.get_default_device(&Direction::Render).map_err(|e| format!("no output device: {e}"))?;
+        // Testing aid: ORFEO_AUDIO_DEVICE=<part of a device's name> picks that output
+        // instead of Windows' default (the app never sets it)
+        let pick = std::env::var("ORFEO_AUDIO_DEVICE").ok().and_then(|want| {
+            en.get_device_collection(&Direction::Render).ok()?.into_iter().flatten()
+                .find(|d| d.get_friendlyname().map(|n| n.contains(want.as_str())).unwrap_or(false))
+        });
+        let dev = match pick { Some(d) => d, None => en.get_default_device(&Direction::Render).map_err(|e| format!("no output device: {e}"))? };
         let device_name = dev.get_friendlyname().unwrap_or_default();
         let mut client = dev.get_iaudioclient().map_err(|e| e.to_string())?;
         let mix = client.get_mixformat().map_err(|e| e.to_string())?;
@@ -81,9 +93,10 @@ impl Output {
         let render = client.get_audiorenderclient().map_err(|e| e.to_string())?;
         let buffer_frames = client.get_buffer_size().map_err(|e| e.to_string())?;
         let reported_latency_ms = unsafe { client.as_iaudioclient().GetStreamLatency() }.map(|h| h as f64 / 1e4).unwrap_or(0.0);
+        let volume = if mode == OutputMode::Exclusive { software_volume(&dev) } else { None };
         Ok(Output {
             bytes_per_frame: fmt.get_blockalign() as usize, fmt: fmt_of(&fmt),
-            client, render, event, mode, rate, period_frames, buffer_frames, device_name, reported_latency_ms, fallback_reason,
+            client, render, event, mode, rate, period_frames, buffer_frames, device_name, reported_latency_ms, fallback_reason, volume,
         })
     }
 
@@ -93,6 +106,18 @@ impl Output {
         client.initialize_client(&fmt, &Direction::Render, &StreamMode::EventsShared { autoconvert: true, buffer_duration_hns: def })
             .map_err(|e| format!("shared mode failed: {e}"))?;
         Ok((fmt, (def as f64 / 1e7 * rate as f64).round() as u32))
+    }
+
+    pub fn has_software_volume(&self) -> bool { self.volume.is_some() }
+
+    /// Windows' volume for this stream as a gain (0 when muted), or 1 when
+    /// Windows applies it anyway (shared mode, or a sound card with hardware volume)
+    pub fn windows_gain(&self) -> f32 {
+        let Some(v) = &self.volume else { return 1.0 };
+        unsafe {
+            if v.GetMute().map(|m| m.as_bool()).unwrap_or(false) { return 0.0 }
+            v.GetMasterVolumeLevel().map(|db| 10f32.powf(db / 20.0)).unwrap_or(1.0)
+        }
     }
 
     /// Interleaves and converts to the device format, then hands it over
@@ -110,4 +135,13 @@ impl Output {
         }
         self.render.write_to_device(l.len(), scratch, None).map_err(|e| e.to_string())
     }
+}
+
+/// The device's volume control, when it is done in software by Windows' mixer —
+/// which an exclusive stream bypasses, so the engine must apply it itself
+fn software_volume(dev: &Device) -> Option<IAudioEndpointVolume> {
+    const HARDWARE_VOLUME: u32 = 1; // ENDPOINT_HARDWARE_SUPPORT_VOLUME
+    let v: IAudioEndpointVolume = unsafe { dev.as_immdevice().Activate(CLSCTX_ALL, None) }.ok()?;
+    let hw = unsafe { v.QueryHardwareSupport() }.unwrap_or(0);
+    if hw & HARDWARE_VOLUME != 0 { None } else { Some(v) }
 }

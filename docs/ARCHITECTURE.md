@@ -227,7 +227,9 @@ channel set to the wrong instrument for the rest of the session.
   runs auto-level → compressor (no look-ahead) on the song bus only, adds live
   keys, metronome clicks (own bus, not on the master fader) and count-in clicks
   on its own clock, and soft-clips. Exclusive mode (~3–4 ms periods; *Low latency*, on only
-  while a MIDI keyboard is connected, not saved) with automatic shared fallback; follows the default device, survives unplugs,
+  while a MIDI keyboard is connected, not saved) with automatic shared fallback. An exclusive stream skips Windows' software
+  volume, so when the device has no hardware volume the engine applies the
+  endpoint volume and mute itself (polled ~20×/s, before the soft clip); follows the default device, survives unplugs,
   steps its buffer up if the device signals late; MMCSS "Pro Audio" priority.
 - **Renderer:** `useNativeEngine.ts` turns store changes into commands
   (song, transport, tempo, transpose, mute/solo, programs, mixer, metronome) and

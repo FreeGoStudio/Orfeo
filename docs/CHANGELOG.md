@@ -8,6 +8,7 @@
 ## [Unreleased]
 
 ### Fixed
+- **The Native sound engine played at full volume on some sound cards, loud and distorted.** With *Low latency* on, Windows' own volume (the taskbar slider and the volume keys) was skipped on sound cards that leave volume to Windows, among them audio interfaces such as Universal Audio's Apollo, and HDMI or DisplayPort monitors. Orfeo then played at full level, far louder than everything else and with its loudest passages clipped. Native now follows the Windows volume and mute itself, live as you move the slider, so it is exactly as loud as the rest of your computer and stays clean.
 - **The Native sound engine took over the sound card even with no keyboard plugged in**, so a website or video playing alongside Orfeo went silent. *Low latency* is now off unless a MIDI keyboard is connected: plugging one in turns it on, unplugging the last one turns it off, and switching it by hand holds until then. Every start begins from that rule.
 
 ## [1.5] — 22. 10. 2026 — Play your own keyboard, without the lag

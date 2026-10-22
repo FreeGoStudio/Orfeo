@@ -92,6 +92,9 @@ pub struct Stats {
     pub channel_peaks: [AtomicU32; 16],
     pub master_peak: AtomicU32,
     pub comp_reduction_db: AtomicU32,
+    /// Windows' volume the engine applies itself (exclusive, software volume), as
+    /// f32 gain bits; u32::MAX = not applied (Windows or the sound card does it)
+    pub windows_gain: AtomicU32,
     pub device_name: Mutex<String>,
     pub fallback_reason: Mutex<Option<String>>,
     pub error: Mutex<Option<String>>,
@@ -295,6 +298,11 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         let mut clicks = Clicks::new(rate as f32);
         clicks.volume = clicks_volume;
         let smooth = 1.0 - (-1.0 / (0.005 * rate as f32)).exp(); // ~5 ms gain ramps
+        // Windows' volume (exclusive only): read ~20 times a second, ramped
+        let mut os_target = out.windows_gain();
+        let mut os_gain = os_target;
+        let mut os_poll = 0usize;
+        let os_every = (rate * 0.05) as usize;
 
         let avail = out.client.get_available_space_in_frames().unwrap_or(0) as usize;
         let _ = out.write(&sl[..avail], &sr[..avail], &mut scratch);
@@ -489,6 +497,9 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
             // ── Song bus: master → auto-level → compressor → safety limiter;  live bus: master. Tone shapes the sum ──
             let use_tone = mix.tone_db.abs() > 0.01;
             let mut mpeak = 0f32;
+            os_poll += avail;
+            if os_poll >= os_every { os_poll = 0; os_target = out.windows_gain(); }
+            stats.windows_gain.store(if out.mode == OutputMode::Exclusive && out.has_software_volume() { os_target.to_bits() } else { u32::MAX }, Relaxed);
             for i in 0..avail {
                 let (mut a, mut b) = (sl[i] * mix.master, sr[i] * mix.master);
                 agc.process(comp.enabled, &mut a, &mut b);
@@ -497,7 +508,9 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                 // live keys and clicks join after the dynamics; tone shapes the sum
                 let (mut a, mut b) = (a + ll[i] * mix.master, b + lr[i] * mix.master);
                 if use_tone { a = tone.process(0, a); b = tone.process(1, b); }
-                let (o1, o2) = (soft_clip(a + kl[i]), soft_clip(b + kr[i]));
+                // Windows' volume before the soft clip, so a turned-down Orfeo stays clean
+                os_gain += (os_target - os_gain) * smooth;
+                let (o1, o2) = (soft_clip((a + kl[i]) * os_gain), soft_clip((b + kr[i]) * os_gain));
                 sl[i] = o1; sr[i] = o2;
                 mpeak = mpeak.max(o1.abs()).max(o2.abs());
             }

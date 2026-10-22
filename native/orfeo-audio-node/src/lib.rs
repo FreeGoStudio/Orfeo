@@ -37,6 +37,8 @@ pub struct Status {
     pub channel_peaks: Vec<f64>,
     pub master_peak: f64,
     pub comp_reduction_db: f64,
+    /// Windows' volume the engine applies itself in exclusive mode (gain), or null
+    pub windows_gain: Option<f64>,
     pub live_notes: u32,
     pub live_wait_avg_ms: f64,
     pub live_wait_max_ms: f64,
@@ -147,6 +149,7 @@ impl NativeEngine {
             channel_peaks: (0..16).map(|c| s.take_channel_peak(c) as f64).collect(),
             master_peak: s.take_master_peak() as f64,
             comp_reduction_db: f32::from_bits(s.comp_reduction_db.load(Relaxed)) as f64,
+            windows_gain: match s.windows_gain.load(Relaxed) { u32::MAX => None, b => Some(f32::from_bits(b) as f64) },
             live_notes: notes,
             live_wait_avg_ms: wait / n / 1000.0,
             live_wait_max_ms: s.live_wait_max_us.swap(0, Relaxed) as f64 / 1000.0,

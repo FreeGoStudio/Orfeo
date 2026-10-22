@@ -88,6 +88,10 @@ fn main() {
                 s.period_frames.load(Relaxed) as f64 * 1000.0 / s.rate.load(Relaxed).max(1) as f64,
                 s.reopens.load(Relaxed), s.late_wakeups.load(Relaxed), s.worst_render_us.swap(0, Relaxed) as f64 / 1000.0, live);
             if let Some(e) = s.error.lock().unwrap().as_ref() { println!("        note: {e}") }
+            match s.windows_gain.load(Relaxed) {
+                u32::MAX => println!("        Windows volume: applied by Windows / the sound card"),
+                b => println!("        Windows volume: applied by the engine, gain {:.3} ({:.1} dB)", f32::from_bits(b), 20.0 * f32::from_bits(b).max(1e-6).log10()),
+            }
         }
     }
 }

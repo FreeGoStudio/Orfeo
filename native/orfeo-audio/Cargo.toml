@@ -22,4 +22,4 @@ wasapi = "0.26"
 midir = "0.11"
 midly = "0.5"
 rtrb = "0.4"
-windows = { version = "0.62", features = ["Win32_System_Threading", "Win32_Foundation"] }
+windows = { version = "0.62", features = ["Win32_System_Threading", "Win32_Foundation", "Win32_System_Com", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints"] }

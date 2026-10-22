@@ -25,6 +25,7 @@ export interface NativeStatus {
   channelPeaks: number[]
   masterPeak: number
   compReductionDb: number
+  windowsGain?: number | null  // Windows volume the engine applies itself (Low latency without hardware volume)
   liveNotes: number
   liveWaitAvgMs: number
   liveWaitMaxMs: number
