@@ -300,7 +300,7 @@ export default function TrackPanel() {
           {/* ── Dashed outline + low opacity — a same-shade disabled icon read as
               a normal, clickable nav icon until hovered; this makes "not yet
               shipped" visible at rest, not just on tooltip. ──────────────── */}
-          <Tooltip title="A dedicated practice mode is planned but not built yet." oneLine wrapperStyle={{ marginTop: 8 }}>
+          <Tooltip title="A dedicated Practice mode is planned but not built yet." oneLine wrapperStyle={{ marginTop: 8 }}>
           <div
             style={{
               color: 'var(--state-disabled)', padding: 3,
@@ -456,7 +456,7 @@ export default function TrackPanel() {
                 {autoMuteNonKeyboard && (
                   <Tooltip
                     title={isCurrentlyFiltered ? 'Piano, Bass & Drums Only' : 'Playing all tracks'}
-                    description={isCurrentlyFiltered ? 'Playing keyboards, bass & drums tracks only. Click to play all tracks.' : 'Click to mute everything except piano,\nbass & drums — good for practicing'}
+                    description={isCurrentlyFiltered ? 'Playing keyboards, bass & drums tracks only. Click to play all tracks.' : 'Click to mute everything except piano,\nbass & drums — good for practising'}
                     wrapperStyle={{ marginLeft: 'auto' }}
                   >
                   <button

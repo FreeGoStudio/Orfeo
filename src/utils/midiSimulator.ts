@@ -135,9 +135,26 @@ export const sim = {
   sentTo(key: string) { return _outputs.get(`sim-${key}-out-0`)?.sent ?? [] },
 }
 
-export const simAvailable = import.meta.env.DEV
+// Dev runs and test portables (npm run dist:portable builds in 'test-build'
+// mode); in a release only after the hidden switch below
+const DEV_TOOLS_KEY = 'orfeo-dev-tools'
+let _unlocked = false
+try { _unlocked = localStorage.getItem(DEV_TOOLS_KEY) === '1' } catch {}
+export const simAvailable = import.meta.env.DEV || import.meta.env.MODE === 'test-build' || _unlocked
 
-if (import.meta.env.DEV && typeof navigator !== 'undefined' && navigator.requestMIDIAccess && !(window as any).__orfeoSimMidi) {
+// Hidden switch, any build: Ctrl+Alt+Shift+D turns the dev tools on or off
+// and reloads the window (not in the manual; see docs/ARCHITECTURE.md)
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey && e.altKey && e.shiftKey && e.code === 'KeyD') || e.repeat) return
+    // AltGr is Ctrl+Alt to Windows: never fire while typing text
+    if ((e.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable="true"]')) return
+    try { localStorage.setItem(DEV_TOOLS_KEY, _unlocked ? '0' : '1') } catch { return }
+    location.reload()
+  })
+}
+
+if (simAvailable && typeof navigator !== 'undefined' && navigator.requestMIDIAccess && !(window as any).__orfeoSimMidi) {
   const realRequest = navigator.requestMIDIAccess.bind(navigator)
   ;(navigator as any).requestMIDIAccess = async (opts?: MIDIOptions) => {
     let real: MIDIAccess | null = null

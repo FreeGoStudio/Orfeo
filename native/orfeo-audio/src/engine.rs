@@ -260,7 +260,7 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
     let mut comp_preset = 0usize;
     let mut sends = [(0f32, 0f32); 16];
     // Each channel's volume as the song file sets it (CC7, GM default 100)
-    let mut file_cc7 = [100u8; 16];
+    let mut file_cc7 = [127u8; 16];
     let mut clicks_volume = 0.6f32;
     // (frames from now, accent) — count-in clicks and a pending start
     let mut pending_clicks: Vec<(u64, bool)> = Vec::new();
@@ -291,6 +291,7 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         let mut comp = Compressor::new(rate as f32);
         comp.set(comp_enabled, comp_preset);
         let mut agc = AutoLevel::new(rate as f32);
+        let mut safety = Compressor::safety(rate as f32);
         let mut clicks = Clicks::new(rate as f32);
         clicks.volume = clicks_volume;
         let smooth = 1.0 - (-1.0 / (0.005 * rate as f32)).exp(); // ~5 ms gain ramps
@@ -390,7 +391,8 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                         timed_offs.push(((dur.max(0.01) * rate) as u64, c, key));
                     }
                     Command::AllNotesOff => { fluid.all_sounds_off(); timed_offs.clear() }
-                    Command::SetOutputMode(m) => { if m != mode { mode = m; reopen.store(true, Relaxed) } }
+                    // Asking again for exclusive after a fallback to shared retries it
+                    Command::SetOutputMode(m) => { if m != mode || m != out.mode { mode = m; reopen.store(true, Relaxed) } }
                     Command::DebugStall(ms) => std::thread::sleep(Duration::from_millis(ms)),
                     Command::Shutdown => break 'device,
                 }
@@ -484,13 +486,14 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
 
             for i in 0..avail { sl[i] += fx[0][i] + fx[2][i]; sr[i] += fx[1][i] + fx[3][i]; }
 
-            // ── Song bus: master → tone → auto-level → compressor;  live bus: master → tone ──
+            // ── Song bus: master → auto-level → compressor → safety limiter;  live bus: master. Tone shapes the sum ──
             let use_tone = mix.tone_db.abs() > 0.01;
             let mut mpeak = 0f32;
             for i in 0..avail {
                 let (mut a, mut b) = (sl[i] * mix.master, sr[i] * mix.master);
                 agc.process(comp.enabled, &mut a, &mut b);
                 comp.process(&mut a, &mut b);
+                safety.process(&mut a, &mut b);
                 // live keys and clicks join after the dynamics; tone shapes the sum
                 let (mut a, mut b) = (a + ll[i] * mix.master, b + lr[i] * mix.master);
                 if use_tone { a = tone.process(0, a); b = tone.process(1, b); }
@@ -564,7 +567,9 @@ fn pro_audio_priority() -> Mmcss {
 fn song_uses_channel(tr: &Transport, ch: usize) -> bool { tr.track_channels.iter().any(|m| m & (1 << ch) != 0) }
 
 /// Synth volume for a channel = the file's CC7 × Orfeo's fader, so the
-/// channel's reverb and chorus follow the fader too
+/// channel's reverb and chorus follow the fader too. Orfeo's fader already
+/// starts at the file's volume and the app sends no CC7 events, so this
+/// stays at full (127) — as in the Web Audio engine — unless a caller does.
 fn send_volume(fluid: &mut Fluid, ch: usize, file_cc7: &[u8; 16], strips: &[Strip; 16]) {
     let v = (file_cc7[ch] as f32 * strips[ch].volume).round().clamp(0.0, 127.0) as u8;
     fluid.midi(0xB0 | ch as u8, 7, v);
@@ -572,7 +577,7 @@ fn send_volume(fluid: &mut Fluid, ch: usize, file_cc7: &[u8; 16], strips: &[Stri
 
 /// Instruments, banks, controllers and pedals as they stand at the playhead
 fn replay_state(fluid: &mut Fluid, tr: &Transport, file_cc7: &mut [u8; 16], strips: &[Strip; 16]) {
-    *file_cc7 = [100; 16];
+    *file_cc7 = [127; 16];
     for &(s, a, b) in &tr.song.state_before(tr.pos) {
         let ch = (s & 0x0F) as usize;
         if s & 0xF0 == 0xC0 && tr.program_override[ch].is_some() { continue }

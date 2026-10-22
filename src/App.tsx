@@ -407,7 +407,7 @@ export default function App() {
           if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) break
           if ((e.target as HTMLElement | null)?.closest?.('[role="slider"], select, [contenteditable="true"]')) break
           const s = useStore.getState()
-          if (!s.midi || s.chordExplorerOpen || s.scaleExplorerOpen || s.lockedChordModalOpen || s.tapSession || isCountingIn()) break
+          if (!s.stepThroughEnabled || !s.midi || s.chordExplorerOpen || s.scaleExplorerOpen || s.lockedChordModalOpen || s.tapSession || isCountingIn()) break
           e.preventDefault()
           stepEvents(e.key === 'ArrowRight' ? 1 : -1, e.shiftKey)
           break

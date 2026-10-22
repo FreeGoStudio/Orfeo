@@ -4,7 +4,7 @@ import { useStore } from '../store'
 import type { SoundfontId, SoundfontInfo } from '../types'
 import { initSamplesEngine, loadSelectedSoundfont } from './useSamplesEngine'
 import { measuredOutputLatencySec } from '../audio/engine'
-import { stopNative } from '../audio/nativeClient'
+import { stopNative, useNativeAudio } from '../audio/nativeClient'
 
 // ── Sound sets + Samples loading — one shared copy for the drawer's Quick
 // Settings and the Settings window (both show the same status). ──────────
@@ -111,6 +111,8 @@ export function useSoundfontService() {
 export function useOutputLatency(): number {
   const audioEngine = useStore((s) => s.audioEngine)
   const samplesStatus = useSoundfontState((s) => s.samplesStatus)
+  // Native: re-read whenever its output changes (exclusive ↔ shared, a new sound card)
+  const nativeOutput = useNativeAudio((s) => s.status ? `${s.status.mode}:${s.status.bufferFrames}:${s.status.rate}:${s.status.reportedLatencyMs}` : '')
   const [sec, setSec] = useState(0)
   useEffect(() => {
     let attempts = 0
@@ -120,6 +122,6 @@ export function useOutputLatency(): number {
       if (v > 0 || attempts >= 5) clearInterval(id)
     }, 400)
     return () => clearInterval(id)
-  }, [audioEngine, samplesStatus])
+  }, [audioEngine, samplesStatus, nativeOutput])
   return sec
 }

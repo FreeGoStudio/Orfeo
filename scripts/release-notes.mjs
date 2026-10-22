@@ -106,7 +106,9 @@ const out = [
   ...summary.map((s) => `- ${s}`),
   '',
   `**Download:** [Installer](${dl}/Orfeo-Setup-${version}.exe) (recommended, updates itself) · ` +
-    `[Portable](${dl}/Orfeo-${version}-portable.exe) (no install)  `,
+    `[Portable](${dl}/Orfeo-${version}-portable.exe) (no install)` +
+    // a beta never goes to the Store; a release reaches it after certification
+    (version.includes('-') ? '  ' : ` · [Microsoft Store](https://apps.microsoft.com/detail/9NJ9Q01P8JQD) (updates through the Store, usually within a few days)  `),
   `**Already installed?** Orfeo updates itself the next time it starts. ` +
     `Found a problem? [Report a bug](https://orfeo.cc/docs/support/report-a-bug).`,
   '',

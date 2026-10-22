@@ -616,7 +616,7 @@ export default function MasterStrip() {
         {autoMuteNonKeyboard && (
           <Tooltip
             title={isCurrentlyFiltered ? 'Piano, bass & drums only' : 'Playing All Tracks'}
-            description={isCurrentlyFiltered ? 'Playing keyboards, bass & drums only. Click to play all tracks.' : 'Click to mute everything except piano, bass & drums — good for practicing'}
+            description={isCurrentlyFiltered ? 'Playing keyboards, bass & drums only. Click to play all tracks.' : 'Click to mute everything except piano, bass & drums — good for practising'}
           >
           <button
             onClick={() => setTrackMuteFilter(!isCurrentlyFiltered)}

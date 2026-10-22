@@ -1,6 +1,9 @@
-//! Master compressor and Auto-Level, rebuilt without look-ahead. The Web Audio
-//! DynamicsCompressorNode delays everything by 6 ms to see peaks coming; here
-//! nothing is delayed — the soft clip after this catches what the attack misses.
+//! Master compressor, safety limiter and Auto-Level, built to sound like the
+//! Samples engine's Web Audio chain: the same static curve and automatic
+//! make-up gain as the browser's DynamicsCompressorNode (Chromium's
+//! DynamicsCompressorKernel), the same always-on safety limiter after it, and
+//! the same Auto-Level loop. One difference on purpose: no 6 ms look-ahead —
+//! nothing is delayed; the soft clip after this catches what the attack misses.
 
 /// Same five positions as the Web Audio engine's COMPRESSOR_PRESETS
 #[derive(Clone, Copy, Debug)]
@@ -14,15 +17,58 @@ pub const PRESETS: [CompPreset; 5] = [
     CompPreset { threshold_db: -24.0, ratio: 20.0, attack_s: 0.003, knee_db: 0.0,  makeup_db: 6.0 }, // Limiter
 ];
 const RELEASE_S: f32 = 0.25;
+/// The Web Audio chain's fixed last stage, always on (useSamplesEngine.ts)
+const SAFETY: CompPreset = CompPreset { threshold_db: -1.0, ratio: 20.0, attack_s: 0.001, knee_db: 0.0, makeup_db: 0.0 };
+const SAFETY_RELEASE_S: f32 = 0.05;
 
 #[inline] fn db_to_gain(db: f32) -> f32 { 10f32.powf(db / 20.0) }
 #[inline] fn gain_to_db(g: f32) -> f32 { 20.0 * g.max(1e-9).log10() }
 
-/// Stereo-linked peak compressor with a soft knee
+/// The browser compressor's static curve: an exponential knee from the
+/// threshold up to threshold + knee, a constant ratio above it, and the
+/// automatic make-up gain it applies on top (Chromium: (1 / gain at 0 dBFS)^0.6)
+#[derive(Clone, Copy)]
+struct Curve { lin_thr: f32, k: f32, knee_thr: f32, knee_thr_db: f32, y_knee_thr_db: f32, slope: f32, makeup: f32 }
+
+impl Curve {
+    fn new(threshold_db: f32, knee_db: f32, ratio: f32) -> Curve {
+        let mut c = Curve { lin_thr: db_to_gain(threshold_db), k: 5.0, knee_thr: 0.0, knee_thr_db: 0.0, y_knee_thr_db: 0.0, slope: 1.0 / ratio, makeup: 1.0 };
+        // k: the knee's sharpness, so the slope at the knee's top equals 1 / ratio
+        let x = db_to_gain(threshold_db + knee_db);
+        let (mut lo, mut hi, mut k) = (0.1f32, 10000f32, 5f32);
+        for _ in 0..15 {
+            if c.slope_at(x, k) < c.slope { hi = k } else { lo = k }
+            k = (lo * hi).sqrt();
+        }
+        c.k = k;
+        c.knee_thr = x;
+        c.knee_thr_db = gain_to_db(x);
+        c.y_knee_thr_db = gain_to_db(c.knee_curve(x, k));
+        c.makeup = (1.0 / c.saturate(1.0)).powf(0.6);
+        c
+    }
+    fn knee_curve(&self, x: f32, k: f32) -> f32 {
+        if x < self.lin_thr { x } else { self.lin_thr + (1.0 - (-k * (x - self.lin_thr)).exp()) / k }
+    }
+    fn slope_at(&self, x: f32, k: f32) -> f32 {
+        if x < self.lin_thr { return 1.0 }
+        let x2 = x * 1.001;
+        (gain_to_db(self.knee_curve(x2, k)) - gain_to_db(self.knee_curve(x, k))) / (gain_to_db(x2) - gain_to_db(x))
+    }
+    /// Output level for an input level (linear)
+    fn saturate(&self, x: f32) -> f32 {
+        if x < self.knee_thr { self.knee_curve(x, self.k) }
+        else { db_to_gain(self.y_knee_thr_db + self.slope * (gain_to_db(x) - self.knee_thr_db)) }
+    }
+}
+
+/// Stereo-linked peak compressor on the browser's curve
 pub struct Compressor {
     rate: f32,
     pub enabled: bool,
     p: CompPreset,
+    curve: Curve,
+    release_s: f32,
     att: f32, rel: f32,
     /// Current gain reduction in dB (≤ 0)
     pub reduction_db: f32,
@@ -30,50 +76,53 @@ pub struct Compressor {
 
 impl Compressor {
     pub fn new(rate: f32) -> Self {
-        let mut c = Compressor { rate, enabled: false, p: PRESETS[0], att: 0.0, rel: 0.0, reduction_db: 0.0 };
+        let mut c = Compressor { rate, enabled: false, p: PRESETS[0], curve: Curve::new(0.0, 0.0, 1.0), release_s: RELEASE_S, att: 0.0, rel: 0.0, reduction_db: 0.0 };
         c.set(false, 0);
         c
     }
-    pub fn set(&mut self, enabled: bool, preset: usize) {
+    /// The always-on safety limiter that ends the song bus
+    pub fn safety(rate: f32) -> Self {
+        let mut c = Compressor::new(rate);
+        c.release_s = SAFETY_RELEASE_S;
+        c.apply(true, SAFETY);
+        c
+    }
+    pub fn set(&mut self, enabled: bool, preset: usize) { self.apply(enabled, PRESETS[preset.min(PRESETS.len() - 1)]) }
+    fn apply(&mut self, enabled: bool, p: CompPreset) {
         self.enabled = enabled;
-        self.p = PRESETS[preset.min(PRESETS.len() - 1)];
-        self.att = (-1.0 / (self.p.attack_s * self.rate)).exp();
-        self.rel = (-1.0 / (RELEASE_S * self.rate)).exp();
+        self.p = p;
+        self.curve = Curve::new(p.threshold_db, p.knee_db, p.ratio);
+        self.att = (-1.0 / (p.attack_s * self.rate)).exp();
+        self.rel = (-1.0 / (self.release_s * self.rate)).exp();
     }
-    #[inline]
-    fn curve(&self, x_db: f32) -> f32 {
-        // Output level for an input level (dB), soft knee around the threshold
-        let (t, r, w) = (self.p.threshold_db, self.p.ratio, self.p.knee_db);
-        let d = x_db - t;
-        if w > 0.0 && 2.0 * d.abs() <= w { x_db + (1.0 / r - 1.0) * (d + w / 2.0).powi(2) / (2.0 * w) }
-        else if 2.0 * d > w { t + d / r }
-        else { x_db }
-    }
-    /// Processes one stereo frame in place (makeup gain applied before, as in the Web Audio chain)
+    /// Processes one stereo frame in place: Orfeo's make-up gain first (as in
+    /// the Web Audio chain), then the compression, then the curve's own make-up
     #[inline]
     pub fn process(&mut self, l: &mut f32, r: &mut f32) {
         if !self.enabled { self.reduction_db = 0.0; return }
         let mk = db_to_gain(self.p.makeup_db);
         *l *= mk; *r *= mk;
-        let x_db = gain_to_db(l.abs().max(r.abs()));
-        let target = (self.curve(x_db) - x_db).min(0.0);
+        let x = l.abs().max(r.abs());
+        let target = if x > 1e-6 { gain_to_db(self.curve.saturate(x) / x).min(0.0) } else { 0.0 };
         let coef = if target < self.reduction_db { self.att } else { self.rel };
         self.reduction_db = target + coef * (self.reduction_db - target);
-        let g = db_to_gain(self.reduction_db);
+        let g = db_to_gain(self.reduction_db) * self.curve.makeup;
         *l *= g; *r *= g;
     }
 }
 
 /// Auto-Level: slow closed-loop gain toward a target loudness, for whole-song
-/// drift (a quiet passage), never for single notes — same constants as the
-/// Web Audio engine. Active only while the compressor is on.
+/// drift (a quiet passage), never for single notes. Measured exactly as the
+/// Web Audio engine does: every 100 ms, the RMS of the last 2048 samples of the
+/// mono mix after this stage's own gain. Active only while the compressor is on.
 pub struct AutoLevel {
     rate: f32,
     pub gain: f32,
     target_gain: f32,
-    sum_sq: f64,
+    ring: Vec<f32>,
+    at: usize,
     count: usize,
-    window: usize,
+    poll: usize,
 }
 
 const AGC_TARGET_DB: f32 = -18.0;
@@ -82,32 +131,49 @@ const AGC_MAX_BOOST_DB: f32 = 9.0;
 const AGC_MAX_CUT_DB: f32 = 4.0;
 const AGC_TC_UP_S: f32 = 3.0;
 const AGC_TC_DOWN_S: f32 = 5.0;
+const AGC_WINDOW: usize = 2048;
 
 impl AutoLevel {
     pub fn new(rate: f32) -> Self {
-        AutoLevel { rate, gain: 1.0, target_gain: 1.0, sum_sq: 0.0, count: 0, window: (rate * 0.1) as usize }
+        AutoLevel { rate, gain: 1.0, target_gain: 1.0, ring: vec![0.0; AGC_WINDOW], at: 0, count: 0, poll: (rate * 0.1) as usize }
     }
     #[inline]
     pub fn process(&mut self, active: bool, l: &mut f32, r: &mut f32) {
-        // measure (post-gain, like the Web Audio analyser)
         *l *= self.gain; *r *= self.gain;
-        self.sum_sq += (*l as f64).powi(2) + (*r as f64).powi(2);
+        self.ring[self.at] = (*l + *r) * 0.5;
+        self.at = (self.at + 1) % AGC_WINDOW;
         self.count += 1;
-        if self.count >= self.window {
-            let rms = (self.sum_sq / (2 * self.count) as f64).sqrt() as f32;
-            self.sum_sq = 0.0; self.count = 0;
+        if self.count >= self.poll {
+            self.count = 0;
             if !active { self.target_gain = 1.0 }
-            else if rms > 0.0 {
-                let rms_db = gain_to_db(rms);
-                if rms_db >= AGC_NOISE_FLOOR_DB {
-                    // correction relative to the signal before this stage's gain
-                    let correction = (AGC_TARGET_DB - (rms_db - gain_to_db(self.gain))).clamp(-AGC_MAX_CUT_DB, AGC_MAX_BOOST_DB);
-                    self.target_gain = db_to_gain(correction);
+            else {
+                let rms = (self.ring.iter().map(|v| (*v as f64).powi(2)).sum::<f64>() / AGC_WINDOW as f64).sqrt() as f32;
+                if rms > 0.0 {
+                    let rms_db = gain_to_db(rms);
+                    if rms_db >= AGC_NOISE_FLOOR_DB {
+                        self.target_gain = db_to_gain((AGC_TARGET_DB - rms_db).clamp(-AGC_MAX_CUT_DB, AGC_MAX_BOOST_DB));
+                    }
                 }
             }
         }
         let tc = if self.target_gain > self.gain { AGC_TC_UP_S } else { AGC_TC_DOWN_S };
         let k = 1.0 - (-1.0 / (tc * self.rate)).exp();
         self.gain += (self.target_gain - self.gain) * k;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn makeup_matches_the_browser() {
+        // Gentle: about +1.2 dB of automatic make-up; the safety limiter about +0.6 dB
+        let g = Curve::new(-6.0, 8.0, 4.0);
+        let s = Curve::new(-1.0, 0.0, 20.0);
+        let (gd, sd) = (gain_to_db(g.makeup), gain_to_db(s.makeup));
+        assert!(gd > 1.0 && gd < 1.5, "gentle makeup {gd}");
+        assert!(sd > 0.3 && sd < 0.9, "safety makeup {sd}");
+        // below the threshold nothing changes
+        assert!((g.saturate(0.1) - 0.1).abs() < 1e-6);
     }
 }

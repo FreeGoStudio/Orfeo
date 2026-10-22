@@ -5,48 +5,44 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
-## [Unreleased] — MIDI keyboard settings
+## [1.5] — 22. 10. 2026 — Play your own keyboard, without the lag
 
 **In short**
-- A new MIDI Keyboard page in Settings: your keyboards, how quickly your playing is heard, touch, pedals, and a delay check.
-- With the Samples sound, the keys you play are heard 12 ms sooner.
-- General MIDI no longer goes silent when a USB keyboard is plugged in.
-- The MIDI icon names the keyboard you're actually playing. Click it to open its settings.
-- Orfeo is now in the Microsoft Store.
-- Step through any song one note or chord at a time with → and ←, at your own pace.
-- New Native sound engine (beta, Windows): your keyboard heard in about 10 ms instead of 40+.
+- A new sound engine for Windows (Native, beta): what you play on a USB keyboard is heard in under 10 ms instead of 40 ms or more, so playing along finally feels like a real instrument.
+- A whole new MIDI Keyboard page in Settings: your keyboards, touch, pedals, and a delay check that shows where every millisecond goes.
+- Step Through: go through any song one note or chord at a time with → and ←, at your own pace.
+- Songs on the Samples sound now play the mix their arranger made, and Orfeo is in the Microsoft Store.
 
 ### New
-- **Settings › MIDI Keyboard**, at the bottom of the Settings window:
-  - **Keyboards** — every connected keyboard by its own model name, with a light that flashes as you play it. Listen to all of them or only the ones you tick, reconnect automatically after unplugging, and *Rescan*.
-  - **Live playing response** (Samples) — *Low latency* (the default), *Balanced* and *Stable* (for computers that crackle).
-  - **Audio delay offset** — lines up key lights, count-in and tapping with what you hear when the measured delay isn't enough, such as Bluetooth headphones or an external instrument. It moves the picture, not the sound.
-  - **General MIDI sound** — play General MIDI through Orfeo's own synth or through a connected digital piano or sound module.
-  - **Touch response** — Soft, Normal, Hard or Fixed, plus ignoring very light touches and capping the loudest note.
-  - **Double-note filter** — ignores a key that accidentally sounds twice in a row.
-  - **Pedals & controls** — sustain, sostenuto and soft pedals, pitch bend, modulation wheel, aftertouch, expression and volume from your keyboard, each one marked *detected* once you use it and each one switchable off. The sustain pedal now works when you play your own keyboard.
-  - **Delay check** — how long each part of the trip from your key to the speaker takes on your computer, plus *Save log…* to send with a bug report.
-  - **Reset & repair** — clear stuck notes, reset MIDI input, reset these settings.
-- The first time you connect a new keyboard, Settings opens on its page.
-- **Step through a song with → and ←.** Each press jumps to the next moment something is played, a single note or a whole chord, sounds it, lights it on the keyboard and moves the playhead there. ← goes back one, and Shift jumps a whole bar. No tempo, no loop to set up: made for learning fast solos and writing them down in notation software.
-  - Notes that start within 30 ms of each other count as one step, so MIDI files made from audio recordings, where a chord's notes never start at exactly the same time, step chord by chord.
-  - Muted tracks and drums are skipped, so if another instrument leaks into the part you're following, mute it and step through just yours.
-  - Press → while the song is playing and it stops on the next note; Space plays on from there.
-
-- **Native sound engine (beta, Windows).** *Settings › Audio › Sound engine › Native (beta)* plays the same sound sets with Orfeo's own engine, straight to your sound card instead of through Windows' mixer: about 10 ms from key to speaker, against 40 ms or more before.
-  - *Low latency* talks to the sound card directly; *Share with other apps* lets a browser lesson or video call keep playing alongside.
-  - Songs are timed to the sample, the metronome and count-in run on the same clock, and the mixer, compressor, auto-level, tone, previews, step-through and your MIDI keyboard all work as before.
-  - Unplug your headphones or USB interface mid-song and it carries on on the next sound card, without stopping.
+- **Native sound engine (beta, Windows).** Until now every note went through Windows' own sound mixer, which holds it back 40 ms or more: enough that a fast passage on a USB keyboard felt sticky, as if the piano answered late. *Settings › Audio › Sound engine › Native (beta)* plays the same sound sets with Orfeo's own engine, straight to your sound card. On a USB audio interface or headphones, what you play is heard in under 10 ms.
+  - **Low latency** (on by default) talks to the sound card directly, for the shortest delay. Other apps stay silent while Orfeo is open. Switch it off to share the sound card, so a browser lesson or a video call keeps playing alongside.
+  - **It switches itself on when you connect a MIDI keyboard**, because that's when the delay matters. Switch it off by hand and it stays off until a keyboard is plugged in again.
+  - **Richer, wider sound.** Every instrument sits where the song puts it: two guitars panned left and right, strings to one side, reverb where the arrangement asks for it.
+  - **Rock-steady timing.** Songs, the metronome and the count-in all run on the engine's own clock, so the first note after a count-in lands exactly on the beat.
+  - **Survives unplugging.** Pull your headphones or USB interface out mid-song and the music carries on through the next sound card without stopping, and comes back when you plug it in again.
+  - The mixer, compressor, auto-level, tone control, chord previews and your MIDI keyboard settings all work just as with Samples, and you can switch engines in the middle of a song.
+  - *Beta* means it's new and has been tested on a handful of machines. If anything sounds wrong, switch back to Samples in one click and tell us.
+- **Settings › MIDI Keyboard**, a new page at the bottom of the Settings window, in three tabs:
+  - **Keyboards** — every connected keyboard by its own model name, with a light that flashes as you play. Listen to all of them or only the ones you tick, reconnect automatically after unplugging, or *Rescan*. The first time you connect a new keyboard, Settings opens on this page.
+  - **Sound & delay** — *Live playing response* for the Samples sound (*Low latency*, *Balanced*, or *Stable* for computers that crackle); an *Audio delay offset* that lines up key lights, the count-in and tapping with what you hear on Bluetooth headphones or an external instrument; a choice to play General MIDI through Orfeo or through your digital piano or sound module; and the **Delay check**, which shows how long each part of the trip from your key to your ear takes on your computer, with a log to send along with a bug report.
+  - **Touch & pedals** — touch response (*Soft*, *Normal*, *Hard* or *Fixed*), ignoring very light touches and capping the loudest note; a filter for keys that accidentally sound twice; and the sustain, sostenuto and soft pedals, pitch bend, modulation, aftertouch, expression and volume from your keyboard, each marked *detected* once you use it and each one switchable off. The sustain pedal now works when you play your own keyboard.
+  - **Reset & repair** — clear stuck notes, reconnect every keyboard, or put this page back to how it started.
+- **Step Through** (*Settings › Practice*, on by default). Press → or click the amber arrow in the keyboard bar, and Orfeo jumps to the next moment something is played, a single note or a whole chord, sounds it, lights it on the keyboard and moves the playhead there. ← goes back one, and Shift jumps a whole bar. No tempo, no loop to set up: made for learning fast solos at your own pace and for writing them down.
+  - Notes that start within 30 ms of each other count as one step, so MIDI files made from audio recordings, whose chords never start at exactly the same moment, still step chord by chord.
+  - Muted tracks and drums are skipped: if another instrument leaks into the part you're learning, mute it and step through just yours.
+  - Press → while the song plays and it stops on the next note; Space plays on from there.
+- **Orfeo is in the Microsoft Store.** Install it from the Store and it keeps itself up to date there. The GitHub installer and portable version stay as they are.
 
 ### Changed
-- **Keys you play on the Samples sound are heard 12 ms sooner.** They used to pass through the song's compressor and safety limiter, which hold every note back 6 ms each even when switched off. Songs still go through both.
-- **The MIDI Keyboard settings** are split into three tabs, *Keyboards*, *Sound & delay* and *Touch & pedals*, with two roomier columns.
-- **The MIDI icon in the top bar** shows the keyboard you're playing, not the first entry in Windows' device list. Its tooltip lists any other keyboards, and clicking it opens the MIDI Keyboard settings.
-- Unplugging a keyboard mid-note, or minimising Orfeo while holding keys, no longer leaves notes or the sustain pedal hanging.
+- **Keys you play on the Samples sound are heard 12 ms sooner.** They used to pass through the song's compressor and safety limiter, which hold every note back even when switched off. Songs still go through both.
+- **The MIDI icon in the top bar** shows the keyboard you're actually playing, not the first entry in Windows' device list. Its tooltip lists any other keyboards, and clicking it opens the MIDI Keyboard settings.
+- **No more hanging notes** when you unplug a keyboard mid-note or minimise Orfeo while holding keys or the sustain pedal.
+- **"Practising" is spelled the British way** where it's a verb, as in "to practise the piano".
 
 ### Fixed
+- **The Samples sound ignored each song's own mix.** The Console showed every track's volume, pan, reverb and chorus as the file sets them, but Samples played every track at full volume, centred and dry until you moved a knob. Songs now sound as their arranger balanced them: instruments placed left and right, quieter parts quieter, reverb where the file asks for it.
+- **General MIDI went silent with a USB keyboard plugged in.** Orfeo sent the song, and what you played, to the keyboard's own MIDI connection instead of its own synth. It now always uses its own synth, unless you choose an instrument in *Settings › MIDI Keyboard › General MIDI sound*.
 - **The Microsoft Store version no longer tries to update itself from GitHub.** The Store keeps it up to date, and *Check for updates* opens the Store.
-- **General MIDI went silent with a USB keyboard plugged in.** Orfeo sent the song, and the keys you played, to the keyboard's own MIDI connection instead of its own synth. It now always uses its own synth unless you choose an instrument in *Settings › MIDI Keyboard › General MIDI sound*.
 
 ## [1.4.4] — 15. 10. 2026 — Starmap
 

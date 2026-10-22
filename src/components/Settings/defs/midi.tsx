@@ -10,6 +10,7 @@ import { getStartedStable } from '../../../hooks/useSamplesEngine'
 import { getDelayBreakdown, getStats, counters, exportPerformanceLog, clearDiagnostics } from '../../../utils/midiDiagnostics'
 import { sim, simAvailable } from '../../../utils/midiSimulator'
 import { confirmDialog } from '../../../utils/confirmController'
+import { useNativeAudio } from '../../../audio/nativeClient'
 import type { SettingDef } from '../types'
 
 const set = (p: Parameters<ReturnType<typeof useMidiSettings.getState>['set']>[0]) => useMidiSettings.getState().set(p)
@@ -146,7 +147,7 @@ function SimulatorPanel() {
   )
   return (
     <div style={{ marginTop: 12, padding: 8, border: '1px dashed var(--border2)', borderRadius: 4 }}>
-      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>{t`Simulated keyboard · dev only`}</div>
+      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>{t`Simulated keyboard · test builds only`}</div>
       <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 6 }}>
         {sim.models.map(m => (
           <OptionBtn key={m.key} active={target === m.key} onClick={() => setTarget(m.key)}>
@@ -179,13 +180,19 @@ function LiveResponseControl() {
   const v = useMidiSettings(s => s.liveResponse)
   const engine = useStore(s => s.audioEngine)
   const started = getStartedStable()  // null until the Samples engine has started
+  const nativeExclusive = useMidiSettings(s => s.nativeExclusive)
+  // Native has its own choice under Audio — don't show a second "Low latency" here
+  if (engine === 'native') return (
+    <HelpText>{nativeExclusive
+      ? t`The Native engine has Low latency on — your keys skip the compressor and go straight to the sound card. The switch is under Settings › Audio › Sound engine.`
+      : t`The Native engine has Low latency off and shares the sound card with other apps, which adds Windows' usual delay. For the shortest delay switch Low latency on under Settings › Audio › Sound engine.`}</HelpText>
+  )
   return (
     <div style={{ opacity: engine === 'samples' ? 1 : 0.45, transition: 'opacity 0.15s' }}>
       <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
         {RESPONSES.map(r => <OptionBtn key={r.v} active={v === r.v} onClick={() => set({ liveResponse: r.v })}>{r.label}</OptionBtn>)}
       </div>
       {engine === 'gm' && <HelpText>{t`General MIDI has no compressor in the way — this applies when the Samples engine is on.`}</HelpText>}
-      {engine === 'native' && <HelpText>{t`The Native engine already keeps your keys out of the compressor. Its own choice — Low latency or Share with other apps — is under Settings › Audio › Sound engine.`}</HelpText>}
       {started !== null && (v === 'stable') !== started && <HelpText>{t`The sound buffer size changes the next time Orfeo starts.`}</HelpText>}
     </div>
   )
@@ -337,6 +344,8 @@ function DelayCheckControl() {
   useEffect(() => { const id = setInterval(() => tick(n => n + 1), 1000); return () => clearInterval(id) }, [])
   const b = getDelayBreakdown()
   const st = getStats()
+  const nativeMode = useNativeAudio(s => s.status?.mode)
+  const shared = engine === 'native' && nativeMode === 'shared'
   const line = (label: string, value: string, strong?: boolean) => (
     <Row key={label}>
       <span style={{ color: strong ? 'var(--text-default)' : 'var(--text-inactive)' }}>{label}</span>
@@ -347,11 +356,12 @@ function DelayCheckControl() {
     : (st.avgInputMs ?? 0) + (st.avgHandleMs ?? 0) + b.synthBlockMs + b.chainMs + b.outputMs
   return (
     <div style={{ display: 'grid', gap: 1 }}>
+      {line(t`Notes measured`, st.notes ? String(st.notes) : t`none yet — play a few notes`)}
       {line(t`Key reaching Orfeo`, st.avgInputMs === null ? '—' : `${ms(st.avgInputMs, 1)} (${t`worst`} ${ms(st.worstInputMs, 1)})`)}
       {line(t`Orfeo handling the key`, st.avgHandleMs === null ? '—' : `${ms(st.avgHandleMs, 1)} (${t`worst`} ${ms(st.worstHandleMs, 1)})`)}
       {line(t`Synth getting its turn`, b.externalOutput ? t`external` : `≤ ${ms(b.synthBlockMs, 1)}`)}
       {line(engine === 'samples' ? t`Compressor & limiter` : t`Sound processing`, ms(b.chainMs))}
-      {line(t`Sound output (Windows + sound card)`, b.outputMs === null ? t`not measurable` : ms(b.outputMs))}
+      {line(shared ? t`Sound output (shared with other apps)` : t`Sound output (Windows + sound card)`, b.outputMs === null ? t`not measurable` : ms(b.outputMs))}
       {line(t`Key → speaker, about`, total === null ? '—' : ms(total), true)}
     </div>
   )
@@ -360,12 +370,25 @@ function DelayCheckExtra() {
   return (
     <>
       <HelpText>{t`The sound output part is set by Windows and your sound card: wired headphones or a USB audio interface lower it, Bluetooth raises it a lot.`}</HelpText>
+      <NativeSharedHint />
+      <HelpText>{t`Start over forgets the notes measured so far; the fixed parts of the trip don't change.`}</HelpText>
       <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 6 }}>
         <ActionBtn onClick={exportPerformanceLog} icon={<FileDown size={11} strokeWidth={1.5} />}>{t`Save log…`}</ActionBtn>
         <ActionBtn onClick={clearDiagnostics}>{t`Start over`}</ActionBtn>
       </div>
     </>
   )
+}
+
+// Native set to share the sound card: say where the shorter delay is
+function NativeSharedHint() {
+  const engine = useStore(s => s.audioEngine)
+  const mode = useNativeAudio(s => s.status?.mode)
+  const wantsExclusive = useMidiSettings(s => s.nativeExclusive)
+  if (engine !== 'native' || mode !== 'shared') return null
+  return <HelpText>{wantsExclusive
+    ? t`Low latency is chosen, but another app was using the sound card when Orfeo started, so Orfeo is sharing it — close that app and switch Low latency off and on again under Settings › Audio › Sound engine.`
+    : t`Orfeo is sharing the sound card with other apps, which adds Windows' usual delay. For the shortest delay switch Low latency on under Settings › Audio › Sound engine.`}</HelpText>
 }
 
 // ── Reset & repair ───────────────────────────────────────────────────────────

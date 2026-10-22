@@ -603,8 +603,17 @@ export async function loadSelectedSoundfont(id: string): Promise<void> {
 // topping that window up for as long as this playback run lasts — see the
 // rolling-lookahead comment above _refillTimer for why, instead of scheduling
 // every note in the file in one go here.
+// ── When Orfeo's Native engine (or any other app) takes the sound card for
+// itself, the browser suspends this context and never resumes it on its own:
+// switching back to Samples played nothing until a restart. Woken whenever
+// Samples is chosen again or starts playing. ───────────────────────────────
+function wakeContext() {
+  if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {})
+}
+
 function buildSamplesPlayer(startSec: number) {
   if (!_synthReady || !_synth) return
+  wakeContext()
   clearSchedule(); clearAllKeys()
   applyChannelVolumes()
 
@@ -633,6 +642,7 @@ function buildSamplesPlayer(startSec: number) {
   _noteCursor.clear()
   _sustainCursor.clear()
   _homogeneousCache.clear()
+  applyTrackMix(midiData, tracks)
   for (const track of midiData.tracks) {
     const ts = tracks.find(t => t.index === track.index)
     if (!ts || ts.muted || (_epochHasSolo && !ts.solo)) continue
@@ -749,9 +759,32 @@ function refillSchedule() {
   }
 }
 
+// ── Master Chorus/Reverb knob, once touched, overrides every channel's own
+// send (the per-track mix pushed at play start included) — same as Native ──
+let _masterChorus: number | null = null
+let _masterReverb: number | null = null
+
+// ── applyTrackMix — each track's volume, pan, reverb and chorus as the
+// Console shows them (seeded from the file's own CC7/10/91/93 on load). Pushed
+// at every play start: until this existed the synth only heard them once a
+// knob was moved, so every song played at full volume, centred and dry. ────
+function applyTrackMix(midiData: any, tracks: ReturnType<typeof useStore.getState>['tracks']): void {
+  for (const track of midiData.tracks) {
+    const ts = tracks.find(t => t.index === track.index)
+    if (!ts) continue
+    const ch = track.channel
+    const cc = (n: number, v: number) => { try { ;(_synth as any).controllerChange(ch, n, Math.round(Math.max(0, Math.min(1, v)) * 127)) } catch {} }
+    cc(7, ts.volume)
+    try { ;(_synth as any).controllerChange(ch, 10, Math.round(Math.max(0, Math.min(127, ((ts.pan ?? 0) + 1) * 63.5)))) } catch {}
+    cc(91, _masterReverb ?? ts.reverb ?? 0)
+    cc(93, _masterChorus ?? ts.chorus ?? 0)
+  }
+}
+
 // ── setMasterChorus — broadcast CC93 to all 16 channels (Samples engine only) ─
 export function setMasterChorus(value: number): void {
   if (!_synth || !_synthReady) return
+  _masterChorus = value
   const val = Math.round(Math.max(0, Math.min(1, value)) * 127)
   for (let ch = 0; ch < 16; ch++) {
     try { ;(_synth as any).controllerChange(ch, 93, val) } catch {}
@@ -761,6 +794,7 @@ export function setMasterChorus(value: number): void {
 // ── setMasterReverb — broadcast CC91 to all 16 channels (Samples engine only) ─
 export function setMasterReverb(value: number): void {
   if (!_synth || !_synthReady) return
+  _masterReverb = value
   const val = Math.round(Math.max(0, Math.min(1, value)) * 127)
   for (let ch = 0; ch < 16; ch++) {
     try { ;(_synth as any).controllerChange(ch, 91, val) } catch {}
@@ -977,6 +1011,7 @@ export function useSamplesEngine() {
         return
       }
 
+      if (engineChanged) wakeContext()
       const ps = state.playbackState
       const bpmChanged = state.bpm !== prevBpm
       const transposeChanged = (state.detectedKey?.transpose ?? 0) !== prevTranspose

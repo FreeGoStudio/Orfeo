@@ -93,19 +93,22 @@ function SoundEngineDelay() {
   )
 }
 
-// Native engine: exclusive (lowest delay, other apps go quiet) or shared
+// Native engine: Low latency on = exclusive (lowest delay, other apps go
+// quiet), off = shared with other apps. Turns itself on when a MIDI keyboard
+// is connected (useNativeEngine.ts); switching it off stays off until then.
 function NativeOutputChoice() {
   const exclusive = useMidiSettings((s) => s.nativeExclusive)
   const pick = (v: boolean) => { useMidiSettings.getState().set({ nativeExclusive: v }); nativeCall('setExclusive', v) }
   return (
     <>
-      <div style={{ display: 'flex', gap: 'var(--space-1)', marginTop: 10 }}>
-        <OptionBtn active={exclusive} onClick={() => pick(true)}>{t`Low latency`}</OptionBtn>
-        <OptionBtn active={!exclusive} onClick={() => pick(false)}>{t`Share with other apps`}</OptionBtn>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', marginTop: 10 }}>
+        <span style={{ fontSize: 11, fontFamily: 'var(--font-ui)', color: exclusive ? 'var(--text-default)' : 'var(--text-inactive)' }}>{t`Low latency`}</span>
+        <Switch value={exclusive} onChange={pick} label={t`Low latency`} />
       </div>
       <HelpText>{exclusive
-        ? t`Orfeo talks to your sound card directly, past Windows' mixer — the shortest delay from key to sound. Other apps stay silent while Orfeo is open; if one is already using the sound card, Orfeo shares it instead.`
-        : t`Other apps (a browser lesson, a video call) keep playing alongside Orfeo, at the cost of Windows' usual delay.`}</HelpText>
+        ? t`On: Orfeo talks to your sound card directly, past Windows' mixer — the shortest delay from key to sound. Other apps stay silent while Orfeo is open; if one is already using the sound card, Orfeo shares it instead.`
+        : t`Off: other apps (a browser lesson, a video call) keep playing alongside Orfeo, at the cost of Windows' usual delay.`}</HelpText>
+      <HelpText>{t`Turns on by itself when a MIDI keyboard is connected. Switch it off to share the sound card while you play.`}</HelpText>
     </>
   )
 }

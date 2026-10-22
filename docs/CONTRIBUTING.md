@@ -69,7 +69,7 @@ npm run dev
 | `npm run preview` | Run the last `build` output without packaging | — |
 | `npm run typecheck` | `tsc --noEmit` — type-check only | — |
 | `npm run dist` | `build`, then package for the current platform | `release/` |
-| `npm run dist:portable` | Windows portable `.exe` only (no installer) | `release/` |
+| `npm run dist:portable` | Windows portable `.exe` only (no installer), as a **test build**: keeps the dev-only tools (simulated MIDI keyboard). Releases are built on GitHub without them | `release/` |
 
 <details>
 <summary><b>Cross-platform packaging</b></summary>

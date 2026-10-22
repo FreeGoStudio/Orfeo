@@ -1,5 +1,8 @@
 import { useMemo, useState, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
 import { useStore } from '../../store'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { stepEvents } from '../../utils/stepThrough'
+import { t } from '../../utils/i18n'
 import Tooltip from '../Tooltip'
 import type { KeyboardSize } from '../../types'
 import { getWhiteKeys, noteToLeftPct, computeTaggedBoundaryCurve, interpolateTaggedCurve, type TaggedBoundarySample } from '../../utils/handBoundaries'
@@ -91,6 +94,8 @@ export default function KeyboardControls() {
   const hintCellRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLSpanElement>(null)
   const [hintShift, setHintShift] = useState(0)
+  const stepThroughEnabled = useStore(s => s.stepThroughEnabled)
+  const hasSong = useStore(s => !!s.midi)
   useLayoutEffect(() => {
     const row = rowRef.current, cell = hintCellRef.current
     if (!row || !cell) return
@@ -112,7 +117,7 @@ export default function KeyboardControls() {
     ro.observe(row)
     window.addEventListener('resize', measure)
     return () => { ro.disconnect(); window.removeEventListener('resize', measure) }
-  }, [isDocked, practiceLineActive, presentationMode])
+  }, [isDocked, practiceLineActive, presentationMode, stepThroughEnabled])
 
   return (
     <div
@@ -198,8 +203,12 @@ export default function KeyboardControls() {
           line (below) is actively rendering; the line takes this spot instead. ── */}
       <div ref={hintCellRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', justifySelf: 'center', minWidth: 0 }}>
         {!practiceLineActive && !presentationMode && (
-          <span ref={hintRef} style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', userSelect: 'none', whiteSpace: 'nowrap', transform: `translateX(${hintShift}px)` }}>
-            Shift+Click three keys or more to build &amp; lock a chord
+          <span ref={hintRef} style={{ display: 'inline-flex', alignItems: 'center', gap: 28, transform: `translateX(${hintShift}px)` }}>
+            {stepThroughEnabled && <StepArrow dir={-1} enabled={hasSong} />}
+            <span style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', userSelect: 'none', whiteSpace: 'nowrap' }}>
+              Shift+Click three keys or more to build &amp; lock a chord
+            </span>
+            {stepThroughEnabled && <StepArrow dir={1} enabled={hasSong} />}
           </span>
         )}
       </div>
@@ -299,5 +308,33 @@ function NoteCounter() {
     <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)' }}>
       {midi.noteCount.toLocaleString()} notes · {midi.tracks.length} tracks
     </span>
+  )
+}
+
+// ── Step Through arrows either side of the hint: same as ← / → (Shift: a bar) ──
+function StepArrow({ dir, enabled }: { dir: 1 | -1; enabled: boolean }) {
+  const [hover, setHover] = useState(false)
+  const Icon = dir === 1 ? ArrowRight : ArrowLeft
+  return (
+    <Tooltip title={dir === 1 ? t`Step to the next note or chord (→, Shift: next bar)` : t`Step back to the previous note or chord (←, Shift: previous bar)`} oneLine>
+      <button
+        type="button"
+        aria-label={dir === 1 ? t`Next note or chord` : t`Previous note or chord`}
+        disabled={!enabled}
+        onClick={(e) => { stepEvents(dir, e.shiftKey); e.currentTarget.blur() }}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 18, padding: 0,
+          background: 'none', border: 'none', borderRadius: 'var(--radius-sm, 3px)',
+          cursor: enabled ? 'pointer' : 'default',
+          color: enabled ? 'var(--text-amber)' : 'var(--state-disabled)',
+          opacity: enabled && !hover ? 0.6 : 1,
+          transition: 'opacity 0.12s',
+        }}
+      >
+        <Icon size={14} strokeWidth={1.8} />
+      </button>
+    </Tooltip>
   )
 }

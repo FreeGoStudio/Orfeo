@@ -417,12 +417,13 @@ function connectAudioHost(): { ok: boolean; reason?: string } {
     audioHost = utilityProcess.fork(join(__dirname, 'audioHost.js'), [], { serviceName: 'Orfeo Audio' })
     audioHost.on('exit', (code) => {
       audioHost = null
-      mainWin?.webContents.send('audio:host-exit', code)
+      // On quit the window is already gone — nobody left to restart the sound for
+      if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('audio:host-exit', code)
     })
   }
   const { port1, port2 } = new MessageChannelMain()
   audioHost.postMessage({ t: 'init', addon, fluidDir: join(nativeDir(), 'fluidsynth') }, [port1])
-  mainWin?.webContents.postMessage('audio:port', null, [port2])
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.postMessage('audio:port', null, [port2])
   return { ok: true }
 }
 ipcMain.handle('audio:connect', () => connectAudioHost())

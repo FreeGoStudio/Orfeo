@@ -32,8 +32,14 @@ if (process.platform !== 'win32') {
 }
 
 // ── 1. The add-on ───────────────────────────────────────────────────────────
+// A terminal opened before Rust was installed doesn't have it on PATH yet:
+// fall back to rustup's own folder rather than failing
+const cargoHome = process.env.CARGO_HOME ?? join(process.env.USERPROFILE ?? '', '.cargo')
+const cargoBin = join(cargoHome, 'bin')
+const env = { ...process.env, Path: `${cargoBin};${process.env.Path ?? process.env.PATH ?? ''}` }
+const cargo = existsSync(join(cargoBin, 'cargo.exe')) ? join(cargoBin, 'cargo.exe') : 'cargo'
 console.log(`[native] cargo build (${debug ? 'debug' : 'release'})`)
-execFileSync('cargo', ['build', '-p', 'orfeo-audio-node', ...(debug ? [] : ['--release'])], { cwd: native, stdio: 'inherit' })
+execFileSync(cargo, ['build', '-p', 'orfeo-audio-node', ...(debug ? [] : ['--release'])], { cwd: native, stdio: 'inherit', env })
 mkdirSync(out, { recursive: true })
 copyFileSync(join(native, 'target', debug ? 'debug' : 'release', 'orfeo_audio_node.dll'), join(out, 'orfeo_audio.node'))
 console.log('[native] native/build/orfeo_audio.node')

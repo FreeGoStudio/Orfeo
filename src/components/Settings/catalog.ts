@@ -14,7 +14,7 @@ export type SettingId =
   | 'soundEngine' | 'soundFonts' | 'autoLevel'
   | 'showDemo' | 'chordTranscription'
   | 'noteEditor' | 'tapTempo' | 'tempoWarnings' | 'countIn' | 'handAssignment' | 'loopRegion' | 'focusMode'
-  | 'chordPrompter' | 'closePanels' | 'handTags' | 'trackVu'
+  | 'stepThrough' | 'chordPrompter' | 'closePanels' | 'handTags' | 'trackVu'
   | 'displaySystem' | 'accidentals' | 'chordTracking' | 'chordReading' | 'chordNaming'
   | 'keyRange' | 'showOctaves' | 'showNoteNames' | 'reflectPianoRoll' | 'preciseScrubTime'
   | 'rollZoom' | 'barNumbers' | 'playbar' | 'visualEffects'
@@ -35,7 +35,7 @@ export const GROUPS: GroupInfo[] = [
   { id: 'audio', name: t`Audio`, intro: t`How Orfeo sounds: the sound engine, extra sound sets, and automatic loudness balancing.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files' },
   { id: 'midi-files-library', name: t`MIDI Files & Library`, intro: t`What the Library shows and what Orfeo can create from your files.`, manualUrl: 'https://orfeo.cc/docs/managing-midi-files' },
   { id: 'playback-editing', name: t`Playback & Editing`, intro: t`Tools for playing and correcting songs: note editing, tempo fixes, count-in, hands, looping and focus.`, manualUrl: 'https://orfeo.cc/docs/editing-midi-files' },
-  { id: 'practice', name: t`Practice`, intro: t`Helpers while you practise: the chord prompter, a clear screen during playback, and hand and level indicators.`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files' },
+  { id: 'practice', name: t`Practice`, intro: t`Helpers while you practise: stepping through a song note by note, the chord prompter, a clear screen during playback, and hand and level indicators.`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files' },
   { id: 'notation', name: t`Notation & Chords`, intro: t`How notes and chords are named, and which instruments the chord display listens to.`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files/how-orfeo-reads-chords' },
   { id: 'keyboard', name: t`Keyboard`, intro: t`The on-screen keyboard: its size and what's printed on the keys.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
   { id: 'piano-roll', name: t`Piano Roll`, intro: t`The falling-notes view: zoom, bar lines, the playbar and visual effects.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll' },
@@ -89,6 +89,9 @@ export const SETTINGS: SettingInfo[] = [
     description: t`Adds a Focus on/off switch to the Tracks panel and the Mixer Console, to hear and see all tracks or only Keys, Bass & Drums.`,
     keywords: 'focus mute tracks keys bass drums' },
   // ── Practice
+  { id: 'stepThrough', group: 'practice', name: t`Step Through`, summary: t`Step through a song note by note with ← and →.`,
+    description: t`Each press of → (or the arrow in the keyboard bar) jumps to the next note or chord, plays it, lights it and moves the playhead there; ← goes back one, Shift jumps a whole bar. No tempo, no loop to set up: learn a fast solo or write it down at your own pace.`,
+    keywords: 'step through arrows next previous note chord solo transcribe learn slow' },
   { id: 'chordPrompter', group: 'practice', name: t`Chord Prompter`, summary: t`Past, current and upcoming chords during playback.`,
     description: t`Shows past, current and upcoming chords during playback. Click the prompter icon above the keyboard to show it.`,
     keywords: 'chords prompter upcoming' },
@@ -195,7 +198,7 @@ export const QUICK_LAYOUT: Record<SettingsGroupId, QuickItem[]> = {
   'audio': ['soundEngine'],
   'midi-files-library': ['showDemo'],
   'playback-editing': ['focusMode', 'tapTempo', 'handAssignment'],
-  'practice': ['chordPrompter'],
+  'practice': ['stepThrough', 'chordPrompter'],
   'notation': ['displaySystem', 'accidentals', 'chordTracking'],
   'keyboard': ['keyRange', 'showOctaves', 'showNoteNames'],
   'piano-roll': ['rollZoom', 'barNumbers', 'playbar'],
