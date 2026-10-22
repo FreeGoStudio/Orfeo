@@ -1,32 +1,27 @@
-# Uploads a release's Microsoft Store package to Partner Center.
+# Sends a released version to the Microsoft Store.
 #
-# Runs as step 4 of release.yml. Can also be started by hand to retry a Store
-# upload without rebuilding or republishing anything: GitHub → Actions →
-# Microsoft Store → Run workflow, with the number of the Release run whose
-# package to send (the number at the end of that run's address,
-# …/actions/runs/NUMBER). Needs the one-time setup in docs/CONTRIBUTING.md →
-# "Microsoft Store"; until then it just says so and skips.
+# Run it by hand once the GitHub release is out: GitHub → Actions →
+# Microsoft Store → Run workflow, type the version (e.g. 1.5.1). It finds the
+# Store package that version's Release run built (its "store-package"
+# artifact), starts a Store update from the published one and, with
+# "submit", sends it for certification; "draft" leaves it in Partner Center
+# for you to check and submit. Talks to Partner Center through
+# scripts/store-submit.mjs. One-time setup: docs/CONTRIBUTING.md →
+# "Microsoft Store".
 name: Microsoft Store
+run-name: Microsoft Store ${{ inputs.version }} (${{ inputs.mode }})
 
 on:
-  workflow_call:
-    inputs:
-      run_id:
-        type: string
-        required: true
-      mode:
-        type: string
-        required: true
   workflow_dispatch:
     inputs:
-      run_id:
-        description: "Number of the Release run whose Store package to upload (…/actions/runs/NUMBER)"
+      version:
+        description: "Version to send, e.g. 1.5.1 (no v). Its Release run must have finished."
         required: true
       mode:
-        description: "draft: stage it in Partner Center for you to submit · submit: send it for certification"
+        description: "submit: send it for certification · draft: leave it in Partner Center for you to submit"
         type: choice
-        options: [draft, submit]
-        default: draft
+        options: [submit, draft]
+        default: submit
 
 permissions:
   actions: read
@@ -34,76 +29,37 @@ permissions:
 
 jobs:
   store:
-    name: Upload to the Microsoft Store
-    runs-on: windows-latest
-    timeout-minutes: 30
+    name: Send to the Microsoft Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
-      - name: Check the Store setup
-        id: setup
-        shell: bash
-        env:
-          TENANT: ${{ secrets.AZURE_AD_TENANT_ID }}
-          CLIENT: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
-          SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
-          SELLER: ${{ secrets.SELLER_ID }}
-          PRODUCT: ${{ vars.MS_STORE_PRODUCT_ID }}
-        run: |
-          if [ -z "$TENANT" ] || [ -z "$CLIENT" ] || [ -z "$SECRET" ] || [ -z "$SELLER" ] || [ -z "$PRODUCT" ]; then
-            echo "### Microsoft Store skipped" >> "$GITHUB_STEP_SUMMARY"
-            echo "The Store secrets or the MS_STORE_PRODUCT_ID variable aren't set up yet — see docs/CONTRIBUTING.md → Microsoft Store. Upload Orfeo-*.appx from the release run's store-package artifact in Partner Center by hand this time." >> "$GITHUB_STEP_SUMMARY"
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: actions/download-artifact@v8
-        if: steps.setup.outputs.ready == 'true'
+      - uses: actions/checkout@v4
         with:
-          name: store-package
-          path: store
-          run-id: ${{ inputs.run_id }}
-          github-token: ${{ github.token }}
+          fetch-depth: 1
 
-      - name: Set up the Microsoft Store Developer CLI
-        if: steps.setup.outputs.ready == 'true'
-        uses: microsoft/microsoft-store-apppublisher@v1.1
-
-      - name: Sign in to Partner Center
-        if: steps.setup.outputs.ready == 'true'
-        run: >
-          msstore reconfigure
-          --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}"
-          --sellerId "${{ secrets.SELLER_ID }}"
-          --clientId "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}"
-          --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
-
-      # 'publish' starts a new submission from the last published one (same
-      # listing, screenshots, price), swaps in the new package, and commits it
-      # for certification; 'draft' only uploads and leaves the submission for
-      # you in Partner Center (--noCommit). The CLI takes only .msix files: an
-      # .appx (what electron-builder makes) is the same package format, so it
-      # is handed over under that name. The Store accepts an .msix only if it
-      # targets Windows 10 1809 or newer: appx.minVersion in package.json.
-      - name: Upload to the Store
-        if: steps.setup.outputs.ready == 'true'
-        shell: pwsh
+      - name: Find the version's Store package
         env:
-          PRODUCT: ${{ vars.MS_STORE_PRODUCT_ID }}
-          MODE: ${{ inputs.mode }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
         run: |
-          $appx = Get-ChildItem store -Filter *.appx | Select-Object -First 1
-          if (-not $appx) { throw "No .appx in the store-package artifact." }
-          $pkg = Join-Path $appx.DirectoryName ($appx.BaseName + '.msix')
-          Copy-Item $appx.FullName $pkg
-          $name = Split-Path $pkg -Leaf
-          if ($env:MODE -eq 'draft') {
-            msstore publish $pkg -id $env:PRODUCT --noCommit
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            "### Microsoft Store: draft staged" >> $env:GITHUB_STEP_SUMMARY
-            "$name is uploaded to a draft submission. Review and submit it in Partner Center." >> $env:GITHUB_STEP_SUMMARY
-          } else {
-            msstore publish $pkg -id $env:PRODUCT
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            "### Microsoft Store: submitted" >> $env:GITHUB_STEP_SUMMARY
-            "$name is submitted for certification (usually hours, up to 3 business days). Store users get the update automatically once it passes." >> $env:GITHUB_STEP_SUMMARY
-          }
+          VERSION="${VERSION#v}"
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/v$VERSION" --jq .sha 2>/dev/null) || {
+            echo "### Microsoft Store: not sent" >> "$GITHUB_STEP_SUMMARY"
+            echo "There is no tag v$VERSION on GitHub. Type the version exactly as released, e.g. 1.5.1." >> "$GITHUB_STEP_SUMMARY"
+            exit 1; }
+          # the newest Release run of that commit that kept a Store package
+          for run in $(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/runs?head_sha=$sha&per_page=20" --jq '.workflow_runs[].id'); do
+            if gh run download "$run" -n store-package -D store 2>/dev/null; then echo "Package from Release run $run"; break; fi
+          done
+          ls store/*.appx >/dev/null 2>&1 || {
+            echo "### Microsoft Store: not sent" >> "$GITHUB_STEP_SUMMARY"
+            echo "No Store package found for v$VERSION: its Release run hasn't built one (pre-release, or it failed before step 2), or it's older than 90 days." >> "$GITHUB_STEP_SUMMARY"
+            exit 1; }
+
+      - name: Send it
+        env:
+          AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          AZURE_AD_APPLICATION_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          AZURE_AD_APPLICATION_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          MS_STORE_PRODUCT_ID: ${{ vars.MS_STORE_PRODUCT_ID }}
+        run: node scripts/store-submit.mjs "$(ls store/*.appx | head -1)" ${{ inputs.mode == 'draft' && '--draft' || '' }}

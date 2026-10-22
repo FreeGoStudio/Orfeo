@@ -9,11 +9,9 @@
 # 2. Build   — on Windows, from the tag: installer, portable, latest.yml → draft release;
 #              the Microsoft Store package (.appx) is kept as a run artifact, not on GitHub
 # 3. Publish — adds the notes and publishes (or keeps it a draft / marks it a pre-release)
-# 4. Store   — uploads the .appx to the Microsoft Store and submits it for certification
-#              (never for a pre-release; a draft run only stages a Store draft). Lives in
-#              store.yml, which can also be run by hand to retry only the Store upload.
-#              Needs the one-time setup in docs/CONTRIBUTING.md → "Microsoft Store";
-#              until then it just says so and skips.
+#
+# The Microsoft Store is a separate step afterwards: Actions → Microsoft Store
+# (store.yml) with the same version sends this run's .appx to the Store.
 name: Release
 
 on:
@@ -31,15 +29,9 @@ on:
         description: "Test run: build everything but keep the release as a draft"
         type: boolean
         default: false
-      store:
-        description: "Microsoft Store: submit the update, only stage it as a draft in Partner Center, or skip"
-        type: choice
-        options: [submit, draft, skip]
-        default: submit
 
 permissions:
   contents: write
-  actions: read   # the Store step reads this run's store-package artifact
 
 concurrency:
   group: release
@@ -171,16 +163,16 @@ jobs:
             '-c.portable.artifactName=Orfeo-${version}-portable.${ext}'
 
       # The Store package is unsigned here — the Store signs it — so it is no
-      # use on the GitHub release page; it only travels on to step 4. Built
+      # use on the GitHub release page; the Microsoft Store workflow (store.yml) picks it up. Built
       # from the app folder step above already made, so it's the same app.
       # A pre-release version (1.5.0-beta.1) can't be a Store version at all.
       - name: Build the Microsoft Store package
-        if: ${{ !inputs.prerelease && inputs.store != 'skip' }}
+        if: ${{ !inputs.prerelease }}
         shell: bash
         run: npx electron-builder --win appx --prepackaged release/win-unpacked --publish never
 
       - uses: actions/upload-artifact@v7
-        if: ${{ !inputs.prerelease && inputs.store != 'skip' }}
+        if: ${{ !inputs.prerelease }}
         with:
           name: store-package
           path: release/*.appx
@@ -216,16 +208,6 @@ jobs:
             gh release edit "$TAG" "${common[@]}" --draft=false --prerelease=false --latest
             echo "### Published $TAG" >> "$GITHUB_STEP_SUMMARY"
             echo "Installed copies of Orfeo will offer the update the next time they start." >> "$GITHUB_STEP_SUMMARY"
+            echo "Next, the Microsoft Store: Actions → **Microsoft Store** → Run workflow, version **${TAG#v}**." >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
-
-  store:
-    name: 4. Microsoft Store
-    needs: [check, publish]
-    if: ${{ !inputs.prerelease && inputs.store != 'skip' }}
-    # store.yml, also runnable on its own to retry just the Store upload
-    uses: ./.github/workflows/store.yml
-    with:
-      run_id: ${{ github.run_id }}
-      mode: ${{ (inputs.draft || inputs.store == 'draft') && 'draft' || 'submit' }}
-    secrets: inherit

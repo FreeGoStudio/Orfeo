@@ -164,15 +164,16 @@ it.
 |---|---|---|
 | 1. Changelog | `docs/CHANGELOG.md` | A section `## [X.Y.Z] — D. M. YYYY — Title` at the top, optionally starting with an **In short** list of 2–4 lines, then `### New` / `### Changed` / `### Fixed`. Preview the notes with `npm run release:notes -- X.Y.Z`. |
 | 2. Version and tag | Git | `version` in `package.json` set to `X.Y.Z`, committed, tagged `vX.Y.Z`; the commit, the tag and `main` pushed to GitHub. |
-| 3. Run the workflow | GitHub → Actions → **Release** → **Run workflow** | Branch `main`, version `X.Y.Z`. Optional: *Pre-release* (installed copies don't update to it, and the Store is skipped), *Test run* (keeps the release as a draft; the Store only gets a draft), and *Microsoft Store*: `submit` (default), `draft` or `skip`. |
+| 3. Run the workflow | GitHub → Actions → **Release** → **Run workflow** | Branch `main`, version `X.Y.Z`. Optional: *Pre-release* (installed copies don't update to it) and *Test run* (keeps the release as a draft). |
+| 4. Microsoft Store | GitHub → Actions → **Microsoft Store** → **Run workflow** | Once the release is out: version `X.Y.Z`, `submit` (default) or `draft`. Not for pre-releases. See below. |
 
 The workflow checks that the tag, `package.json` and the changelog agree,
 builds the installer (`Orfeo-Setup-X.Y.Z.exe`) and the portable app
 (`Orfeo-X.Y.Z-portable.exe`) on Windows from the tag, uploads them with
 `latest.yml` and the blockmap, writes the release notes from the changelog and
-publishes the release as *Latest*. It then builds the Microsoft Store package
-(`Orfeo-X.Y.Z.appx`, from the same app folder) and submits it to the Store —
-see below.
+publishes the release as *Latest*. It also builds the Microsoft Store package
+(`Orfeo-X.Y.Z.appx`, from the same app folder) and keeps it with the run, for
+step 4.
 
 > [!IMPORTANT]
 > `latest.yml` is what makes auto-update work, and `electron-updater` only sees
@@ -192,23 +193,27 @@ for a manual upload in Partner Center.
 ### Microsoft Store
 
 Orfeo is in the Microsoft Store as an MSIX package (`appx` in `package.json`,
-identity `Squarebow.Orfeo`; tile logos in `build/appx/`). The **4. Microsoft
-Store** job of the release workflow uploads each new version with the
-[Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/overview):
-`msstore publish` starts a new submission from the last published one (same
-listing, screenshots and price), swaps in the new package and commits it for
-certification. Store users get the update automatically once it passes.
+identity `Squarebow.Orfeo`; tile logos in `build/appx/`). Sending a version to
+the Store is its own workflow, run after the release: **Actions → Microsoft
+Store → Run workflow**, with the version (`1.5.1`) and `submit` or `draft`.
+
+It finds the `.appx` that version's Release run built, then
+(`scripts/store-submit.mjs`, through the Partner Center submission API) starts
+a new submission from the published one (same listing, screenshots and price),
+puts the new package in place of the old ones, uploads it and — with `submit` —
+sends it for certification, waiting until Microsoft has accepted the package.
+`draft` leaves it in Partner Center to check and submit by hand. Store users
+get the update automatically once certification passes (a few hours to 3
+business days).
 
 - The Store needs a plain version (`1.5.0` → package `1.5.0.0`), higher than
-  the one already in the Store. Pre-releases are never sent to the Store.
-- A *Test run*, or *Microsoft Store: draft*, only uploads the package and
-  leaves the submission as a draft in Partner Center to review and submit by hand.
-- Until the one-time setup below is done, the job just says so and skips; the
-  `.appx` is still in the run's `store-package` artifact for a manual upload.
-- **Retry only the Store upload** (it failed, or you skipped it): GitHub →
-  Actions → **Microsoft Store** → **Run workflow**, with the Release run's
-  number (the end of its address, `…/actions/runs/NUMBER`) and `draft` or
-  `submit`. It sends that run's package again without rebuilding anything.
+  the one already in the Store. Pre-releases have no Store package.
+- Only one update can be in progress. If the previous one is still in
+  certification, the workflow says so and stops: run it again once Partner
+  Center shows it published. A draft it made itself is replaced; an update
+  started by hand in Partner Center has to be submitted or deleted there first.
+- Without the one-time setup below it stops and says what's missing; the
+  `.appx` is in the Release run's `store-package` artifact for a manual upload.
 
 One-time setup (Partner Center + GitHub):
 
@@ -229,17 +234,16 @@ One-time setup (Partner Center + GitHub):
      [Entra admin center](https://entra.microsoft.com), also as **Manager**.
    - Click the application's name: it shows the **Tenant ID** and **Client ID**.
      **Add new key** shows the key (the client secret) once — copy it then.
-4. Partner Center → **Account settings → Legal info** (or *Identifiers*): copy
-   the **Seller ID**. The app's **Store ID** (12 characters, starts with `9`) is
-   under *Apps and games → Orfeo → Product management → Product identity*.
+4. The app's **Store ID** (12 characters, starts with `9`) is under *Apps and
+   games → Orfeo → Product management → Product identity*.
 5. GitHub → **Settings → Secrets and variables → Actions**:
    - Secrets: `AZURE_AD_TENANT_ID`, `AZURE_AD_APPLICATION_CLIENT_ID`,
-     `AZURE_AD_APPLICATION_SECRET` (the key), `SELLER_ID`.
+     `AZURE_AD_APPLICATION_SECRET` (the key).
    - Variable: `MS_STORE_PRODUCT_ID` = the Store ID.
 
 The key expires (Partner Center shows the date next to it): add a new key and
-update `AZURE_AD_APPLICATION_SECRET` before it does, or the Store job fails at
-*Sign in to Partner Center*.
+update `AZURE_AD_APPLICATION_SECRET` before it does, or the Microsoft Store
+workflow stops with "Signing in to Partner Center failed".
 
 <details>
 <summary><b>Contributing a macOS / Linux build (community)</b></summary>
