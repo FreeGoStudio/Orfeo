@@ -5,6 +5,11 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
+## [Unreleased]
+
+### Fixed
+- **Parts that change instrument mid-song now do, on both sound engines.** Some arrangers switch a part's instrument partway through, as Kate Bush's "Wuthering Heights" does: its lead melody is a nylon guitar in the intro, an oboe in the verse, then a guitar again. Orfeo shows such a part as one track per instrument in the Tracks panel, but they all share one MIDI channel, and both engines played that channel with a single instrument for the whole song: Samples the last one (oboe throughout), Native the first one (guitar throughout). Both now switch at the right moment, exactly as the file intends. An instrument you change in the Tracks panel is heard straight away, even mid-song.
+
 ## [1.5.1] — 22. 10. 2026 — Native sound, safe on every sound card
 
 **In short**

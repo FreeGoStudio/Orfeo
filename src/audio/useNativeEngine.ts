@@ -12,6 +12,7 @@ import { NES } from '../utils/noteEditorState'
 import { pushHitEffect, amberHex } from '../utils/hitEffectQueue'
 import { isHomogeneousHandTrack, resolveHandAwareColor } from '../utils/handColors'
 import { startNative, stopNative, nativeCall, isNativeRunning, useNativeAudio, onNativeRestart } from './nativeClient'
+import { programTimeline } from './programTimeline'
 
 // FluidSynth at gain 1 sits ~6 dB under the Samples engine (which boosts ×3);
 // this brings Native to the same loudness at the same master volume
@@ -88,19 +89,28 @@ function sendSong() {
     }
     for (const p of t.sustainEvents ?? []) ev.push([p.time, 1, t.index, 0xb0 | ch, 64, p.down ? 127 : 0])
   }
-  // note-offs before pedal before note-ons at the same instant
+  // Each channel's instrument, switching where one of its tracks takes over
+  // (a file track that changes instrument is split into one track per instrument)
+  for (const [ch, switches] of programTimeline(midi, tracks)) {
+    for (const sw of switches) ev.push([sw.time, 1, sw.track, 0xc0 | ch, sw.program, 0])
+  }
+  // note-offs before pedal and instrument changes before note-ons at the same instant
   ev.sort((a, b) => a[0] - b[0] || a[1] - b[1])
   const times = new Float64Array(ev.length), trk = new Uint16Array(ev.length), bytes = new Uint8Array(ev.length * 3)
   ev.forEach((e, i) => { times[i] = e[0]; trk[i] = e[2]; bytes[3 * i] = e[3]; bytes[3 * i + 1] = e[4]; bytes[3 * i + 2] = e[5] })
   nativeCall('loadSong', times, trk, bytes, trackCount, midi.duration ?? 0)
-  // Each melodic channel plays the instrument Orfeo's track panel says
-  const done = new Set<number>()
-  for (const t of midi.tracks) {
-    if (t.isDrum || done.has(t.channel)) continue
-    const ts = tracks.find(x => x.index === t.index)
-    if (ts) { nativeCall('setChannelProgram', t.channel, ts.program); done.add(t.channel) }
-  }
+  // the instruments are in the song itself now: no channel keeps a fixed one
+  for (let ch = 0; ch < 16; ch++) nativeCall('setChannelProgram', ch, -1)
   sendTrackState(tracks)
+}
+
+// A changed instrument on a channel shared by several tracks: the song's
+// instrument switches change, so the song goes again, from where it is
+function resendSongKeepingPlace() {
+  const s = useStore.getState()
+  sendSong(); sendSongClicks()
+  nativeCall('seek', s.currentTime)
+  if (s.playbackState === 'playing') nativeCall('play')
 }
 
 function sendTrackState(tracks: Tracks) {
@@ -275,13 +285,18 @@ export function useNativeEngine() {
       // instruments chosen in the track panel
       if (s.tracks !== p.tracks) {
         const midi = activeMidiData()
+        let resend = false
         for (const t of s.tracks) {
           const o = p.tracks.find(x => x.index === t.index)
           if (o && o.program !== t.program) {
             const ch = midi?.tracks?.find((x: any) => x.index === t.index)?.channel
-            if (ch !== undefined && ch !== 9) nativeCall('setChannelProgram', ch, t.program)
+            if (ch === undefined || ch === 9) continue
+            const shared = (midi?.tracks ?? []).filter((x: any) => x.channel === ch && x.notes?.length).length > 1
+            if (shared) resend = true
+            else nativeCall('setChannelProgram', ch, t.program) // its only track: change it on the spot
           }
         }
+        if (resend) resendSongKeepingPlace()
       }
 
       const bpmChanged = s.bpm !== p.bpm || s.originalBpm !== p.originalBpm

@@ -12,6 +12,7 @@ import { useStore } from '../store'
 import { pushHitEffect, amberHex } from '../utils/hitEffectQueue'
 import { isHomogeneousHandTrack, resolveHandAwareColor } from '../utils/handColors'
 import { NES } from '../utils/noteEditorState'
+import { programTimeline, programAt } from '../audio/programTimeline'
 import { useMidiSettings, latencyOffsetSec, midiPrefsReady } from '../store/midiSettings'
 
 // ── Live edit-buffer awareness — mirrors useAudioEngine.ts's activeMidiData().
@@ -313,6 +314,9 @@ let _epochStartFileSec = 0  // file-native seconds at that same moment
 // scheduled notes on every refill.
 const _noteCursor = new Map<number, number>()
 const _sustainCursor = new Map<number, number>()
+// Instrument switches still to come this run, per channel (see programTimeline)
+let _programSwitches: { ch: number; time: number; program: number }[] = []
+let _programCursor = 0
 // trackIndex -> isHomogeneousHandTrack(track.notes), computed once per rebuild
 // rather than on every refill tick — the result can't change mid-run since
 // _epochMidiData itself is frozen for the run.
@@ -643,15 +647,21 @@ function buildSamplesPlayer(startSec: number) {
   _sustainCursor.clear()
   _homogeneousCache.clear()
   applyTrackMix(midiData, tracks)
+  // Each channel's instrument where playback starts, then its switches to come
+  // (a file track that changes instrument is split into one track per instrument)
+  _programSwitches = []
+  _programCursor = 0
+  for (const [ch, switches] of programTimeline(midiData, tracks)) {
+    try { _synth.programChange(ch, programAt(switches, startSec)) } catch {}
+    _samplesChanInit.add(ch)
+    if (ch === LIVE_CH) _liveProgramDirty = true
+    for (const sw of switches) if (sw.time > startSec) _programSwitches.push({ ch, time: sw.time, program: sw.program })
+  }
+  _programSwitches.sort((a, b) => a.time - b.time)
   for (const track of midiData.tracks) {
     const ts = tracks.find(t => t.index === track.index)
     if (!ts || ts.muted || (_epochHasSolo && !ts.solo)) continue
     _homogeneousCache.set(track.index, isHomogeneousHandTrack(track.notes))
-    if (!track.isDrum) {
-      try { _synth.programChange(track.channel, ts.program) } catch {}
-      _samplesChanInit.add(track.channel)
-      if (track.channel === LIVE_CH) _liveProgramDirty = true
-    }
 
     // ── note.time and startSec are both in the file's OWN timeline (real
     // seconds at the file's original tempo) — find the first note at or
@@ -695,6 +705,13 @@ function buildSamplesPlayer(startSec: number) {
 function refillSchedule() {
   if (!_synth || !_epochMidiData) return
   const targetFileSec = nowFileSec() + LOOKAHEAD_SEC * _epochRatio
+
+  // Instrument switches first, a few ms ahead, so the new instrument's first note gets it
+  while (_programCursor < _programSwitches.length && _programSwitches[_programCursor].time < targetFileSec) {
+    const sw = _programSwitches[_programCursor++]
+    const delay = Math.max(0, (sw.time - nowFileSec()) / _epochRatio * 1000 - 5)
+    _schedule.push(setTimeout(() => { try { _synth?.programChange(sw.ch, sw.program) } catch {} }, delay))
+  }
 
   for (const track of _epochMidiData.tracks) {
     const ts = _epochTracks.find(t => t.index === track.index)
@@ -986,10 +1003,11 @@ export function useSamplesEngine() {
     // straight to the synth via setChannelVolume/Pan/Chorus/Reverb at the
     // same call site that patches the store, so reacting to every `tracks`
     // reference change here (as a raw `!==` would) rebuilds the whole scheduled
+    // (the instrument IS included: a channel's instrument switches depend on it)
     // player on every fader mousemove — dozens of times a second — which is
     // what was stuttering/pausing playback while dragging a Console fader. ───
     const scheduleSignature = (ts: ReturnType<typeof useStore.getState>['tracks']) =>
-      ts.map(t => (t.muted ? 'm' : t.solo ? 's' : '.') + (t.showOnKeyboard ? 'k' : '.') + (t.visible ? 'v' : '.')).join('')
+      ts.map(t => (t.muted ? 'm' : t.solo ? 's' : '.') + (t.showOnKeyboard ? 'k' : '.') + (t.visible ? 'v' : '.') + t.program).join(',')
     let prevSignature = scheduleSignature(useStore.getState().tracks)
 
     const unsub = useStore.subscribe((state) => {
