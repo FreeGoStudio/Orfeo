@@ -8,6 +8,7 @@
 ## [Unreleased]
 
 ### Changed
+- **Security update.** Orfeo now runs on Electron 44, with Chromium 152 and Node 24.22. The Electron 42 version it was built on stopped receiving security fixes this week. File pickers (Open MIDI file, Import SoundFont, library folder) still open in the folder you last used: Electron 44 would otherwise open them in *Downloads* every time.
 - **Check for updates sends you to the right place.** In the Microsoft Store version it opens Orfeo's own page in the Store, with its *Update* button. In the portable version, and if an automatic update ever fails, it opens [orfeo.cc/download](https://orfeo.cc/download) instead of GitHub.
 
 ### Fixed

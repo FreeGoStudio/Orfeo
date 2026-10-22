@@ -176,6 +176,17 @@ function savePrefs(data: Record<string, any>) {
   try { writeFileSync(getPrefsPath(), JSON.stringify({ ...loadPrefs(), ...data }, null, 2)) } catch {}
 }
 ipcMain.handle('prefs:get', async () => loadPrefs())
+
+// File pickers open where you last were for that kind of file (Electron opens
+// them in Downloads otherwise, and Windows no longer remembers the folder);
+// first time: the library folder
+function dialogDir(kind: string): string | undefined {
+  const p = loadPrefs()
+  return p.dialogDirs?.[kind] ?? p.libraryFolder ?? undefined
+}
+function rememberDialogDir(kind: string, dir: string) {
+  savePrefs({ dialogDirs: { ...loadPrefs().dialogDirs, [kind]: dir } })
+}
 ipcMain.handle('prefs:set', async (_e, data) => savePrefs(data))
 
 // ── App zoom (Ctrl +/−/0) ────────────────────────────────────────────────
@@ -477,10 +488,12 @@ ipcMain.handle('soundfont:read', (_e, id: string) => {
 ipcMain.handle('soundfont:import', async () => {
   const result = await dialog.showOpenDialog({
     title: 'Import SoundFont',
+    defaultPath: dialogDir('soundfont'),
     filters: [{ name: 'SoundFont', extensions: ['sf2', 'sf3'] }],
     properties: ['openFile'],
   })
   if (result.canceled || !result.filePaths[0]) return null
+  rememberDialogDir('soundfont', dirname(result.filePaths[0]))
 
   const sourcePath = result.filePaths[0]
   const origName = basename(sourcePath)
@@ -544,6 +557,7 @@ ipcMain.handle('soundfont:download', (e, id: string) => {
 ipcMain.handle('dialog:openMidi', async () => {
   const result = await dialog.showOpenDialog({
     title: 'Open MIDI File',
+    defaultPath: dialogDir('midi'),
     filters: [
       { name: 'MIDI & Score Files', extensions: ['mid', 'midi', 'kar', 'musicxml', 'xml', 'mxl', 'gp', 'gp3', 'gp4', 'gp5', 'gpx', 'cap'] },
     ],
@@ -551,6 +565,7 @@ ipcMain.handle('dialog:openMidi', async () => {
   })
   if (result.canceled || !result.filePaths[0]) return null
   const filePath = result.filePaths[0]
+  rememberDialogDir('midi', dirname(filePath))
   const fileName = filePath.split(/[\\/]/).pop() ?? filePath
   return { fileName, filePath, base64: readFileSync(filePath).toString('base64') }
 })
@@ -558,7 +573,7 @@ ipcMain.handle('dialog:openMidi', async () => {
 // ── Library folder ─────────────────────────────────────────────────────────
 ipcMain.handle('dialog:openFolder', async () => {
   const result = await dialog.showOpenDialog({
-    title: 'Select MIDI Library Folder', properties: ['openDirectory'],
+    title: 'Select MIDI Library Folder', defaultPath: loadPrefs().libraryFolder, properties: ['openDirectory'],
   })
   if (result.canceled || !result.filePaths[0]) return null
   const folderPath = result.filePaths[0]
