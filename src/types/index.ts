@@ -210,6 +210,10 @@ declare global {
       downloadSoundfont:   (id: SoundfontId) => Promise<{ ok: boolean; error?: string }>
       deleteSoundfont:     (id: SoundfontId) => Promise<void>
       readSoundfont:       (id: SoundfontId) => Promise<ArrayBuffer | null>
+      // Native audio engine (beta) — see src/audio/nativeClient.ts
+      connectNativeAudio:    () => Promise<{ ok: boolean; reason?: string }>
+      nativeSoundfontPaths:  (extraId: string | null) => Promise<string[]>
+      onNativeAudioHostExit: (fn: (code: number) => void) => void
       importSoundfont:     () => Promise<SoundfontId | null>
       onSoundfontProgress: (fn: (data: { id: SoundfontId; progress: number }) => void) => void
       offSoundfontProgress: () => void

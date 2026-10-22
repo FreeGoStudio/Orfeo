@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Menu, utilityProcess, MessageChannelMain, type UtilityProcess } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join, basename, dirname, extname } from 'path'
 import { readFileSync, writeFileSync, existsSync, readdirSync, createWriteStream, statSync } from 'fs'
@@ -391,6 +391,51 @@ function soundfontPath(id: string): string | null {
   const entry = SOUNDFONT_CATALOG[id]
   return entry ? join(soundfontsDir(), entry.filename) : null
 }
+
+// ── Native audio engine (beta) ────────────────────────────────────────────
+// The engine runs in its own utility process (electron/audioHost.ts): a crash
+// there restarts the sound, it doesn't close Orfeo. The renderer asks to
+// connect; main starts the process if needed and hands each side one end of a
+// MessageChannel, so commands and status never pass through main afterwards.
+// Dev: native/build (scripts/build-native.mjs). Packaged: resources/native.
+function nativeDir() {
+  return app.isPackaged ? join(process.resourcesPath, 'native') : join(app.getAppPath(), 'native', 'build')
+}
+// FluidSynth reads files itself, so the bundled set must be a real file —
+// unpacked from the asar in the packaged app
+function bundledSoundfontPath() {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'app.asar.unpacked', 'out', 'renderer', 'GeneralUser-GS.sf2')
+    : join(app.getAppPath(), 'public', 'GeneralUser-GS.sf2')
+}
+let audioHost: UtilityProcess | null = null
+function connectAudioHost(): { ok: boolean; reason?: string } {
+  if (process.platform !== 'win32') return { ok: false, reason: 'The native engine is Windows-only for now.' }
+  const addon = join(nativeDir(), 'orfeo_audio.node')
+  if (!existsSync(addon)) return { ok: false, reason: `Native engine not built (${addon} missing) — run npm run native:build.` }
+  if (!audioHost) {
+    audioHost = utilityProcess.fork(join(__dirname, 'audioHost.js'), [], { serviceName: 'Orfeo Audio' })
+    audioHost.on('exit', (code) => {
+      audioHost = null
+      mainWin?.webContents.send('audio:host-exit', code)
+    })
+  }
+  const { port1, port2 } = new MessageChannelMain()
+  audioHost.postMessage({ t: 'init', addon, fluidDir: join(nativeDir(), 'fluidsynth') }, [port1])
+  mainWin?.webContents.postMessage('audio:port', null, [port2])
+  return { ok: true }
+}
+ipcMain.handle('audio:connect', () => connectAudioHost())
+// Real file paths for the sound sets to load, bundled set first
+ipcMain.handle('audio:soundfontPaths', (_e, extraId: string | null) => {
+  const paths = [bundledSoundfontPath()]
+  if (extraId && extraId !== 'generaluser-gs') {
+    const p = soundfontPath(extraId)
+    if (p && existsSync(p)) paths.push(p)
+  }
+  return paths
+})
+app.on('before-quit', () => { try { audioHost?.kill() } catch {} })
 
 ipcMain.handle('soundfont:list', () => {
   const catalogEntries = Object.entries(SOUNDFONT_CATALOG).map(([id, entry]) => ({

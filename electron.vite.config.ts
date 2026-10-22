@@ -11,7 +11,8 @@ export default defineConfig({
   main: {
     build: {
       lib: {
-        entry: 'electron/main.ts',
+        // main.js + the native audio engine's utility process (audioHost.js)
+        entry: { main: 'electron/main.ts', audioHost: 'electron/audioHost.ts' },
       },
       // pdfkit uses __dirname to locate its font .afm files; bundling it inline
       // would break that (resolves to out/main/ instead of node_modules/pdfkit/js/).

@@ -10,7 +10,15 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 // only the one it was given. ────────────────────────────────────────────
 const zoomListeners = new Map<(data: any) => void, (e: unknown, data: any) => void>()
 
+// ── Native audio engine: main hands us one end of a MessageChannel; pass it
+// to the page (a MessagePort can't cross contextBridge, window.postMessage can) ──
+ipcRenderer.on('audio:port', (e) => { window.postMessage('orfeo-audio-port', '*', e.ports) })
+
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Native audio engine (beta)
+  connectNativeAudio:     () => ipcRenderer.invoke('audio:connect'),
+  nativeSoundfontPaths:   (extraId: string | null) => ipcRenderer.invoke('audio:soundfontPaths', extraId),
+  onNativeAudioHostExit:  (fn: (code: number) => void) => { ipcRenderer.removeAllListeners('audio:host-exit'); ipcRenderer.on('audio:host-exit', (_e, code) => fn(code)) },
   // Existing
   openMidiFile:       () => ipcRenderer.invoke('dialog:openMidi'),
   windowMinimize:     () => ipcRenderer.invoke('window:minimize'),
