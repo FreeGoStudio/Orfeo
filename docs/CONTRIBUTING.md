@@ -141,15 +141,17 @@ match how that binary was built, or silently never fire.
 
 So: **no auto-update on macOS/Linux, by design** — same as the Windows
 **portable** build (no installer for `electron-updater` to act on). Users on
-any of these check the [Releases](https://github.com/Squarebow/Orfeo/releases)
-page manually. `electron/main.ts` decides this once as `updateMode` (`'auto'`
+any of these get new versions from [orfeo.cc/download](https://orfeo.cc/download),
+which follows every GitHub release. `electron/main.ts` decides this once as `updateMode` (`'auto'`
 for the installed Windows build, `'store'` for the Microsoft Store build,
 `'manual'` for everything else) and the renderer reads it on mount via
 `update:info`; in `'manual'` mode the Settings "Check for updates" button just
-opens the Releases page in the browser — it never enters a checking/downloading
-state. In `'store'` mode (`process.windowsStore`) the Store updates the app and
-the button opens the Store's *Downloads and updates* page; `electron-updater`
-never runs there, since it would install a second, non-Store copy.
+opens orfeo.cc/download in the browser (also the fallback when an automatic
+update fails) — it never enters a checking/downloading state. In `'store'` mode
+(`process.windowsStore`) the Store updates the app and the button opens Orfeo's
+page in the Store app, with its *Update* button; `electron-updater` never runs
+there, and the website is never offered, since either would install a second,
+non-Store copy.
 
 </details>
 

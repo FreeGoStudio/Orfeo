@@ -7,6 +7,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **Check for updates sends you to the right place.** In the Microsoft Store version it opens Orfeo's own page in the Store, with its *Update* button. In the portable version, and if an automatic update ever fails, it opens [orfeo.cc/download](https://orfeo.cc/download) instead of GitHub.
+
 ### Fixed
 - **Parts that change instrument mid-song now do, on both sound engines.** Some arrangers switch a part's instrument partway through, as Kate Bush's "Wuthering Heights" does: its lead melody is a nylon guitar in the intro, an oboe in the verse, then a guitar again. Orfeo shows such a part as one track per instrument in the Tracks panel, but they all share one MIDI channel, and both engines played that channel with a single instrument for the whole song: Samples the last one (oboe throughout), Native the first one (guitar throughout). Both now switch at the right moment, exactly as the file intends. An instrument you change in the Tracks panel is heard straight away, even mid-song.
 

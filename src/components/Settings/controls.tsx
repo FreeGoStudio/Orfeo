@@ -579,12 +579,12 @@ export function UpdateButton({ placement = 'left', showStatus = true }: { placem
       )}
       <Tooltip
         title={
-          updateInfo.mode === 'manual'         ? t`Check for updates` :
-          updateInfo.mode === 'store'          ? t`Updates come from the Microsoft Store — click to check there` :
+          updateInfo.mode === 'manual'         ? t`Check for updates on orfeo.cc` :
+          updateInfo.mode === 'store'          ? t`Updates come from the Microsoft Store — click to open Orfeo there` :
           updateStatus.state === 'checking'    ? 'Checking for updates…' :
           updateStatus.state === 'downloading' ? `Downloading update${updateStatus.percent ? ` — ${Math.round(updateStatus.percent)}%` : '…'}` :
           updateStatus.state === 'ready'       ? `Update ${updateStatus.version ?? ''} ready — click to restart and install` :
-          updateStatus.state === 'error'       ? `${(updateStatus.message ?? 'Update check failed').slice(0, 160)} — click to open the Releases page` :
+          updateStatus.state === 'error'       ? `${(updateStatus.message ?? 'Update check failed').slice(0, 160)} — click to open the download page` :
           t`Check for updates`
         }
         oneLine

@@ -1793,7 +1793,7 @@ ipcMain.handle('window:setFullScreen', (_e, value: boolean) => {
 // builds usually aren't uploaded as electron-updater-recognized artifacts
 // at all). Portable builds have no installer/uninstaller for
 // electron-updater to work with either. All three fall back to the
-// Settings "Check for updates" button just opening the releases page for
+// Settings "Check for updates" button just opening the download page for
 // a manual look — see docs/CONTRIBUTING.md's "Releases & auto-update"
 // section. ─────────────────────────────────────────────────────────────────
 // ── Three distinct update modes, decided once here and never re-derived:
@@ -1803,16 +1803,17 @@ ipcMain.handle('window:setFullScreen', (_e, value: boolean) => {
 //              electron-updater must never run here — it would download the
 //              GitHub installer and put a second, non-Store copy beside it
 //              (and Store policy forbids an app updating itself). The button
-//              opens the Store's Downloads and updates page.
+//              opens Orfeo's page in the Store app, with its Update button.
+//              Never the website: that would install a second, non-Store copy.
 //   'manual' — portable build, macOS/Linux, and dev: no installer for
 //              electron-updater to act on, so the button just opens the
-//              GitHub releases page in the browser. Nothing is ever
-//              downloaded or checked in-process.
+//              download page on orfeo.cc (updated with every release).
+//              Nothing is ever downloaded or checked in-process.
 // The renderer asks for this ONCE on mount (update:info) and renders the
 // button's tooltip + click behavior from it — it never has to click and
 // wait to discover which mode it's in. ───────────────────────────────────
-const RELEASES_URL = 'https://github.com/Squarebow/Orfeo/releases'
-const STORE_UPDATES_URL = 'ms-windows-store://downloadsandupdates'
+const DOWNLOAD_URL = 'https://orfeo.cc/download'
+const STORE_PAGE_URL = 'ms-windows-store://pdp/?productid=9NJ9Q01P8JQD'
 const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR
 const updateMode: 'auto' | 'store' | 'manual' =
   process.windowsStore ? 'store'
@@ -1849,13 +1850,13 @@ if (updateMode === 'auto') {
 }
 
 // Renderer reads this once to pick the button's tooltip + behavior.
-ipcMain.handle('update:info', () => ({ mode: updateMode, releasesUrl: RELEASES_URL }))
+ipcMain.handle('update:info', () => ({ mode: updateMode, downloadUrl: DOWNLOAD_URL }))
 
 ipcMain.handle('update:check', () => {
   // 'manual' mode: the only action is "open the releases page". Keep it in
   // main so the button does exactly one thing regardless of build.
-  if (updateMode === 'manual') { void shell.openExternal(RELEASES_URL); return }
-  if (updateMode === 'store') { void shell.openExternal(STORE_UPDATES_URL); return }
+  if (updateMode === 'manual') { void shell.openExternal(DOWNLOAD_URL); return }
+  if (updateMode === 'store') { void shell.openExternal(STORE_PAGE_URL); return }
   autoUpdater.checkForUpdates().catch((err) => sendUpdateStatus(summarizeUpdateError(err)))
 })
 

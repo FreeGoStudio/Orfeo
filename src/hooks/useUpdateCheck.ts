@@ -7,7 +7,7 @@ import type { UpdateStatus, UpdateInfo } from '../types'
 // exactly once (useUpdateService, mounted in SettingsPanel). ─────────────
 export const useUpdateState = create<{ status: UpdateStatus; info: UpdateInfo }>(() => ({
   status: { state: 'idle' },
-  info: { mode: 'manual', releasesUrl: 'https://github.com/Squarebow/Orfeo/releases' },
+  info: { mode: 'manual', downloadUrl: 'https://orfeo.cc/download' },
 }))
 const setStatus = (status: UpdateStatus) => useUpdateState.setState({ status })
 
@@ -15,7 +15,7 @@ export function pressUpdateButton() {
   const { status, info } = useUpdateState.getState()
   if (info.mode === 'manual' || info.mode === 'store') { void window.electronAPI.checkForUpdates(); return }
   if (status.state === 'ready') { void window.electronAPI.installUpdate(); return }
-  if (status.state === 'error') { void window.electronAPI.openExternal(info.releasesUrl); return }
+  if (status.state === 'error') { void window.electronAPI.openExternal(info.downloadUrl); return }
   setStatus({ state: 'checking' })
   void window.electronAPI.checkForUpdates()
 }

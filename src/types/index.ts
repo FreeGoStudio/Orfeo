@@ -242,10 +242,10 @@ declare global {
 // in electron/main.ts and read by SettingsPanel on mount:
 //   'auto'   — installed Windows build: electron-updater does check→download→install.
 //   'store'  — Microsoft Store build: the Store updates it; the button opens the Store.
-//   'manual' — portable / macOS / Linux / dev: the button just opens releasesUrl.
+//   'manual' — portable / macOS / Linux / dev: the button just opens downloadUrl (orfeo.cc/download).
 export type UpdateInfo = {
   mode: 'auto' | 'store' | 'manual'
-  releasesUrl: string
+  downloadUrl: string
 }
 
 export type UpdateStatus = {
