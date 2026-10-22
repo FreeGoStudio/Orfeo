@@ -6,7 +6,7 @@
 
 use crate::clicks::Clicks;
 use crate::dsp::{soft_clip, HighShelf};
-use crate::dynamics::{AutoLevel, Compressor};
+use crate::dynamics::{AutoLevel, Brickwall, Compressor};
 use crate::fluid::Fluid;
 use crate::output::{Output, OutputMode, EXCLUSIVE_STEPS};
 use crate::song::Song;
@@ -291,10 +291,13 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         let (mut kl, mut kr) = (vec![0f32; n], vec![0f32; n]);
         let mut scratch = Vec::with_capacity(n * 8);
         let mut tone = HighShelf::new(rate as f32, 3000.0, mix.tone_db);
+        let mut tone_live = HighShelf::new(rate as f32, 3000.0, mix.tone_db);
         let mut comp = Compressor::new(rate as f32);
         comp.set(comp_enabled, comp_preset);
         let mut agc = AutoLevel::new(rate as f32);
         let mut safety = Compressor::safety(rate as f32);
+        // never above -1 dBFS, on any sound card; holds the song and clicks back 2 ms
+        let mut ceiling = Brickwall::new(rate as f32, -1.0, 0.002, 0.08);
         let mut clicks = Clicks::new(rate as f32);
         clicks.volume = clicks_volume;
         let smooth = 1.0 - (-1.0 / (0.005 * rate as f32)).exp(); // ~5 ms gain ramps
@@ -381,7 +384,7 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                         if let Some(p) = program { fluid.midi(0xC0 | c as u8, p, 0) }
                     }
                     Command::SetMasterGain(g) => mix.master = g.max(0.0),
-                    Command::SetToneDb(db) => { mix.tone_db = db; tone.set(rate as f32, 3000.0, db) }
+                    Command::SetToneDb(db) => { mix.tone_db = db; tone.set(rate as f32, 3000.0, db); tone_live.set(rate as f32, 3000.0, db) }
                     Command::SetCompressor { enabled, preset } => { comp_enabled = enabled; comp_preset = preset; comp.set(enabled, preset) }
                     Command::SetMetronome { enabled, volume } => { mix.metronome_on = enabled; clicks_volume = volume; clicks.volume = volume }
                     Command::SetSongClicks(c) => { tr.song_clicks = c; tr.click_idx = tr.song_clicks.partition_point(|x| x.0 < tr.pos) }
@@ -494,7 +497,8 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
 
             for i in 0..avail { sl[i] += fx[0][i] + fx[2][i]; sr[i] += fx[1][i] + fx[3][i]; }
 
-            // ── Song bus: master → auto-level → compressor → safety limiter;  live bus: master. Tone shapes the sum ──
+            // ── Song bus: master → auto-level → compressor → safety limiter → tone, + clicks → ceiling (-1 dBFS look-ahead);
+            //    live bus: master → tone, added after; then Windows' volume (when the engine applies it) and the soft clip ──
             let use_tone = mix.tone_db.abs() > 0.01;
             let mut mpeak = 0f32;
             os_poll += avail;
@@ -505,12 +509,16 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                 agc.process(comp.enabled, &mut a, &mut b);
                 comp.process(&mut a, &mut b);
                 safety.process(&mut a, &mut b);
-                // live keys and clicks join after the dynamics; tone shapes the sum
-                let (mut a, mut b) = (a + ll[i] * mix.master, b + lr[i] * mix.master);
                 if use_tone { a = tone.process(0, a); b = tone.process(1, b); }
+                // the clicks join the song for the ceiling (both scheduled, both held back 2 ms)
+                let (mut a, mut b) = (a + kl[i], b + kr[i]);
+                ceiling.process(&mut a, &mut b);
+                // your own keys join after it, undelayed
+                let (mut la, mut lb) = (ll[i] * mix.master, lr[i] * mix.master);
+                if use_tone { la = tone_live.process(0, la); lb = tone_live.process(1, lb); }
                 // Windows' volume before the soft clip, so a turned-down Orfeo stays clean
                 os_gain += (os_target - os_gain) * smooth;
-                let (o1, o2) = (soft_clip((a + kl[i]) * os_gain), soft_clip((b + kr[i]) * os_gain));
+                let (o1, o2) = (soft_clip((a + la) * os_gain), soft_clip((b + lb) * os_gain));
                 sl[i] = o1; sr[i] = o2;
                 mpeak = mpeak.max(o1.abs()).max(o2.abs());
             }

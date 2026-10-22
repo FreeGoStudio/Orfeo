@@ -1,12 +1,12 @@
 //! Master-chain pieces that add no delay. (Look-ahead compression is what cost
 //! 12 ms in the Web Audio chain; nothing here looks ahead.)
 
-/// Linear up to 0.8, smooth knee to 1.0 — transparent at normal levels,
-/// catches the peaks of a hard ten-finger chord. Same curve as the Web Audio
-/// live path.
+/// Emergency stage only: linear up to 0.95 (above the song's -1 dBFS ceiling,
+/// so the song never touches it), then a smooth knee to 1.0 — catches your own
+/// keys played hard on top of an already-loud song, never a hard clip.
 #[inline]
 pub fn soft_clip(x: f32) -> f32 {
-    const KNEE: f32 = 0.8;
+    const KNEE: f32 = 0.95;
     let a = x.abs();
     if a <= KNEE { x } else { x.signum() * (KNEE + (1.0 - KNEE) * ((a - KNEE) / (1.0 - KNEE)).tanh()) }
 }

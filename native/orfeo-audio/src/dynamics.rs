@@ -162,6 +162,74 @@ impl AutoLevel {
     }
 }
 
+/// The song bus's last stage: a look-ahead brickwall limiter. The audio is
+/// delayed by a couple of milliseconds so every peak is seen coming, and the
+/// gain eases down just enough before it, so the output never goes above the
+/// ceiling on any sound card, at any volume. No clipping: it only turns down,
+/// smoothly, and comes back up over the release time.
+///
+/// Gain needed per sample t = min(1, ceiling / peak); a sliding minimum of t
+/// over L samples, a release that lets it rise only slowly, then a moving
+/// average over L samples. Every value averaged is at most t of the sample
+/// L-1 back, which is the one leaving the delay line now — so the ceiling
+/// holds exactly, and the averaging turns each gain change into a ramp.
+pub struct Brickwall {
+    ceiling: f32,
+    len: usize,
+    delay: Vec<(f32, f32)>,
+    at: usize,
+    // sliding minimum of the needed gain: (sample index, gain), increasing gains
+    mins: std::collections::VecDeque<(u64, f32)>,
+    n: u64,
+    released: f32,
+    rel: f32,
+    avg: Vec<f32>,
+    avg_at: usize,
+    avg_sum: f64,
+    /// Current gain reduction in dB (<= 0)
+    pub reduction_db: f32,
+}
+
+impl Brickwall {
+    pub fn new(rate: f32, ceiling_db: f32, lookahead_s: f32, release_s: f32) -> Self {
+        let len = ((rate * lookahead_s) as usize).max(2);
+        Brickwall {
+            ceiling: db_to_gain(ceiling_db), len,
+            delay: vec![(0.0, 0.0); len - 1], at: 0,
+            mins: std::collections::VecDeque::with_capacity(len + 1), n: 0,
+            released: 1.0, rel: 1.0 - (-1.0 / (release_s * rate)).exp(),
+            avg: vec![1.0; len], avg_at: 0, avg_sum: len as f64,
+            reduction_db: 0.0,
+        }
+    }
+    /// How far the audio is held back, in samples
+    pub fn latency(&self) -> usize { self.len - 1 }
+
+    #[inline]
+    pub fn process(&mut self, l: &mut f32, r: &mut f32) {
+        let peak = l.abs().max(r.abs());
+        let need = if peak > self.ceiling { self.ceiling / peak } else { 1.0 };
+        // sliding minimum over the last `len` samples
+        while self.mins.back().map_or(false, |&(_, g)| g >= need) { self.mins.pop_back(); }
+        self.mins.push_back((self.n, need));
+        while self.mins.front().map_or(false, |&(i, _)| i + self.len as u64 <= self.n) { self.mins.pop_front(); }
+        self.n += 1;
+        let held = self.mins.front().map_or(1.0, |&(_, g)| g);
+        // release: rise slowly, fall at once
+        self.released = if held < self.released { held } else { self.released + (held - self.released) * self.rel };
+        // moving average over `len` samples
+        self.avg_sum += (self.released - self.avg[self.avg_at]) as f64;
+        self.avg[self.avg_at] = self.released;
+        self.avg_at = (self.avg_at + 1) % self.len;
+        let g = (self.avg_sum / self.len as f64) as f32;
+        // delay line
+        let (dl, dr) = std::mem::replace(&mut self.delay[self.at], (*l, *r));
+        self.at = (self.at + 1) % self.delay.len();
+        *l = dl * g; *r = dr * g;
+        self.reduction_db = gain_to_db(g).min(0.0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,5 +243,35 @@ mod tests {
         assert!(sd > 0.3 && sd < 0.9, "safety makeup {sd}");
         // below the threshold nothing changes
         assert!((g.saturate(0.1) - 0.1).abs() < 1e-6);
+    }
+
+    #[test]
+    fn brickwall_never_passes_the_ceiling() {
+        let rate = 48_000.0;
+        let mut lim = Brickwall::new(rate, -1.0, 0.002, 0.08);
+        let ceiling = db_to_gain(-1.0);
+        // noise with sudden bursts up to +12 dB over full scale, single-sample spikes included
+        let mut seed = 12345u32;
+        let mut rnd = || { seed = seed.wrapping_mul(1664525).wrapping_add(1013904223); (seed >> 8) as f32 / (1u32 << 24) as f32 * 2.0 - 1.0 };
+        let mut worst = 0f32;
+        let mut input = Vec::new();
+        let mut output = Vec::new();
+        for i in 0..rate as usize * 4 {
+            let level = match (i / 4800) % 5 { 0 => 0.3, 1 => 1.0, 2 => 2.5, 3 => 4.0, _ => 0.05 };
+            let spike = if i % 9973 == 0 { 3.5 } else { 1.0 };
+            let (mut l, mut r) = (rnd() * level * spike, rnd() * level);
+            input.push(l);
+            lim.process(&mut l, &mut r);
+            output.push(l);
+            worst = worst.max(l.abs()).max(r.abs());
+        }
+        assert!(worst <= ceiling * 1.0001, "peak {worst} over ceiling {ceiling}");
+        // quiet audio passes untouched, just delayed
+        let mut quiet = Brickwall::new(rate, -1.0, 0.002, 0.08);
+        let d = quiet.latency();
+        let xs: Vec<f32> = (0..2000).map(|i| (i as f32 * 0.05).sin() * 0.5).collect();
+        let ys: Vec<f32> = xs.iter().map(|&x| { let (mut a, mut b) = (x, x); quiet.process(&mut a, &mut b); a }).collect();
+        for i in d..2000 { assert!((ys[i] - xs[i - d]).abs() < 1e-6, "sample {i}") }
+        let _ = (input, output);
     }
 }

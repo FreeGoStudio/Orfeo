@@ -224,7 +224,8 @@ channel set to the wrong instrument for the rest of the session.
   the glib-free builds crash with ≥ 8 audio groups). It plays the song from a
   flat time-sorted event list, splitting each period at event times, mixes the
   16 channels itself (fader = file CC7 × Orfeo volume, pan, mute fades, meters),
-  runs auto-level → compressor (no look-ahead) on the song bus only, adds live
+  runs auto-level → compressor → safety limiter (no look-ahead) → tone on the song bus only, then
+  a look-ahead brickwall (`Brickwall`, -1 dBFS ceiling, 2 ms, song + clicks only), adds live
   keys, metronome clicks (own bus, not on the master fader) and count-in clicks
   on its own clock, and soft-clips. Exclusive mode (~3–4 ms periods; *Low latency*, on only
   while a MIDI keyboard is connected, not saved) with automatic shared fallback. An exclusive stream skips Windows' software
