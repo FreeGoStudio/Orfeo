@@ -82,7 +82,8 @@ jobs:
       # for certification; 'draft' only uploads and leaves the submission for
       # you in Partner Center (--noCommit). The CLI takes only .msix files: an
       # .appx (what electron-builder makes) is the same package format, so it
-      # is handed over under that name.
+      # is handed over under that name. The Store accepts an .msix only if it
+      # targets Windows 10 1809 or newer: appx.minVersion in package.json.
       - name: Upload to the Store
         if: steps.setup.outputs.ready == 'true'
         shell: pwsh
