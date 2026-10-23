@@ -223,8 +223,21 @@ channel set to the wrong instrument for the rest of the session.
 - **Engine:** one audio thread owns WASAPI and FluidSynth (2.5.7 *glib* build —
   the glib-free builds crash with ≥ 8 audio groups). It plays the song from a
   flat time-sorted event list, splitting each period at event times, mixes the
-  16 channels itself (fader = file CC7 × Orfeo volume, pan, mute fades, meters),
-  runs auto-level → compressor → safety limiter (no look-ahead) → tone on the song bus only, then
+  16 channels itself (song CC7 × fader ÷ the song's first CC7 — `src/audio/songVolume.ts`,
+  shared with Samples, which plays the same CC7/CC11 moves; pan is CC10 to
+  FluidSynth, which pans each voice — a stereo pair's sides separately — as
+  spessasynth does; mute fades; meters). Reverb and chorus are not
+  FluidSynth's (both off): each channel's send, level × (the preset's own send
+  from the sound set + CC91/CC93) on the channel's L + R, corrected for mono vs
+  stereo samples and pan (`sf2.rs` reads the presets' generators;
+  REVERB_LEVEL / CHORUS_LEVEL measured against spessasynth), feeds
+  `reverb.rs`: a sample-exact port of the plate Samples plays (spessasynth's
+  Dattorro at its starting values — Orfeo never sends the GS reset that would
+  load Hall 2), and its chorus at starting values (no depth or rate: the send,
+  one sample late, at half level). Parity is measured,
+  not assumed: render the same song through both synths and compare each
+  part's level, reverb and chorus (local tool, docs/Tools/engine-parity).
+  It runs auto-level → compressor → safety limiter (no look-ahead) → tone on the song bus only, then
   a look-ahead brickwall (`Brickwall`, -1 dBFS ceiling, 2 ms, song + clicks only), adds live
   keys, metronome clicks (own bus, not on the master fader) and count-in clicks
   on its own clock, and soft-clips. Exclusive mode (~3–4 ms periods; *Low latency*, on only

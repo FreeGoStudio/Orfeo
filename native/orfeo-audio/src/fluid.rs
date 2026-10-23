@@ -16,6 +16,7 @@ pub struct Fluid {
     noteoff: unsafe extern "C" fn(Ptr, c_int, c_int) -> c_int,
     cc: unsafe extern "C" fn(Ptr, c_int, c_int, c_int) -> c_int,
     program: unsafe extern "C" fn(Ptr, c_int, c_int) -> c_int,
+    get_program: unsafe extern "C" fn(Ptr, c_int, *mut c_int, *mut c_int, *mut c_int) -> c_int,
     bend: unsafe extern "C" fn(Ptr, c_int, c_int) -> c_int,
     chan_pressure: unsafe extern "C" fn(Ptr, c_int, c_int) -> c_int,
     key_pressure: unsafe extern "C" fn(Ptr, c_int, c_int, c_int) -> c_int,
@@ -66,10 +67,10 @@ impl Fluid {
             // the glib build of 2.5.7 is fine. Use a glib build until fixed upstream.
             setint(settings, c("synth.audio-groups").as_ptr(), 16);
             setint(settings, c("synth.audio-channels").as_ptr(), 16);
-            // Effects stay on; their amount is set per channel (CC91 / CC93),
-            // which starts at 0 — same as the current Samples engine
-            setint(settings, c("synth.reverb.active").as_ptr(), 1);
-            setint(settings, c("synth.chorus.active").as_ptr(), 1);
+            // Reverb and chorus are the engine's own (reverb.rs, the Samples
+            // engine's), not FluidSynth's
+            setint(settings, c("synth.reverb.active").as_ptr(), 0);
+            setint(settings, c("synth.chorus.active").as_ptr(), 0);
             let synth = new_synth(settings);
             if synth.is_null() { return Err("new_fluid_synth failed".into()) }
 
@@ -79,6 +80,7 @@ impl Fluid {
                 noteoff: sym!(b"fluid_synth_noteoff"),
                 cc: sym!(b"fluid_synth_cc"),
                 program: sym!(b"fluid_synth_program_change"),
+                get_program: sym!(b"fluid_synth_get_program"),
                 bend: sym!(b"fluid_synth_pitch_bend"),
                 chan_pressure: sym!(b"fluid_synth_channel_pressure"),
                 key_pressure: sym!(b"fluid_synth_key_pressure"),
@@ -104,6 +106,13 @@ impl Fluid {
         if id < 0 { Err(format!("FluidSynth could not load {}", path.display())) } else { Ok(id) }
     }
     pub fn unload_soundfont(&mut self, id: i32) { unsafe { (self.sfunload)(self.synth, id, 1); } }
+
+    /// The sound set, bank and program a channel plays (`None` before it has one)
+    pub fn channel_program(&self, ch: u8) -> Option<(i32, u16, u16)> {
+        let (mut sf, mut bank, mut prog) = (0, 0, 0);
+        let ok = unsafe { (self.get_program)(self.synth, ch as c_int, &mut sf, &mut bank, &mut prog) } == 0;
+        (ok && sf > 0).then_some((sf, bank as u16, prog as u16))
+    }
 
     /// One raw MIDI channel message
     pub fn midi(&mut self, status: u8, d1: u8, d2: u8) {

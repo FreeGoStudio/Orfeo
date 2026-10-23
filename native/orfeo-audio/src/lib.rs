@@ -11,6 +11,8 @@ pub mod dynamics;
 pub mod engine;
 pub mod fluid;
 pub mod output;
+pub mod reverb;
+pub mod sf2;
 pub mod song;
 
 pub use engine::{Command, Engine, EngineConfig, Stats, LIVE_CH};

@@ -9,6 +9,8 @@ use crate::dsp::{soft_clip, HighShelf};
 use crate::dynamics::{AutoLevel, Brickwall, Compressor};
 use crate::fluid::Fluid;
 use crate::output::{Output, OutputMode, EXCLUSIVE_STEPS};
+use crate::reverb::{Chorus, Reverb};
+use crate::sf2::{preset_sends, PresetSend, CHORUS_LEVEL, REVERB_LEVEL};
 use crate::song::Song;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering::Relaxed};
@@ -255,14 +257,18 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
     // they get the shared stream instead (Windows' mixer handles them correctly)
     let mut refused: Vec<(String, String)> = Vec::new();
     let mut out_slot = match open_output(mode, step, &synced, &refused) { Ok(o) => Some(o), Err(e) => { let _ = ready.send(Err(e)); return } };
-    let make_fluid = |rate: u32| -> Result<Fluid, String> {
+    // each sound set's own reverb and chorus per instrument (sf2.rs), in load order;
+    // `sf_ids` are FluidSynth's ids for them in the current synth
+    let own_sends: Vec<std::collections::HashMap<(u16, u16), PresetSend>> = soundfonts.iter().map(|p| preset_sends(p)).collect();
+    let make_fluid = |rate: u32| -> Result<(Fluid, Vec<i32>), String> {
         let mut f = Fluid::new(&fluid_dir, rate as f64)?;
-        for sf in &soundfonts { f.load_soundfont(sf)?; }
+        let mut ids = Vec::new();
+        for sf in &soundfonts { ids.push(f.load_soundfont(sf)?); }
         for ch in 0..16u8 { f.midi(0xB0 | ch, 91, 0); f.midi(0xB0 | ch, 93, 0); }
         f.midi(0xC0 | LIVE_CH as u8, 0, 0);
-        Ok(f)
+        Ok((f, ids))
     };
-    let mut fluid = match make_fluid(out_slot.as_ref().unwrap().rate) { Ok(f) => f, Err(e) => { let _ = ready.send(Err(e)); return } };
+    let (mut fluid, mut sf_ids) = match make_fluid(out_slot.as_ref().unwrap().rate) { Ok(f) => f, Err(e) => { let _ = ready.send(Err(e)); return } };
     let _ = ready.send(Ok(()));
 
     let mut tr = Transport {
@@ -312,6 +318,11 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         let mut safety = Compressor::safety(rate as f32);
         // never above -1 dBFS, on any sound card; holds the song and clicks back 2 ms
         let mut ceiling = Brickwall::new(rate as f32, -1.0, 0.002, 0.08);
+        // the Samples engine's room: every channel's reverb send, summed, into its plate
+        let mut plate = Reverb::new(rate as f32);
+        let mut plate_in = vec![0f32; n];
+        let mut chorus = Chorus::new();
+        let mut chorus_in = vec![0f32; n];
         let mut clicks = Clicks::new(rate as f32);
         clicks.volume = clicks_volume;
         let smooth = 1.0 - (-1.0 / (0.005 * rate as f32)).exp(); // ~5 ms gain ramps
@@ -400,9 +411,12 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                     Command::SetAudibleTracks(a) => { tr.audible = a; tr.recompute_channel_mutes(); }
                     Command::SetChannel { ch, volume, pan, reverb, chorus } => {
                         let c = (ch & 0x0F) as usize;
-                        mix.strips[c].volume = volume.clamp(0.0, 2.0);
+                        mix.strips[c].volume = volume.clamp(0.0, 16.0); // × the song's own volume: may be well above 1
                         send_volume(&mut fluid, c, &file_cc7, &mix.strips);
-                        mix.strips[c].pan = pan.clamp(-1.0, 1.0);
+                        // pan goes to FluidSynth, which places each note's samples as the Samples synth
+                        // does (a stereo recording's two sides separately, keeping its width)
+                        let pan = pan.clamp(-1.0, 1.0);
+                        if mix.strips[c].pan != pan { mix.strips[c].pan = pan; fluid.midi(0xB0 | c as u8, 10, pan_cc(pan)); }
                         let (rv, cv) = ((reverb.clamp(0.0, 1.0) * 127.0) as u8, (chorus.clamp(0.0, 1.0) * 127.0) as u8);
                         if sends[c] != (reverb, chorus) { fluid.midi(0xB0 | c as u8, 91, rv); fluid.midi(0xB0 | c as u8, 93, cv); sends[c] = (reverb, chorus); }
                     }
@@ -525,26 +539,33 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
 
             // ── Mix the 16 channels into the song bus and the live bus ──────
             sl[..avail].fill(0.0); sr[..avail].fill(0.0);
+            plate_in[..avail].fill(0.0); chorus_in[..avail].fill(0.0);
             // (metronome clicks for this period already sit in kl/kr)
             for ch in 0..16 {
                 let st = &mut mix.strips[ch];
                 let target = if tr.channel_muted[ch] { 0.0 } else { 1.0 };
-                let (pl, pr) = pan_gains(st.pan);
                 let (bl, br) = if ch == LIVE_CH && !song_uses_channel(&tr, LIVE_CH) { (&mut ll, &mut lr) } else { (&mut sl, &mut sr) };
                 let (cl, cr) = (&chans[2 * ch], &chans[2 * ch + 1]);
+                // reverb and chorus sends as the Samples synth makes them (sf2.rs)
+                let ps = fluid.channel_program(ch as u8)
+                    .and_then(|(sf, bank, prog)| sf_ids.iter().position(|&id| id == sf).and_then(|i| own_sends[i].get(&(bank, prog)).copied()))
+                    .unwrap_or_default();
+                let send = ps.send(ps.reverb, sends[ch].0, st.pan, REVERB_LEVEL);
+                let csend = ps.send(ps.chorus, sends[ch].1, st.pan, CHORUS_LEVEL);
                 let mut peak = 0f32;
                 for i in 0..avail {
                     st.gain += (target - st.gain) * smooth;
-                    let (a, b) = (cl[i] * st.gain * pl, cr[i] * st.gain * pr);
+                    let (a, b) = (cl[i] * st.gain, cr[i] * st.gain);
                     bl[i] += a; br[i] += b;
+                    let dry = (cl[i] + cr[i]) * st.gain;
+                    plate_in[i] += dry * send; chorus_in[i] += dry * csend;
                     peak = peak.max(a.abs()).max(b.abs());
                 }
                 fmax_atomic(&stats.channel_peaks[ch], peak);
             }
 
-            // FluidSynth's chorus comes back 3 dB quieter than the Samples engine's (measured
-            // on the same sound sets); its reverb already matches
-            for i in 0..avail { sl[i] += fx[0][i] + fx[2][i] * CHORUS_MATCH; sr[i] += fx[1][i] + fx[3][i] * CHORUS_MATCH; }
+            plate.process(&plate_in[..avail], &mut sl[..avail], &mut sr[..avail]);
+            chorus.process(&chorus_in[..avail], &mut sl[..avail], &mut sr[..avail]);
 
             // ── Song bus: master → auto-level → compressor → safety limiter → tone, + clicks → ceiling (-1 dBFS look-ahead);
             //    live bus: master → tone, added after; then Windows' volume (when the engine applies it) and the soft clip ──
@@ -600,8 +621,8 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                 Ok(o) => {
                     if o.rate != old_rate {
                         // FluidSynth is built for one sample rate: rebuild it, then restore the song state
-                        match make_fluid(o.rate) { Ok(f) => fluid = f, Err(e) => { *stats.error.lock().unwrap() = Some(e); break 'device } }
-                        for (c, s) in sends.iter().enumerate() { fluid.midi(0xB0 | c as u8, 91, (s.0 * 127.0) as u8); fluid.midi(0xB0 | c as u8, 93, (s.1 * 127.0) as u8); }
+                        match make_fluid(o.rate) { Ok((f, ids)) => { fluid = f; sf_ids = ids }, Err(e) => { *stats.error.lock().unwrap() = Some(e); break 'device } }
+                        for (c, s) in sends.iter().enumerate() { fluid.midi(0xB0 | c as u8, 91, (s.0 * 127.0) as u8); fluid.midi(0xB0 | c as u8, 93, (s.1 * 127.0) as u8); fluid.midi(0xB0 | c as u8, 10, pan_cc(mix.strips[c].pan)); }
                     }
                     replay_state(&mut fluid, &tr, &mut file_cc7, &mix.strips);
                     out_slot = Some(o);
@@ -650,39 +671,16 @@ fn pro_audio_priority() -> Mmcss {
     }
 }
 
-const CHORUS_MATCH: f32 = std::f32::consts::SQRT_2;
-
-/// Pan as the Samples engine (and the SoundFont standard) does it: equal power,
-/// so a part moved to one side gets louder there, not just quieter on the
-/// other. FluidSynth renders each channel centred (each side at -3 dB), so the
-/// gains are relative to centre: 1 / 1 there, up to √2 / 0 fully to one side.
-fn pan_gains(pan: f32) -> (f32, f32) {
-    let theta = (pan.clamp(-1.0, 1.0) + 1.0) * std::f32::consts::FRAC_PI_4;
-    (theta.cos() * std::f32::consts::SQRT_2, theta.sin() * std::f32::consts::SQRT_2)
-}
-
-#[cfg(test)]
-mod pan_tests {
-    use super::pan_gains;
-    #[test]
-    fn pan_matches_the_samples_engine() {
-        // the Samples synth's pan law, relative to its centre (cos/sin of 45°)
-        let samples = |pan: f32| { let a = (pan + 1.0) * std::f32::consts::FRAC_PI_4; (a.cos() / 0.5f32.sqrt(), a.sin() / 0.5f32.sqrt()) };
-        for pan in [-1.0f32, -0.6, -0.2, 0.0, 0.33, 0.67, 1.0] {
-            let (l, r) = pan_gains(pan);
-            let (sl, sr) = samples(pan);
-            assert!((l - sl).abs() < 1e-4 && (r - sr).abs() < 1e-4, "pan {pan}: {l},{r} vs {sl},{sr}");
-        }
-        assert!((pan_gains(0.0).0 - 1.0).abs() < 1e-5);
-    }
-}
+/// Orfeo's pan (-1…1) as CC10, as the Samples engine sends it
+fn pan_cc(pan: f32) -> u8 { ((pan + 1.0) * 63.5).round().clamp(0.0, 127.0) as u8 }
 
 fn song_uses_channel(tr: &Transport, ch: usize) -> bool { tr.track_channels.iter().any(|m| m & (1 << ch) != 0) }
 
-/// Synth volume for a channel = the file's CC7 × Orfeo's fader, so the
-/// channel's reverb and chorus follow the fader too. Orfeo's fader already
-/// starts at the file's volume and the app sends no CC7 events, so this
-/// stays at full (127) — as in the Web Audio engine — unless a caller does.
+/// Synth volume for a channel = the song's CC7 at this moment × the strip's
+/// volume, so the channel's reverb and chorus follow both. The app sends the
+/// song's volume moves and, as the strip's volume, the fader ÷ the song's
+/// first volume (src/audio/songVolume.ts): untouched, the song plays exactly
+/// as written. A channel the song never sets stays at 127 × the fader.
 fn send_volume(fluid: &mut Fluid, ch: usize, file_cc7: &[u8; 16], strips: &[Strip; 16]) {
     let v = (file_cc7[ch] as f32 * strips[ch].volume).round().clamp(0.0, 127.0) as u8;
     fluid.midi(0xB0 | ch as u8, 7, v);
@@ -691,6 +689,8 @@ fn send_volume(fluid: &mut Fluid, ch: usize, file_cc7: &[u8; 16], strips: &[Stri
 /// Instruments, banks, controllers and pedals as they stand at the playhead
 fn replay_state(fluid: &mut Fluid, tr: &Transport, file_cc7: &mut [u8; 16], strips: &[Strip; 16]) {
     *file_cc7 = [127; 16];
+    // expression starts full; a swell the song made later must not linger after a jump back
+    for ch in 0..16u8 { fluid.midi(0xB0 | ch, 11, 127) }
     for &(s, a, b) in &tr.song.state_before(tr.pos) {
         let ch = (s & 0x0F) as usize;
         if s & 0xF0 == 0xC0 && tr.program_override[ch].is_some() { continue }
