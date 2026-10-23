@@ -13,6 +13,8 @@ import { pushHitEffect, amberHex } from '../utils/hitEffectQueue'
 import { isHomogeneousHandTrack, resolveHandAwareColor } from '../utils/handColors'
 import { startNative, stopNative, nativeCall, isNativeRunning, useNativeAudio, onNativeRestart } from './nativeClient'
 import { programTimeline } from './programTimeline'
+import { volumeRatio } from './songVolume'
+import type { ControlEvent, ParsedTrack } from '../types'
 
 // FluidSynth at gain 1 sits ~6 dB under the Samples engine (which boosts ×3);
 // this brings Native to the same loudness at the same master volume
@@ -27,9 +29,14 @@ interface Ch { volume: number; pan: number; reverb: number; chorus: number }
 const _ch: Ch[] = Array.from({ length: 16 }, () => ({ volume: 1, pan: 0, reverb: 0, chorus: 0 }))
 let _masterReverb: number | null = null
 let _masterChorus: number | null = null
+// Per channel, the track whose volume moves the song plays there: the engine
+// multiplies them by the fader ÷ the song's first volume (songVolume.ts)
+const _volumeTrack: (ParsedTrack | undefined)[] = Array(16).fill(undefined)
 function pushChannel(c: number) {
   const s = _ch[c]
-  nativeCall('setChannel', c, s.volume, s.pan, _masterReverb ?? s.reverb, _masterChorus ?? s.chorus)
+  const t = _volumeTrack[c]
+  const volume = t ? volumeRatio(t, s.volume) : s.volume
+  nativeCall('setChannel', c, volume, s.pan, _masterReverb ?? s.reverb, _masterChorus ?? s.chorus)
 }
 export const nativeSetChannelVolume = (c: number, v: number) => { _ch[c].volume = v; pushChannel(c) }
 export const nativeSetChannelPan = (c: number, v: number) => { _ch[c].pan = v; pushChannel(c) }
@@ -88,6 +95,14 @@ function sendSong() {
       ev.push([n.time + Math.max(n.duration, 0.04), 0, t.index, 0x80 | ch, n.midi, 0])
     }
     for (const p of t.sustainEvents ?? []) ev.push([p.time, 1, t.index, 0xb0 | ch, 64, p.down ? 127 : 0])
+    // the song's own volume and expression moves (the first one holds from the start, as in songVolume.ts)
+    ;(t.volumeEvents ?? []).forEach((e: ControlEvent, i: number) => ev.push([i ? e.time : 0, 1, t.index, 0xb0 | ch, 7, Math.round(e.value * 127)]))
+    ;(t.expressionEvents ?? []).forEach((e: ControlEvent, i: number) => ev.push([i ? e.time : 0, 1, t.index, 0xb0 | ch, 11, Math.round(e.value * 127)]))
+  }
+  _volumeTrack.fill(undefined)
+  for (const t of midi.tracks) {
+    const ch = t.channel & 0x0f
+    if (t.volumeEvents?.length && !_volumeTrack[ch]) _volumeTrack[ch] = t
   }
   // Each channel's instrument, switching where one of its tracks takes over
   // (a file track that changes instrument is split into one track per instrument)

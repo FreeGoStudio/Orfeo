@@ -13,6 +13,7 @@ import { pushHitEffect, amberHex } from '../utils/hitEffectQueue'
 import { isHomogeneousHandTrack, resolveHandAwareColor } from '../utils/handColors'
 import { NES } from '../utils/noteEditorState'
 import { programTimeline, programAt } from '../audio/programTimeline'
+import { volumeAt, expressionAt, valueAt, volumeRatio } from '../audio/songVolume'
 import { useMidiSettings, latencyOffsetSec, midiPrefsReady } from '../store/midiSettings'
 
 // ── Live edit-buffer awareness — mirrors useAudioEngine.ts's activeMidiData().
@@ -314,6 +315,11 @@ let _epochStartFileSec = 0  // file-native seconds at that same moment
 // scheduled notes on every refill.
 const _noteCursor = new Map<number, number>()
 const _sustainCursor = new Map<number, number>()
+// the song's own volume (CC7) and expression (CC11) moves still to come, per track
+const _volumeCursor = new Map<number, number>()
+const _expressionCursor = new Map<number, number>()
+// per channel, the track whose volume moves play there (for the live fader)
+const _volumeTrackByCh = new Map<number, any>()
 // Instrument switches still to come this run, per channel (see programTimeline)
 let _programSwitches: { ch: number; time: number; program: number }[] = []
 let _programCursor = 0
@@ -645,8 +651,10 @@ function buildSamplesPlayer(startSec: number) {
   _samplesChanInit.clear()
   _noteCursor.clear()
   _sustainCursor.clear()
+  _volumeCursor.clear()
+  _expressionCursor.clear()
   _homogeneousCache.clear()
-  applyTrackMix(midiData, tracks)
+  applyTrackMix(midiData, tracks, startSec)
   // Each channel's instrument where playback starts, then its switches to come
   // (a file track that changes instrument is split into one track per instrument)
   _programSwitches = []
@@ -670,6 +678,12 @@ function buildSamplesPlayer(startSec: number) {
     let startIdx = track.notes.findIndex((n: any) => n.time >= startSec)
     if (startIdx === -1) startIdx = track.notes.length
     _noteCursor.set(track.index, startIdx)
+    // volume/expression: the values at startSec are already set (applyTrackMix)
+    for (const [cursor, ev] of [[_volumeCursor, track.volumeEvents], [_expressionCursor, track.expressionEvents]] as const) {
+      if (!ev?.length) continue
+      const i = ev.findIndex((e: any) => e.time > startSec)
+      cursor.set(track.index, i === -1 ? ev.length : i)
+    }
 
     // ── Sustain pedal (CC64) — if playback starts under a held pedal, set it
     // down now so the passage isn't dry. clearSchedule() already reset every
@@ -773,6 +787,23 @@ function refillSchedule() {
       }
       _sustainCursor.set(track.index, sCursor)
     }
+
+    // ── The song's volume and expression moves; volume under the fader as it is when each plays
+    for (const [cursor, ev, cc] of [[_volumeCursor, track.volumeEvents, 7], [_expressionCursor, track.expressionEvents, 11]] as const) {
+      if (!ev?.length) continue
+      let c = cursor.get(track.index) ?? ev.length
+      while (c < ev.length && ev[c].time < targetFileSec) {
+        const e = ev[c++]
+        const delay = Math.max(0, (e.time - nowFileSec()) / _epochRatio * 1000)
+        const trackIndex = track.index
+        _schedule.push(setTimeout(() => {
+          const fader = useStore.getState().tracks.find(t => t.index === trackIndex)?.volume ?? 1
+          const v = cc === 7 ? volumeAt(track, fader, e.time) : e.value
+          try { ;(_synth as any)?.controllerChange(ch, cc, Math.round(v * 127)) } catch {}
+        }, delay))
+      }
+      cursor.set(track.index, c)
+    }
   }
 }
 
@@ -785,13 +816,17 @@ let _masterReverb: number | null = null
 // Console shows them (seeded from the file's own CC7/10/91/93 on load). Pushed
 // at every play start: until this existed the synth only heard them once a
 // knob was moved, so every song played at full volume, centred and dry. ────
-function applyTrackMix(midiData: any, tracks: ReturnType<typeof useStore.getState>['tracks']): void {
+function applyTrackMix(midiData: any, tracks: ReturnType<typeof useStore.getState>['tracks'], startSec = 0): void {
+  _volumeTrackByCh.clear()
   for (const track of midiData.tracks) {
     const ts = tracks.find(t => t.index === track.index)
     if (!ts) continue
     const ch = track.channel
     const cc = (n: number, v: number) => { try { ;(_synth as any).controllerChange(ch, n, Math.round(Math.max(0, Math.min(1, v)) * 127)) } catch {} }
-    cc(7, ts.volume)
+    // the song's volume and expression where playback starts (songVolume.ts)
+    cc(7, volumeAt(track, ts.volume, startSec))
+    cc(11, expressionAt(track, startSec))
+    if (track.volumeEvents?.length && !_volumeTrackByCh.has(ch)) _volumeTrackByCh.set(ch, track)
     try { ;(_synth as any).controllerChange(ch, 10, Math.round(Math.max(0, Math.min(127, ((ts.pan ?? 0) + 1) * 63.5)))) } catch {}
     cc(91, _masterReverb ?? ts.reverb ?? 0)
     cc(93, _masterChorus ?? ts.chorus ?? 0)
@@ -925,7 +960,10 @@ export function setChannelPan(ch: number, value: number): void {
 // value: 0…1 (fader); maps to CC7 0–127
 export function setChannelVolume(ch: number, value: number): void {
   if (!_synth || !_synthReady) return
-  const val = Math.round(Math.max(0, Math.min(1, value)) * 127)
+  // a channel the song moves: its volume right now, under the new fader position
+  const t = _volumeTrackByCh.get(ch)
+  const v = t ? valueAt(t.volumeEvents, nowFileSec()) * volumeRatio(t, value) : value
+  const val = Math.round(Math.max(0, Math.min(1, v)) * 127)
   try { ;(_synth as any).controllerChange(ch, 7, val) } catch {}
 }
 

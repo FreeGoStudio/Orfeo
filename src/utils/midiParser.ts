@@ -107,6 +107,16 @@ export function parseMidiBuffer(buffer: ArrayBuffer, fileName: string, filePath 
           .filter((e: { down: boolean }, i: number, arr: { down: boolean }[]) => i === 0 || e.down !== arr[i - 1].down)
       : undefined
 
+    // ── Volume (CC7) and expression (CC11) through the song, repeats dropped
+    const controlEvents = (n: number) => {
+      const arr = (track as any).controlChanges?.[n]
+      if (!Array.isArray(arr) || arr.length === 0) return undefined
+      return arr
+        .map((e: any) => ({ time: e.time ?? 0, value: e.value }))
+        .sort((a: { time: number }, b: { time: number }) => a.time - b.time)
+        .filter((e: { value: number }, i: number, a: { value: number }[]) => i === 0 || e.value !== a[i - 1].value)
+    }
+
     const parsedTrack: any = {
       index: tracks.length,
       name: track.name || gmName,
@@ -122,6 +132,8 @@ export function parseMidiBuffer(buffer: ArrayBuffer, fileName: string, filePath 
       _cc91: parseCC(91),
       _cc93: parseCC(93),
       sustainEvents,
+      volumeEvents: controlEvents(7),
+      expressionEvents: controlEvents(11),
     }
 
     tracks.push(parsedTrack)

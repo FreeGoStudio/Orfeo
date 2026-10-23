@@ -53,6 +53,11 @@ export interface SustainEvent {
   down: boolean  // true = pedal pressed (CC64 ≥ 64)
 }
 
+export interface ControlEvent {
+  time: number   // seconds, at the file's own tempo
+  value: number  // 0–1
+}
+
 export interface ParsedTrack {
   index: number
   name: string
@@ -68,6 +73,11 @@ export interface ParsedTrack {
   // spessasynth so pedalled passages ring; the GM engine gets pedal for free
   // (it streams the raw MIDI). Absent when the file has no CC64 data. ────────
   sustainEvents?: SustainEvent[]
+  // ── The song's own volume (CC7) and expression (CC11) as it moves: fades,
+  // swells, a part brought up for its solo. Both engines play them on top of
+  // the Console fader (src/audio/songVolume.ts). Absent when the file has none.
+  volumeEvents?: ControlEvent[]
+  expressionEvents?: ControlEvent[]
 }
 
 export interface TempoEvent {
