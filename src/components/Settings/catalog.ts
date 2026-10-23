@@ -17,7 +17,8 @@ export interface GroupTab {
   aside?: string            // id of a small live readout at the right of the tab row (defs/midi.tsx TAB_ASIDES)
 }
 // `stack`: explicit columns for an untabbed group (top to bottom); every column ends at the same line
-export interface GroupInfo { id: SettingsGroupId; name: string; intro: string; manualUrl: string; tabs?: GroupTab[]; stack?: SettingId[][] }
+// `looseFirst`: with `stack`, the first column grows on its own when its card opens up
+export interface GroupInfo { id: SettingsGroupId; name: string; intro: string; manualUrl: string; tabs?: GroupTab[]; stack?: SettingId[][]; looseFirst?: boolean }
 
 export type SettingId =
   | 'soundEngine' | 'soundFonts' | 'autoLevel'
@@ -52,11 +53,12 @@ export const GROUPS: GroupInfo[] = [
   { id: 'playback-editing', name: t`Playback`, intro: t`Shape playback`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files',
     stack: [['tapTempo'], ['tempoWarnings', 'preciseScrubTime'], ['countIn', 'loopRegion', 'focusMode']] },
   { id: 'practice', name: t`Practice`, intro: t`Tools for practising`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files' },
-  { id: 'editing', name: t`Editing`, intro: t`Edit your songs`, manualUrl: 'https://orfeo.cc/docs/editing-midi-files' },
+  { id: 'editing', name: t`Editing`, intro: t`Edit your songs`, manualUrl: 'https://orfeo.cc/docs/editing-midi-files',
+    stack: [['handAssignment'], ['noteEditor'], ['trackVu']], looseFirst: true },
   { id: 'notation', name: t`Chords & Notation`, intro: t`Read chords and notes`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files/how-orfeo-reads-chords' },
   { id: 'keyboard', name: t`Virtual Keyboard`, intro: t`Set up the keyboard`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
   { id: 'piano-roll', name: t`Piano Roll`, intro: t`Tune the falling notes`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll',
-    stack: [['visualEffects'], ['rollZoom'], ['barNumbers', 'playbar']] },
+    stack: [['visualEffects'], ['rollZoom'], ['barNumbers', 'playbar']], looseFirst: true },
   { id: 'appearance', name: t`Appearance`, intro: t`Change the look`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
 ]
 
