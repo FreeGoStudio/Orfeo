@@ -74,12 +74,17 @@ telemetry; MIDI files are processed entirely on your device.
   them, in Practice (moving split line) or Performance (per-note tags) mode, with
   optional colourblind-friendly L/R badges
 - **Hardware MIDI input** — play along on a real keyboard with true sustain and
-  multi-device support
+  multi-device support. A dedicated *MIDI Keyboard* page in Settings lists every
+  keyboard by name and sets touch response, pedals and controls, and a double-note
+  filter, with a **Delay check** that shows where every millisecond between key and
+  speaker goes
+- **Step Through** — walk through a song one note or chord at a time with `→` and
+  `←`, at your own pace
 
 ### Chord & Scale Explorers
 
 - **Chord Explorer** — browse and audition any chord in any key; filter by hand
-  span or note count; cycle inversions; play progressions in seven voicing
+  span or note count; cycle inversions; play progressions in nine chord
   styles
 - **Scale Explorer** — interactive Circle of Fifths; ten scale types, each with
   its diatonic chords and Roman numerals
@@ -112,17 +117,25 @@ telemetry; MIDI files are processed entirely on your device.
 ### Audio
 
 - **Master volume** — a physical-feeling toolbar knob, persists across sessions
-- **Two engines** — **General MIDI** (instant, no download) or **Samples**
-  (SpessaSynth + downloadable SF2/SF3 soundfonts, GeneralUser GS by default) for
-  far richer sound
+- **Three sound engines** — **GM** (General MIDI: instant, no download),
+  **Studio** (SpessaSynth + downloadable SF2/SF3 soundfonts, GeneralUser GS by
+  default) for far richer sound, and **Native** *(beta)*, which plays the same
+  soundfonts straight to your sound card so a MIDI keyboard is heard in under
+  10 ms. Native mixes songs like Studio and has two modes: **Shared** (other apps
+  keep playing) and **Exclusive** (the shortest latency from keyboard to speaker,
+  3-10 ms in average, depending on your sound card). A connected keyboard switches
+  it to Exclusive by itself
+- **Your own mix, played as written** — both engines follow a song's own volume
+  swells and fades, tracks sharing a MIDI channel share its mix, and parts that
+  change instrument mid-song switch at the right moment
 
 ### Settings
 
 - **Setup** — the everyday switches (sound engine, Focus mode, Tap Tempo, note
   names, key range, zoom…) in the left panel, each with a one-line explanation
-- **Settings window** (`Ctrl` `,`) — every setting in eight groups with full
+- **Settings window** (`Ctrl` `,`) — every setting in nine groups with full
   descriptions, a search box, and a link to the matching page of the online
-  manual
+  manual. Hints can be switched off with the *Tooltips* switch under Appearance
 
 Full walkthrough of every feature: **[orfeo.cc/docs](https://orfeo.cc/docs)**.
 
@@ -142,6 +155,10 @@ page:
 </tbody>
 </table>
 
+Prefer the Store? Orfeo is also in the
+[Microsoft Store](https://apps.microsoft.com/detail/9NJ9Q01P8JQD), which keeps it
+up to date for you.
+
 Not sure which, or want to know how they differ (auto-updates, where settings
 live)? See **[docs/INSTALLATION.md](docs/INSTALLATION.md)**.
 
@@ -154,6 +171,7 @@ live)? See **[docs/INSTALLATION.md](docs/INSTALLATION.md)**.
 <thead><tr><th>Document</th><th>What's in it</th></tr></thead>
 <tbody>
 <tr><td><a href="https://orfeo.cc/docs">User manual</a></td><td>The complete guide — Play, Edit, Practice, Manage files, Extras (online at orfeo.cc)</td></tr>
+<tr><td><a href="https://orfeo.cc/docs/support/roadmap">Roadmap</a></td><td>What is being built next</td></tr>
 <tr><td><a href="docs/SHORTCUTS.md">Shortcuts</a></td><td>Every keyboard and mouse gesture</td></tr>
 <tr><td><a href="docs/INSTALLATION.md">Installation</a></td><td>Installer vs. portable, updates, where data lives</td></tr>
 <tr><td><a href="docs/ARCHITECTURE.md">Architecture</a></td><td>How Orfeo is built and why</td></tr>
@@ -194,8 +212,8 @@ no account.
 
 No account, no login, no telemetry — and no internet connection is needed to
 play, practise or edit. MIDI files are processed entirely on your device, and
-both sound engines work offline: the Samples engine's default sound set
-(GeneralUser GS) ships inside the installer.
+every sound engine works offline: the default sound set (GeneralUser GS)
+ships inside the installer.
 
 Orfeo only goes online when you ask it to, or to check for updates:
 
@@ -204,9 +222,10 @@ Orfeo only goes online when you ask it to, or to check for updates:
   button in Settings → Audio, and kept in `%APPDATA%\Orfeo\soundfonts\`
   (your own imported `.sf2` / `.sf3` files go there too).
 - **Updates:** the installed version checks GitHub for a new release when it
-  starts; the portable version only shows a link. Offline, this simply
+  starts; the portable version only shows a link, and *Check for updates* in the
+  Microsoft Store version opens Orfeo's Store page. Offline, this simply
   doesn't happen.
-- **Links** (How to Use, GitHub) open in your web browser.
+- **Links** (user manual, GitHub) open in your web browser.
 
 </details>
 
