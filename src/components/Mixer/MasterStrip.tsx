@@ -148,7 +148,7 @@ function CompressorPresetKnob({ presetIndex, onChange, disabled, interactive }: 
   // the same "switch engines" explanation instead of its own preset info —
   // there's nothing preset-specific to say if you can't select any of them.
   const content = hoverPreset === null ? null
-    : disabled ? { title: 'Compressor', description: 'You must switch to Samples engine to use the Compressor.' }
+    : disabled ? { title: 'Compressor', description: 'Switch to the Studio or Native engine to use the Compressor.' }
     : hovered ? { title: hovered.label, description: `${hovered.ratio}:1 ratio, ${hovered.threshold} dB threshold` }
     : null
 
@@ -664,14 +664,14 @@ export default function MasterStrip() {
           accentColor="var(--knob-chorus)" size={52}
           disabled={knobsDisabled} label="Chorus" labelOffset={-10}
           title="Chorus" description="Thickens the overall mix by layering slightly detuned copies of it"
-          disabledHint="You must switch to Samples engine to use Chorus."
+          disabledHint="Switch to the Studio or Native engine to use Chorus."
         />
         <MixerKnob
           value={reverb} onChange={handleReverb}
           accentColor="var(--knob-reverb)" size={52}
           disabled={knobsDisabled} label="Reverb" labelOffset={-10}
           title="Reverb" description="Adds room/space ambience to the mix"
-          disabledHint="You must switch to Samples engine to use Reverb."
+          disabledHint="Switch to the Studio or Native engine to use Reverb."
         />
       </div>
 
@@ -706,7 +706,7 @@ export default function MasterStrip() {
             accentColor="var(--knob-tone)" size={52}
             disabled={knobsDisabled} bipolar
             title="Tone" description="Tilts the overall EQ darker or brighter"
-            disabledHint="You must switch to Samples engine to use Tone."
+            disabledHint="Switch to the Studio or Native engine to use Tone."
           />
           <span style={{
             position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
@@ -725,7 +725,7 @@ export default function MasterStrip() {
         <Tooltip
           title={knobsDisabled ? 'Compressor' : masterCompEnabled ? 'Compressor on' : 'Compressor off'}
           description={knobsDisabled
-            ? 'You must switch to Samples engine to use the Compressor.'
+            ? 'Switch to the Studio or Native engine to use the Compressor.'
             : 'Automatically pulls down the loudest peaks so playback stays clear of digital clipping, without a blanket volume cut. Click to toggle.'}
         >
         <button

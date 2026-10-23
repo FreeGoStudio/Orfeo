@@ -20,4 +20,9 @@ export interface SettingDef {
   NameRight?: ComponentType     // small readout at the right end of the name line — Setup only (choice settings)
   useVisible?: () => boolean    // hook; false hides the setting in both places
   badge?: 'beta'
+  // 'controlFirst': the control right under the name, then the glance lines, then
+  // the description (which may change with the choice), then the follow-up options
+  layout?: 'controlFirst'
+  QuickExtra?: ComponentType    // follow-up control shown in Setup only (under the glance)
+  notice?: boolean              // amber-bordered, for an information card
 }

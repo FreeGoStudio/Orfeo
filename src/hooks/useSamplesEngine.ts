@@ -220,6 +220,10 @@ export function getStartedStable(): boolean | null { return _startedStable }
 export function getSamplesSampleRate(): number {
   return _ctx?.sampleRate ?? 0
 }
+// The browser's own sound buffer for this output (Settings readout)
+export function getSamplesBufferSec(): number {
+  return _ctx?.baseLatency ?? 0
+}
 
 function ensureLiveChannel() {
   if (!_synth || !_liveProgramDirty) return

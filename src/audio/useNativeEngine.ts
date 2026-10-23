@@ -55,13 +55,15 @@ export const nativeSetMasterPan = (_v: number) => { /* master pan: not in the na
 // browser or video call keeps playing) unless a MIDI keyboard is connected.
 // A keyboard connecting (or found at startup) turns it on, the last one
 // unplugged turns it off; switching it by hand holds until the next of
-// those. Never saved, so every start begins from that rule. ───────────────
+// those. Never saved, so every start begins from that rule. The rule itself
+// can be switched off (MIDI Keyboard › Sound & Latency: autoLowLatency). ──
 let _keyboards = new Set<string>()
 useMidiSettings.subscribe((m) => {
   const now = new Set(m.devices.filter(d => d.connected).map(d => d.key))
   const fresh = [...now].some(k => !_keyboards.has(k))
   const allGone = _keyboards.size > 0 && now.size === 0
   _keyboards = now
+  if (!m.autoLowLatency) return
   if (fresh) setLowLatency(true)
   else if (allGone) setLowLatency(false)
 })

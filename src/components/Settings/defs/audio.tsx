@@ -1,7 +1,9 @@
+import { useEffect, useState, type ReactNode } from 'react'
 import { Volume2, Library, Gauge, Upload } from 'lucide-react'
 import { useStore } from '../../../store'
 import { t } from '../../../utils/i18n'
 import { OptionBtn, Switch, SettingsDropdown, SoundfontActionLink, HelpText } from '../controls'
+import { getSamplesSampleRate, getSamplesBufferSec } from '../../../hooks/useSamplesEngine'
 import {
   useSoundfontState, useOutputLatency, chooseSamplesFromQuick, selectSoundfont,
   downloadSoundfont, deleteSoundfont, importSoundfont, allSoundfonts,
@@ -18,122 +20,136 @@ function SoundEngineControl() {
   const audioEngine = useStore((s) => s.audioEngine)
   return (
     <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-      <OptionBtn active={audioEngine === 'gm'} onClick={async () => { if (useStore.getState().audioEngine === 'native') await stopNative(); useStore.getState().setAudioEngine('gm') }}>General MIDI</OptionBtn>
-      <OptionBtn active={audioEngine === 'samples'} onClick={chooseSamplesFromQuick}>Samples</OptionBtn>
-      {NATIVE_AVAILABLE && (
-        <OptionBtn active={audioEngine === 'native'} onClick={() => useStore.getState().setAudioEngine('native')}
-          title={t`Orfeo's own low-latency engine: the Samples sound, played straight to your sound card`}>{t`Native (beta)`}</OptionBtn>
-      )}
+      <OptionBtn active={audioEngine === 'gm'} onClick={async () => { if (useStore.getState().audioEngine === 'native') await stopNative(); useStore.getState().setAudioEngine('gm') }}>GM</OptionBtn>
+      <OptionBtn active={audioEngine === 'samples'} onClick={chooseSamplesFromQuick}>{t`Studio`}</OptionBtn>
+      {NATIVE_AVAILABLE && <OptionBtn active={audioEngine === 'native'} onClick={() => useStore.getState().setAudioEngine('native')}>{t`Native`}</OptionBtn>}
     </div>
   )
 }
 
-// Output delay + the one-line sound-set status (Quick Settings and window)
+// Windows' default output, by name ("Speakers (Realtek(R) Audio)") — what GM and
+// Studio play through
+function useDefaultOutputName(): string {
+  const [name, setName] = useState('')
+  useEffect(() => {
+    const read = () => navigator.mediaDevices?.enumerateDevices?.().then(list => {
+      const d = list.find(x => x.kind === 'audiooutput' && x.deviceId === 'default') ?? list.find(x => x.kind === 'audiooutput')
+      setName((d?.label ?? '').replace(/^Default - /, ''))
+    }).catch(() => {})
+    void read()
+    navigator.mediaDevices?.addEventListener?.('devicechange', read)
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', read)
+  }, [])
+  return name
+}
+
+const rowStyle = { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 10, alignItems: 'baseline', marginTop: 4,
+  fontSize: 10, fontFamily: 'var(--font-ui)', lineHeight: 1.4 } as const
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={rowStyle}>
+      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span style={{ color: 'var(--text-default)', textAlign: 'right', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
+    </div>
+  )
+}
+const amber = (s: ReactNode) => <span style={{ color: 'var(--text-amber)' }}>{s}</span>
+const kHz = (rate: number) => `${Math.round(rate / 100) / 10} kHz`
+const msOf = (sec: number) => `${Math.round(sec * 1000 * 10) / 10} ms`
+
+// Three rows under the engine buttons, Setup and window: the sound card, how
+// Orfeo uses it, and the delay from "play" to "heard"
 function SoundEngineGlance() {
   const audioEngine = useStore((s) => s.audioEngine)
-  const selectedSoundfont = useStore((s) => s.selectedSoundfont)
   const samplesStatus = useSoundfontState((s) => s.samplesStatus)
-  const extra = useSoundfontState((s) => s.extra)
-  const active = allSoundfonts(extra).find(sf => sf.id === selectedSoundfont)
-  if (audioEngine === 'native') return <NativeGlance />
-  return (
-    <>
-      {samplesStatus === 'ready' && (
-        <div style={{ marginTop: 5, fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
-          {active?.name ?? selectedSoundfont} · {active?.sizeMB ?? '?'} MB · <span style={{ color: audioEngine === 'samples' ? 'var(--text-amber)' : 'inherit' }}>loaded</span>
-        </div>
-      )}
-      {samplesStatus === 'loading' && (
-        <div style={{ marginTop: 5, fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>{t`Loading sounds…`}</div>
-      )}
-      {samplesStatus === 'error' && (
-        <div style={{ marginTop: 5, fontSize: 9, color: 'var(--status-error)', fontFamily: 'var(--font-ui)' }}>Failed to load soundfont — check console</div>
-      )}
-      {samplesStatus === 'idle' && (
-        <div style={{ marginTop: 5, fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
-          {audioEngine === 'gm'
-            ? 'GM Synth (jzz-synth-tiny) — ships with app, no internet needed.'
-            : `${active?.name ?? selectedSoundfont} · ${active?.sizeMB ?? '?'} MB · click Samples to load`}
-        </div>
-      )}
-    </>
-  )
-}
-
-// Native engine: which card, which mode, or why it couldn't start
-function NativeGlance() {
+  const latencySec = useOutputLatency()
+  const defaultName = useDefaultOutputName()
+  const gmExternal = useMidiSettings((s) => s.gmOutput)
+  const native = useNativeAudio((s) => s.status)
   const phase = useNativeAudio((s) => s.phase)
-  const status = useNativeAudio((s) => s.status)
   const error = useNativeAudio((s) => s.error)
-  const lowLatency = useMidiSettings((s) => s.nativeExclusive)
-  const line = { marginTop: 5, fontSize: 9, fontFamily: 'var(--font-ui)', color: 'var(--text-muted)' } as const
-  if (phase === 'failed') return <div style={{ ...line, color: 'var(--status-error)' }}>{t`Native engine unavailable:`} {error}</div>
-  if (phase !== 'running' || !status) return <div style={line}>{t`Starting the native engine…`}</div>
-  if (status.mode === 'none') return <div style={line}>{t`Waiting for a sound card…`}</div>
-  return (
-    <>
-      <div style={line}>
-        {status.deviceName} · <span style={{ color: 'var(--text-amber)' }}>{status.mode === 'exclusive' ? t`exclusive` : t`shared`}</span> · {Math.round(status.rate / 100) / 10} kHz · {Math.round(status.bufferFrames * 1000 / status.rate * 10) / 10} ms {t`buffer`}
+  const wantsExclusive = useMidiSettings((s) => s.nativeExclusive)
+  const latency = <InfoRow label={t`Latency`}>{latencySec > 0 ? amber(`${Math.round(latencySec * 1000)} ms`) : '—'}</InfoRow>
+
+  if (audioEngine === 'native') {
+    if (phase === 'failed') return <HelpText>{t`Native engine unavailable:`} {error}</HelpText>
+    if (phase !== 'running' || !native) return <InfoRow label={t`Your sound card`}>{t`starting…`}</InfoRow>
+    if (native.mode === 'none') return <InfoRow label={t`Your sound card`}>{t`waiting for a sound card…`}</InfoRow>
+    return (
+      <div style={{ marginTop: 6 }}>
+        <InfoRow label={t`Your sound card`}>{native.deviceName}</InfoRow>
+        <InfoRow label={t`Mode`}>{native.mode === 'exclusive' ? amber(t`Exclusive (low latency)`) : t`Shared`} · {kHz(native.rate)} · {msOf(native.bufferFrames / native.rate)} {t`buffer`}</InfoRow>
+        {latency}
+        {/* Exclusive asked for, but the card couldn't do it: say why */}
+        {wantsExclusive && native.mode === 'shared' && native.fallbackReason && <HelpText>{t`Sharing the sound card instead of Exclusive:`} {native.fallbackReason}.</HelpText>}
       </div>
-      {/* Low latency asked for, but the card couldn't do it: say why */}
-      {lowLatency && status.mode === 'shared' && status.fallbackReason && (
-        <div style={{ ...line, color: 'var(--text-amber)' }}>{t`Sharing the sound card instead of Low latency:`} {status.fallbackReason}.</div>
-      )}
-    </>
+    )
+  }
+  const rate = getSamplesSampleRate(), buffer = getSamplesBufferSec()
+  return (
+    <div style={{ marginTop: 6 }}>
+      <InfoRow label={t`Your sound card`}>{audioEngine === 'gm' && gmExternal ? gmExternal : defaultName || t`Windows' default output`}</InfoRow>
+      <InfoRow label={t`Mode`}>{audioEngine === 'gm' && gmExternal ? t`External instrument` : <>{t`Shared`}{audioEngine === 'samples' && samplesStatus === 'ready' && rate > 0 && <> · {kHz(rate)}{buffer > 0 && <> · {msOf(buffer)} {t`buffer`}</>}</>}</>}</InfoRow>
+      {latency}
+    </div>
   )
 }
 
-// Measured output delay (Samples only): "output delay 32 ms", value in amber
-function DelayReadout({ upper }: { upper?: boolean }) {
-  const outputLatencySec = useOutputLatency()
-  if (outputLatencySec === 0) return <>{t`not measurable for this output`}</>
-  return <>{upper ? t`Output delay` : t`output delay`} <span style={{ color: 'var(--text-amber)' }}>{Math.round(outputLatencySec * 1000)} ms</span></>
-}
-
-// Setup: at the right end of the "Sound engine" name line
-function SoundEngineDelay() {
+// What the chosen engine is — only that one
+function SoundEngineDescription() {
   const audioEngine = useStore((s) => s.audioEngine)
-  if (audioEngine === 'gm') return null
-  return (
-    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>
-      <DelayReadout />
-    </span>
-  )
+  if (audioEngine === 'gm') return <>{t`The simple synth built into Orfeo: light, always ready, no sound set needed. It sounds basic — good for slow computers, or for playing through an external instrument (MIDI Keyboard › General MIDI sound).`}</>
+  if (audioEngine === 'native') return <>{t`The same sound sets as Studio, played by Orfeo's own engine straight to your sound card: the shortest delay from key to sound. Windows only.`}</>
+  return <>{t`Real recorded instruments from a sound set (choose it under Sound Fonts). Plays through Windows' mixer like any other app, with its usual delay.`}</>
 }
 
-// Native engine: Low latency on = exclusive (lowest delay, other apps go
-// quiet), off = shared with other apps. Turns itself on when a MIDI keyboard
-// is connected (useNativeEngine.ts); switching it off stays off until then.
-function NativeOutputChoice() {
+// Native's Low latency mode: Shared (default) or Exclusive. A keyboard plugged in
+// switches to Exclusive by itself unless that's turned off (MIDI Keyboard ›
+// Sound & Latency); a choice made here holds until the next keyboard change.
+function LowLatencyButtons() {
   const exclusive = useMidiSettings((s) => s.nativeExclusive)
-  const pick = (v: boolean) => setLowLatency(v)
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', marginTop: 10 }}>
-        <span style={{ fontSize: 11, fontFamily: 'var(--font-ui)', color: exclusive ? 'var(--text-default)' : 'var(--text-inactive)' }}>{t`Low latency`}</span>
-        <Switch value={exclusive} onChange={pick} label={t`Low latency`} />
+      <div style={{ marginTop: 12, marginBottom: 7, fontSize: 'var(--text-xs)', color: 'var(--text-default)', fontWeight: 500, letterSpacing: '0.02em', textTransform: 'uppercase' }}>{t`Low latency mode`}</div>
+      <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+        <OptionBtn active={!exclusive} onClick={() => setLowLatency(false)}>{t`Shared`}</OptionBtn>
+        <OptionBtn active={exclusive} onClick={() => setLowLatency(true)}>{t`Exclusive`}</OptionBtn>
       </div>
+    </>
+  )
+}
+function LowLatencyMode() {
+  const exclusive = useMidiSettings((s) => s.nativeExclusive)
+  const autoLow = useMidiSettings((s) => s.autoLowLatency)
+  return (
+    <>
+      <LowLatencyButtons />
       <HelpText>{exclusive
-        ? t`On: Orfeo talks to your sound card directly, past Windows' mixer — the shortest delay from key to sound. Other apps stay silent while Orfeo is open; if one is already using the sound card, Orfeo shares it instead.`
-        : t`Off: other apps (a browser lesson, a video call) keep playing alongside Orfeo, at the cost of Windows' usual delay.`}</HelpText>
-      <HelpText>{t`Off unless a MIDI keyboard is connected: plugging one in turns it on, unplugging the last one turns it off. Switching it by hand holds until then.`}</HelpText>
+        ? t`Orfeo talks to your sound card directly, past Windows' mixer: the shortest delay from key to sound. Recommended when the delay between pressing a key and hearing it feels uncomfortable.`
+        : t`Orfeo shares the sound card with everything else, so you still hear YouTube, video calls and other apps alongside it. Windows adds its usual delay between key and sound.`}</HelpText>
+      {exclusive && <div style={{ marginTop: 6, fontSize: 'var(--text-xs)', color: 'var(--text-amber)', lineHeight: 1.5, fontFamily: 'var(--font-ui)' }}>{t`Orfeo takes over the whole sound card: other apps stay silent while Orfeo is open.`}</div>}
+      {autoLow && <HelpText>{t`Switches to Exclusive by itself when you plug in a keyboard — change that under MIDI Keyboard › Sound & Latency.`}</HelpText>}
     </>
   )
 }
 
-// Window only: loading progress, then the output delay and what it means
+// Window only: loading progress, then Low latency mode (Native)
 function SoundEngineExtra() {
   const audioEngine = useStore((s) => s.audioEngine)
   return (
     <>
       <SoundEngineLoading />
-      {audioEngine === 'native' && <NativeOutputChoice />}
-      {audioEngine !== 'gm' && (
-        <>
-          <div style={{ marginTop: 10, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}><DelayReadout upper /></div>
-          <HelpText>{t`The real gap between your sound card being told to play a note and it actually reaching the speakers — every machine answers this differently.`}</HelpText>
-        </>
-      )}
+      {audioEngine === 'native' && <LowLatencyMode />}
+    </>
+  )
+}
+// Setup only: the Low latency mode buttons (Native)
+function SoundEngineQuickExtra() {
+  const audioEngine = useStore((s) => s.audioEngine)
+  return (
+    <>
+      <SoundEngineLoading />
+      {audioEngine === 'native' && <LowLatencyButtons />}
     </>
   )
 }
@@ -175,7 +191,7 @@ function SoundFontsControl() {
           return (
             <div key={sf.id} style={{ display: 'contents' }}>
               <span
-                title={sf.downloaded ? `Use ${sf.name} for the Samples engine` : `Download ${sf.name} first`}
+                title={sf.downloaded ? `Use ${sf.name} for the Studio and Native engines` : `Download ${sf.name} first`}
                 style={{
                   fontSize: 'var(--text-xs)', fontFamily: 'var(--font-ui)',
                   color: isActive ? 'var(--text-amber)' : 'var(--text-inactive)', fontWeight: isActive ? 600 : 400,
@@ -202,12 +218,12 @@ function SoundFontsControl() {
       <button
           onClick={() => void importSoundfont()}
           style={{
-            display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '5px 8px', width: '100%',
-            borderRadius: 4, border: '1px dashed var(--border2)', background: 'transparent',
-            color: 'var(--text-inactive)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-ui)', cursor: 'pointer', justifyContent: 'center',
+            display: 'flex', alignItems: 'center', gap: 6, margin: '14px 0 8px', padding: '6px 8px', width: '100%',
+            borderRadius: 4, border: '1px dashed var(--text-muted)', background: 'transparent',
+            color: 'var(--text-default)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-ui)', cursor: 'pointer', justifyContent: 'center',
           }}
           onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--text-amber)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-inactive)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-default)'; e.currentTarget.style.borderColor = 'var(--text-muted)' }}
         >
           <Upload size={11} strokeWidth={1.5} />
           Import your own .sf2/.sf3
@@ -218,9 +234,8 @@ function SoundFontsControl() {
 }
 
 export const AUDIO_DEFS: SettingDef[] = [
-  { id: 'soundEngine', icon: Volume2, kind: 'choice',
-    Description: () => <>{t`General MIDI uses the simple built-in synth — light and always ready.`}<br /><br />{t`Samples plays real recorded instruments from a sound set (recommended).`}{NATIVE_AVAILABLE && <><br /><br />{t`Native (beta) plays the same sound sets with Orfeo's own engine, straight to your sound card — the shortest delay when you play your keyboard.`}</>}</>,
-    Control: SoundEngineControl, Glance: SoundEngineGlance, Extra: SoundEngineExtra, NameRight: SoundEngineDelay },
+  { id: 'soundEngine', icon: Volume2, kind: 'choice', layout: 'controlFirst', Description: SoundEngineDescription,
+    Control: SoundEngineControl, Glance: SoundEngineGlance, Extra: SoundEngineExtra, QuickExtra: SoundEngineQuickExtra },
   { id: 'soundFonts', icon: Library, kind: 'choice', Control: SoundFontsControl },
   {
     id: 'autoLevel', icon: Gauge, kind: 'switch',

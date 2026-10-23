@@ -284,16 +284,20 @@ export default function TopBar() {
       }}>
       {/* ── LOGO ── */}
       <div className="app-no-drag" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, paddingRight: 'var(--space-3)' }}>
-        <Tooltip title="Reset" description={"Closes the file and resets tempo,\ntranspose, and playback to defaults."} placement="bottom">
-          <span onClick={handleReset} className="app-no-drag" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-            <OrfeoLogo />
-            <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-              v{__APP_VERSION__}
-              {/* dev tools on: dev run, test portable, or Ctrl+Alt+Shift+D */}
-              {simAvailable && <span style={{ color: 'var(--text-amber)', marginLeft: 6, letterSpacing: '0.05em' }}>DEV MODE</span>}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+          <Tooltip title="Reset" description={"Closes the file and resets tempo,\ntranspose, and playback to defaults."} placement="bottom">
+            <span onClick={handleReset} className="app-no-drag" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+              <OrfeoLogo />
+              <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>v{__APP_VERSION__}</span>
             </span>
-          </span>
-        </Tooltip>
+          </Tooltip>
+          {/* dev tools on: dev run, test portable, or Ctrl+Alt+Shift+D */}
+          {simAvailable && (
+            <Tooltip title="Dev mode" description={"Test tools are on: a simulated MIDI keyboard\nin Settings › MIDI Keyboard. Ctrl+Alt+Shift+D\nswitches them on and off."} placement="bottom">
+              <span className="app-no-drag" style={{ color: 'var(--text-amber)', fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', whiteSpace: 'nowrap', cursor: 'default' }}>DEV MODE</span>
+            </Tooltip>
+          )}
+        </div>
         <Tooltip title="Open a file (Ctrl+O)" description={"Loads a supported file from\ndisk to start a new session."} placement="bottom">
           <button
             onClick={openFile}

@@ -10,6 +10,7 @@ import { searchSettings, gridColumns, CARD_GAP } from './search'
 import { SettingCard } from './SettingCard'
 import { UpdateButton } from './controls'
 import { GROUP_ICONS } from './groupIcons'
+import { TAB_ASIDES } from './defs/midi'
 
 // ── Settings window — every setting, by group, with full descriptions.
 // Opened from Quick Settings (gear per group / Open settings) or Ctrl + ,.
@@ -28,15 +29,16 @@ function CardGrid({ ids, width, layoutCount = ids.length }: { ids: SettingId[]; 
 }
 
 // Tabbed groups: two independent columns (cards alternate left/right in
-// catalog order), so a short card never stretches to match a tall neighbour
+// catalog order), so a short card never stretches to match a tall neighbour;
+// each column's last card grows so both columns end at the same line
 function ColumnCards({ ids, width }: { ids: SettingId[]; width: number }) {
   const cols = gridColumns(2, width)
   const columns = Array.from({ length: cols }, (_, c) => ids.filter((_, i) => i % cols === c))
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: CARD_GAP, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: CARD_GAP, alignItems: 'stretch' }}>
       {columns.map((col, c) => (
-        <div key={c} style={{ display: 'grid', gap: CARD_GAP, minWidth: 0 }}>
-          {col.map(id => <SettingCard key={id} id={id} />)}
+        <div key={c} style={{ display: 'flex', flexDirection: 'column', gap: CARD_GAP, minWidth: 0 }}>
+          {col.map((id, i) => <div key={id} style={{ flex: i === col.length - 1 ? 1 : 'none', display: 'flex', flexDirection: 'column' }}><SettingCard id={id} /></div>)}
         </div>
       ))}
     </div>
@@ -171,7 +173,7 @@ export default function SettingsWindow() {
                   <p style={{ margin: '0 0 16px', fontSize: 'var(--text-lg)', color: 'var(--text-default)', lineHeight: 1.45, fontFamily: 'var(--font-ui)' }}>{g.intro}</p>
                   {g.tabs ? (
                     <>
-                      <div role="tablist" aria-label={g.name} style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border2)' }}>
+                      <div role="tablist" aria-label={g.name} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border2)' }}>
                         {g.tabs.map((tb, i) => {
                           const on = i === Math.min(tab, g.tabs!.length - 1)
                           return (
@@ -186,9 +188,18 @@ export default function SettingsWindow() {
                             </button>
                           )
                         })}
+                        {(() => { const Aside = TAB_ASIDES[g.tabs![Math.min(tab, g.tabs!.length - 1)].aside ?? '']; return Aside ? <div style={{ marginLeft: 'auto', paddingBottom: 2 }}><Aside /></div> : null })()}
                       </div>
-                      {/* Two across: tabbed groups have the busier cards */}
-                      <ColumnCards ids={g.tabs[Math.min(tab, g.tabs.length - 1)].ids} width={width} />
+                      {(() => {
+                        const tb = g.tabs![Math.min(tab, g.tabs!.length - 1)]
+                        return (
+                          <>
+                            {/* Two across by default: tabbed groups have the busier cards */}
+                            {tb.columns === 3 ? <CardGrid ids={tb.ids} width={width} layoutCount={3} /> : <ColumnCards ids={tb.ids} width={width} />}
+                            {tb.wide?.map(id => <div key={id} style={{ marginTop: CARD_GAP }}><SettingCard id={id} /></div>)}
+                          </>
+                        )
+                      })()}
                     </>
                   ) : (
                     <CardGrid ids={SETTINGS.filter(s => s.group === g.id).map(s => s.id)} width={width} />

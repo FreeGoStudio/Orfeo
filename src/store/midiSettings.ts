@@ -21,6 +21,7 @@ export interface MidiPrefs {
   listenMode: 'all' | 'selected'
   selectedDevices: string[]       // device keys (cleaned model names) to listen to in 'selected' mode
   autoReconnect: boolean          // a re-plugged keyboard is listened to again without a click
+  autoLowLatency: boolean         // Native: a keyboard plugged in switches to Exclusive, the last one out back to Shared
   liveResponse: LiveResponse
   latencyOffsetMs: number         // manual alignment on top of the measured output delay
   velocityCurve: VelocityCurve
@@ -38,6 +39,7 @@ export const MIDI_DEFAULTS: MidiPrefs = {
   listenMode: 'all',
   selectedDevices: [],
   autoReconnect: true,
+  autoLowLatency: true,
   liveResponse: 'low',
   latencyOffsetMs: 0,
   velocityCurve: 'normal',

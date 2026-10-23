@@ -15,11 +15,17 @@ export function SettingCard({ id }: { id: SettingId }) {
   if (!visible) return null
   const { Control, Glance, Extra, Description, NameSuffix, icon: Icon } = def
   const onNameLine = def.kind !== 'choice'
+  const controlFirst = def.layout === 'controlFirst'
+  const description = (
+    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', lineHeight: 1.5, fontFamily: 'var(--font-ui)', fontStyle: 'italic', marginTop: controlFirst ? 10 : 0 }}>
+      {Description ? <Description /> : info.description}
+    </div>
+  )
   return (
     <SurfaceContext.Provider value="window">
     <div role="group" aria-labelledby={labelId} style={{
-      background: 'var(--bg-tile)', border: '1px solid var(--border2)', borderRadius: 'var(--radius-lg)',
-      padding: '12px 14px', minWidth: 0, display: 'flex', flexDirection: 'column',
+      background: 'var(--bg-tile)', border: `1px solid ${def.notice ? 'var(--accent-amber-strong)' : 'var(--border2)'}`, borderRadius: 'var(--radius-lg)',
+      padding: '12px 14px', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box',
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', columnGap: 8, marginBottom: 6, minHeight: 20 }}>
         <div id={labelId} style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0,
@@ -30,11 +36,19 @@ export function SettingCard({ id }: { id: SettingId }) {
         </div>
         {onNameLine ? <Control /> : null}
       </div>
-      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', lineHeight: 1.5, fontFamily: 'var(--font-ui)', fontStyle: 'italic' }}>
-        {Description ? <Description /> : info.description}
-      </div>
-      {!onNameLine && <div style={{ marginTop: 10 }}><Control /></div>}
-      {Glance && !def.glanceQuickOnly && <Glance />}
+      {controlFirst ? (
+        <>
+          {!onNameLine && <div style={{ marginTop: 4 }}><Control /></div>}
+          {Glance && !def.glanceQuickOnly && <Glance />}
+          {description}
+        </>
+      ) : (
+        <>
+          {description}
+          {!onNameLine && <div style={{ marginTop: 10 }}><Control /></div>}
+          {Glance && !def.glanceQuickOnly && <Glance />}
+        </>
+      )}
       {Extra && <Extra />}
     </div>
     </SurfaceContext.Provider>

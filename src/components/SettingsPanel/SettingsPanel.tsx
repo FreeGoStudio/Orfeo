@@ -153,7 +153,11 @@ type RowPlacement = 'top' | 'bottom' | 'left' | 'right'
 // `RowIconButton` below) — a ref-counter, not a plain boolean, so two
 // adjacent suppressing icons (undo + star) can't leave it stuck open if
 // their enter/leave events interleave. ─────────────────────────────────────
-function RowTooltip({ title, placement = 'right', wrapperStyle, children }: {
+// Shown above the row (inside the drawer, not over the piano roll), and only
+// after the pointer has rested on it for ROW_TIP_DELAY_MS — running the
+// mouse down the list doesn't flash a tip on every song
+const ROW_TIP_DELAY_MS = 3000
+function RowTooltip({ title, placement = 'top', wrapperStyle, children }: {
   title: string | undefined
   placement?: RowPlacement
   wrapperStyle?: React.CSSProperties
@@ -161,6 +165,10 @@ function RowTooltip({ title, placement = 'right', wrapperStyle, children }: {
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  const enter = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => setHover(true), ROW_TIP_DELAY_MS) }
+  const leave = () => { if (timer.current) clearTimeout(timer.current); timer.current = null; setHover(false) }
   const suppressCount = useRef(0)
   const [suppressed, setSuppressed] = useState(false)
   const suppress = (on: boolean) => {
@@ -171,8 +179,8 @@ function RowTooltip({ title, placement = 'right', wrapperStyle, children }: {
   return (
     <div
       ref={ref}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={enter}
+      onMouseLeave={leave}
       style={{ display: 'block', width: '100%', ...wrapperStyle }}
     >
       {children(suppress)}

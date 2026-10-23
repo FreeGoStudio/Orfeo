@@ -7,7 +7,13 @@ import type { SettingsGroupId } from '../../types'
 
 // `tabs`: a big group can split its cards into tabs in the Settings window
 // (two cards across instead of three, so each has room). Search ignores tabs.
-export interface GroupTab { name: string; ids: SettingId[] }
+export interface GroupTab {
+  name: string
+  ids: SettingId[]
+  columns?: 2 | 3           // cards across (default 2); 3 = one row of equal-height cards
+  wide?: SettingId[]        // full-width cards under the others
+  aside?: string            // id of a small live readout at the right of the tab row (defs/midi.tsx TAB_ASIDES)
+}
 export interface GroupInfo { id: SettingsGroupId; name: string; intro: string; manualUrl: string; tabs?: GroupTab[] }
 
 export type SettingId =
@@ -19,7 +25,7 @@ export type SettingId =
   | 'keyRange' | 'showOctaves' | 'showNoteNames' | 'reflectPianoRoll' | 'preciseScrubTime'
   | 'rollZoom' | 'barNumbers' | 'playbar' | 'visualEffects'
   | 'theme' | 'appZoom' | 'starmap'
-  | 'midiKeyboards' | 'liveResponse' | 'latencyOffset' | 'gmOutput' | 'touchResponse' | 'duplicateFilter'
+  | 'midiKeyboards' | 'midiReconnect' | 'liveResponse' | 'latencyOffset' | 'gmOutput' | 'touchResponse' | 'duplicateFilter'
   | 'pedalsControls' | 'delayCheck' | 'midiTools'
 
 export interface SettingInfo {
@@ -32,29 +38,29 @@ export interface SettingInfo {
 }
 
 export const GROUPS: GroupInfo[] = [
-  { id: 'audio', name: t`Audio`, intro: t`How Orfeo sounds: the sound engine, extra sound sets, and automatic loudness balancing.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files' },
-  { id: 'midi-files-library', name: t`MIDI Files & Library`, intro: t`What the Library shows and what Orfeo can create from your files.`, manualUrl: 'https://orfeo.cc/docs/managing-midi-files' },
-  { id: 'playback-editing', name: t`Playback & Editing`, intro: t`Tools for playing and correcting songs: note editing, tempo fixes, count-in, hands, looping and focus.`, manualUrl: 'https://orfeo.cc/docs/editing-midi-files' },
-  { id: 'practice', name: t`Practice`, intro: t`Helpers while you practise: stepping through a song note by note, the chord prompter, a clear screen during playback, and hand and level indicators.`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files' },
-  { id: 'notation', name: t`Notation & Chords`, intro: t`How notes and chords are named, and which instruments the chord display listens to.`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files/how-orfeo-reads-chords' },
-  { id: 'keyboard', name: t`Keyboard`, intro: t`The on-screen keyboard: its size and what's printed on the keys.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
-  { id: 'piano-roll', name: t`Piano Roll`, intro: t`The falling-notes view: zoom, bar lines, the playbar and visual effects.`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll' },
-  { id: 'appearance', name: t`Appearance`, intro: t`How Orfeo looks: theme, the size of everything on screen, and the Starmap view.`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
-  { id: 'midi', name: t`MIDI Keyboard`, intro: t`Your own MIDI keyboard: which ones Orfeo listens to, how quickly your playing is heard, touch, pedals, and a delay check.`, manualUrl: 'https://orfeo.cc/docs/settings/midi-keyboard-settings',
+  { id: 'audio', name: t`Audio`, intro: t`Set your audio preferences`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files' },
+  { id: 'midi-files-library', name: t`MIDI Files & Library`, intro: t`Organise your library`, manualUrl: 'https://orfeo.cc/docs/managing-midi-files' },
+  { id: 'playback-editing', name: t`Playback & Editing`, intro: t`Shape playback and edits`, manualUrl: 'https://orfeo.cc/docs/editing-midi-files' },
+  { id: 'practice', name: t`Practice`, intro: t`Tools for practising`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files' },
+  { id: 'notation', name: t`Notation & Chords`, intro: t`Name notes and chords`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files/how-orfeo-reads-chords' },
+  { id: 'keyboard', name: t`Keyboard`, intro: t`Set up the keyboard`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
+  { id: 'piano-roll', name: t`Piano Roll`, intro: t`Tune the falling notes`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll' },
+  { id: 'appearance', name: t`Appearance`, intro: t`Change the look`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
+  { id: 'midi', name: t`MIDI Keyboard`, intro: t`Manage your keyboards`, manualUrl: 'https://orfeo.cc/docs/settings/midi-keyboard-settings',
     tabs: [
-      { name: t`Keyboards`, ids: ['midiKeyboards', 'midiTools'] },
-      { name: t`Sound & delay`, ids: ['liveResponse', 'delayCheck', 'latencyOffset', 'gmOutput'] },
+      { name: t`Keyboards`, ids: ['midiKeyboards', 'midiTools', 'midiReconnect'], columns: 3, aside: 'noKeyboards' },
+      { name: t`Sound & Latency`, ids: ['delayCheck', 'latencyOffset', 'gmOutput'], columns: 3, wide: ['liveResponse'], aside: 'keyToSpeaker' },
       { name: t`Touch & pedals`, ids: ['touchResponse', 'pedalsControls', 'duplicateFilter'] },
     ] },
 ]
 
 export const SETTINGS: SettingInfo[] = [
   // ── Audio
-  { id: 'soundEngine', group: 'audio', name: t`Sound engine`, summary: t`General MIDI is light and built in; Samples sounds like real instruments.`,
-    description: t`General MIDI uses the simple built-in synth — light and always ready. Samples plays real recorded instruments from a sound set (recommended). Native (beta, Windows) plays the same sound sets with Orfeo's own engine, straight to your sound card, for the shortest delay when you play.`,
-    keywords: 'gm general midi samples native synth latency output delay exclusive shared engine' },
-  { id: 'soundFonts', group: 'audio', name: t`Sound Fonts`, summary: t`Extra sound sets for the Samples and Native engines.`,
-    description: t`Extra sound sets for the Samples and Native engines. GeneralUser GS comes with Orfeo; others download on demand, or import your own .sf2/.sf3.`,
+  { id: 'soundEngine', group: 'audio', name: t`Sound engine`, summary: t`GM is light and built in; Studio and Native sound like real instruments.`,
+    description: t`GM uses the simple built-in synth. Studio plays real recorded instruments from a sound set. Native plays the same sound sets straight to your sound card, for the shortest delay when you play.`,
+    keywords: 'gm general midi studio samples native synth latency output delay exclusive shared low latency mode engine sound card' },
+  { id: 'soundFonts', group: 'audio', name: t`Sound Fonts`, summary: t`Extra sound sets for the Studio and Native engines.`,
+    description: t`Extra sound sets for the Studio and Native engines. GeneralUser GS comes with Orfeo; others download on demand, or import your own .sf2/.sf3.`,
     keywords: 'soundfont sf2 sf3 download import fluid musescore generaluser' },
   { id: 'autoLevel', group: 'audio', name: t`Auto-Level on Load`, summary: t`Balances loud and quiet passages automatically.`,
     description: t`Automatically balances loud and quiet passages in a MIDI file using the Compressor's makeup gain.`,
@@ -90,7 +96,7 @@ export const SETTINGS: SettingInfo[] = [
     keywords: 'focus mute tracks keys bass drums' },
   // ── Practice
   { id: 'stepThrough', group: 'practice', name: t`Step Through`, summary: t`Step through a song note by note with ← and →.`,
-    description: t`Each press of → (or the arrow in the keyboard bar) jumps to the next note or chord, plays it, lights it and moves the playhead there; ← goes back one, Shift jumps a whole bar. No tempo, no loop to set up: learn a fast solo or write it down at your own pace.`,
+    description: t`Each press of ← or → (or the arrows in the keyboard bar) steps back or forward to the next note or chord, plays it, lights it and moves the playhead there. Shift jumps a whole bar.`,
     keywords: 'step through arrows next previous note chord solo transcribe learn slow' },
   { id: 'chordPrompter', group: 'practice', name: t`Chord Prompter`, summary: t`Past, current and upcoming chords during playback.`,
     description: t`Shows past, current and upcoming chords during playback. Click the prompter icon above the keyboard to show it.`,
@@ -162,10 +168,13 @@ export const SETTINGS: SettingInfo[] = [
   // ── MIDI Keyboard
   { id: 'midiKeyboards', group: 'midi', name: t`Keyboards`, summary: t`Which connected keyboards Orfeo listens to.`,
     description: t`Every MIDI keyboard connected by USB, with a light that flashes as you play it. Listen to all of them, or only the ones you tick. The top bar shows the one you're playing.`,
-    keywords: 'midi keyboard usb device controller connect input port rescan reconnect' },
-  { id: 'liveResponse', group: 'midi', name: t`Live playing response`, summary: t`How quickly a key you play is heard.`,
-    description: t`Samples engine. Low latency: the keys you play skip the compressor and limiter the song goes through, and are heard 12 ms sooner. Balanced: your keys share the song's compressor (12 ms later). Stable: a larger sound buffer for computers that crackle (10 ms later, from the next start).`,
-    keywords: 'latency delay lag responsiveness buffer low latency balanced stable crackle' },
+    keywords: 'midi keyboard usb device controller connect input port' },
+  { id: 'midiReconnect', group: 'midi', name: t`Reconnect automatically`, summary: t`Pick a keyboard up again when it's plugged back in.`,
+    description: t`A keyboard you unplug and plug back in is picked up again straight away. When off, it waits until you press Rescan.`,
+    keywords: 'reconnect rescan unplug plug usb' },
+  { id: 'liveResponse', group: 'midi', name: t`Playing live`, summary: t`How quickly a key you play is heard.`,
+    description: t`How quickly the keys you play are heard depends on the sound engine and the sound card.`,
+    keywords: 'latency delay lag responsiveness buffer low latency balanced stable crackle exclusive auto usb' },
   { id: 'latencyOffset', group: 'midi', name: t`Audio delay offset`, summary: t`Line the screen up with what you hear.`,
     description: t`Orfeo measures how late your sound output plays and lights keys, counts in and reads taps to match. If it still feels off — Bluetooth headphones, or General MIDI played through an external instrument — shift it here. This moves the picture, not the sound: no setting can make a note arrive sooner.`,
     keywords: 'latency delay offset compensation sync bluetooth calibrate' },

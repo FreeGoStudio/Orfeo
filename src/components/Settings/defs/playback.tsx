@@ -92,7 +92,7 @@ export const PLAYBACK_DEFS: SettingDef[] = [
     id: 'tempoWarnings', icon: TriangleAlert, kind: 'switch', Extra: TempoWarningsExtra,
     Description: () => <>
       {t`Marks songs whose bar lines and metronome don't match the music's steady beat — the ones Tap Tempo can fix.`}
-      <br />
+      <br /><br />
       {t`Shown`} <span aria-hidden style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--text-amber)', verticalAlign: '1px', margin: '0 2px' }} /> {t`next to Key in the top bar and in the Library.`}
     </>,
     Control: () => { const v = useStore(s => s.tempoWarningsEnabled); return <Switch value={v} onChange={useStore.getState().setTempoWarningsEnabled} label={t`Tempo warnings`} /> },

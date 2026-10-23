@@ -7,6 +7,17 @@
 
 ## [Unreleased]
 
+### Changed
+- **Clearer Settings.**
+  - Every page now opens with a short heading.
+  - **Sound engine:** the three engines are now called GM, Studio (formerly Samples) and Native. Under them you see your sound card, its mode with sample rate and buffer, and the latency. The description shows only the engine you've picked.
+  - **Low latency mode** (Native): two buttons, Shared and Exclusive, each explaining what it does. Exclusive warns that Orfeo takes over the whole sound card.
+  - **Setup** shows the same engine buttons and rows.
+  - **MIDI Keyboard:** the cards sit three across, at equal height. *Reconnect automatically* has its own card. "No keyboards connected" and your keyboard-to-speaker delay sit at the right of the tab row. The *Sound & Latency* tab gains a *Playing live* card, rewritten to be easier to follow.
+- **Choose whether a keyboard switches Native to Exclusive.** A new switch under *MIDI Keyboard › Sound & Latency*, on by default. It's recommended when you play along on a keyboard and nothing else on the computer needs sound. Off: Native stays in the mode you choose.
+- **The Library's "Right-click for options" hint** now appears just above the song, inside the Library, and only after you rest on a song for 3 seconds, not every time the mouse passes over.
+- **DEV MODE** has its own line under the version number, with a tip saying what it is.
+
 ### Fixed
 - **Orfeo's native mode now mixes songs exactly like Samples.** Parts placed to one side of the stereo picture, like the piano in Toto's "Rosanna", the guitars or a panned horn section, came out 1.5–3 dB quieter in native mode, while parts in the middle got slightly louder. Their reverb stayed as loud as before, so those parts sounded pushed to the back of the mix. Instruments recorded in stereo, like the piano and horns in many sound sets, were also squeezed to one side, losing their width. Native mode now places every note left and right exactly as Samples does, keeping stereo instruments as wide as they are. Measured part by part on eight songs and two sound sets, every part is now within about 1 dB of Samples in level and in its left–right placement. Before, levels differed by up to 4 dB and placement by up to 13 dB. This works for every song, with nothing to set.
 - **Orfeo's native mode no longer sounds thin next to Samples.** It played about 4 dB hotter into its peak limiter, which then flattened the bass and drum hits all the time, so loud songs lost their punch and the midrange came forward. Its level now matches Samples before any limiting. Its ceiling sits just under full scale, as Samples' does. Measured on whole songs, both engines now sound the same within about 1 dB in every octave, from the deepest bass to the top.

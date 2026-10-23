@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { KeyboardMusic, Zap, Timer, Speaker, Feather, Copy, Footprints, Stethoscope, Wrench, RefreshCw, FileDown } from 'lucide-react'
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
+import { KeyboardMusic, Zap, Timer, Speaker, Feather, Copy, Footprints, Stethoscope, Wrench, RefreshCw, FileDown, Plug } from 'lucide-react'
 import { useStore } from '../../../store'
 import { t } from '../../../utils/i18n'
 import { OptionBtn, Switch, SettingsDropdown, HelpText, GlanceLine, ZoomStepBtn } from '../controls'
@@ -94,7 +94,7 @@ function KeyboardsControl() {
       </div>
       <div style={{ marginTop: 8, display: 'grid', gap: 2 }}>
         {error && <HelpText>{t`MIDI isn't available: ${error}`}</HelpText>}
-        {!error && devices.length === 0 && <HelpText>{t`No keyboard connected. Plug one in by USB — it appears here straight away.`}</HelpText>}
+        {!error && devices.length === 0 && <HelpText>{t`Plug one in by USB — it appears here straight away.`}</HelpText>}
         {devices.map(d => {
           const listening = listenMode === 'all' || selected.includes(d.key)
           return (
@@ -122,17 +122,16 @@ function KeyboardsControl() {
 }
 
 function KeyboardsExtra() {
-  const autoReconnect = useMidiSettings(s => s.autoReconnect)
-  return (
-    <>
-      <div style={{ marginTop: 10 }}>
-        <SwitchRow label={t`Reconnect automatically`} value={autoReconnect} onChange={v => set({ autoReconnect: v })} />
-      </div>
-      <HelpText>{t`When off, a keyboard you unplug and plug back in waits until you press Rescan.`}</HelpText>
-      <div style={{ marginTop: 8 }}><ActionBtn onClick={() => void rescanMidiDevices()} icon={<RefreshCw size={11} strokeWidth={1.5} />}>{t`Rescan keyboards`}</ActionBtn></div>
-      {simAvailable && <SimulatorPanel />}
-    </>
-  )
+  return simAvailable ? <SimulatorPanel /> : null
+}
+
+// ── Reconnect automatically ──────────────────────────────────────────────────
+function ReconnectControl() {
+  const v = useMidiSettings(s => s.autoReconnect)
+  return <Switch value={v} onChange={x => set({ autoReconnect: x })} label={t`Reconnect automatically`} />
+}
+function ReconnectExtra() {
+  return <div style={{ marginTop: 10 }}><ActionBtn onClick={() => void rescanMidiDevices()} icon={<RefreshCw size={11} strokeWidth={1.5} />}>{t`Rescan keyboards`}</ActionBtn></div>
 }
 
 // ── Development builds only: pretend keyboards are plugged in ────────────────
@@ -179,26 +178,42 @@ const RESPONSES: { v: LiveResponse; label: string }[] = [
 function LiveResponseControl() {
   const v = useMidiSettings(s => s.liveResponse)
   const engine = useStore(s => s.audioEngine)
-  const started = getStartedStable()  // null until the Samples engine has started
+  const started = getStartedStable()  // null until the Studio engine has started
   const nativeExclusive = useMidiSettings(s => s.nativeExclusive)
-  // Native has its own choice under Audio — don't show a second "Low latency" here
-  if (engine === 'native') return (
-    <HelpText>{nativeExclusive
-      ? t`The Native engine has Low latency on — your keys skip the compressor and go straight to the sound card. The switch is under Settings › Audio › Sound engine.`
-      : t`The Native engine has Low latency off and shares the sound card with other apps, which adds Windows' usual delay. For the shortest delay switch Low latency on under Settings › Audio › Sound engine.`}</HelpText>
-  )
+  const autoLow = useMidiSettings(s => s.autoLowLatency)
+  const heading = (s: string) => <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>{s}</div>
   return (
-    <div style={{ opacity: engine === 'samples' ? 1 : 0.45, transition: 'opacity 0.15s' }}>
-      <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-        {RESPONSES.map(r => <OptionBtn key={r.v} active={v === r.v} onClick={() => set({ liveResponse: r.v })}>{r.label}</OptionBtn>)}
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: 24, rowGap: 12 }}>
+      <div style={{ minWidth: 0 }}>
+        {heading(engine === 'gm' ? t`With GM` : engine === 'native' ? t`With Native` : t`With Studio`)}
+        {engine === 'gm' && <HelpText>{t`GM plays your keys at once: there's nothing between your keys and the synth.`}</HelpText>}
+        {engine === 'native' && <HelpText>{nativeExclusive
+          ? t`Native is in Exclusive mode: your keys go straight to the sound card, the shortest delay this computer can do.`
+          : t`Native is sharing the sound card with other apps, which adds Windows' usual delay. For the shortest delay choose Exclusive under Settings › Audio › Sound engine.`}</HelpText>}
+        {engine === 'samples' && (
+          <>
+            <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+              {RESPONSES.map(r => <OptionBtn key={r.v} active={v === r.v} onClick={() => set({ liveResponse: r.v })}>{r.label}</OptionBtn>)}
+            </div>
+            <HelpText>{v === 'low'
+              ? t`Your keys skip the song's compressor and limiter, and are heard about 12 ms sooner.`
+              : v === 'balanced'
+                ? t`Your keys go through the song's compressor with it, so they sit in the same mix — about 12 ms later.`
+                : t`A larger sound buffer for computers whose sound crackles — about 10 ms later.`}</HelpText>
+            {started !== null && (v === 'stable') !== started && <HelpText>{t`The sound buffer size changes the next time Orfeo starts.`}</HelpText>}
+          </>
+        )}
       </div>
-      {engine === 'gm' && <HelpText>{t`General MIDI has no compressor in the way — this applies when the Samples engine is on.`}</HelpText>}
-      {started !== null && (v === 'stable') !== started && <HelpText>{t`The sound buffer size changes the next time Orfeo starts.`}</HelpText>}
+      <div style={{ minWidth: 0 }}>
+        {heading(t`When a keyboard is plugged in`)}
+        <SwitchRow label={t`Switch to Exclusive when a keyboard is connected`} value={autoLow} onChange={x => set({ autoLowLatency: x })} />
+        <HelpText>{t`Recommended when you play along on a keyboard and nothing else on the computer needs sound: plugging a keyboard in switches Native to Exclusive, for the shortest delay; unplugging the last one switches back to Shared. Off: Native stays in the mode you choose.`}</HelpText>
+      </div>
     </div>
   )
 }
 
-// "Your key → speaker on this computer: about 44 ms"
+// "Keyboard → speaker on this computer: about 44 ms" — at the right of the tab row
 function KeyToEarGlance() {
   useDiag()
   useMidiSettings(s => s.liveResponse)
@@ -206,10 +221,21 @@ function KeyToEarGlance() {
   useEffect(() => { const id = setInterval(() => tick(n => n + 1), 1000); return () => clearInterval(id) }, [])
   const b = getDelayBreakdown()
   const st = getStats()
-  if (b.outputMs === null) return <GlanceLine>{t`Key → speaker: can't be measured for this sound output.`}</GlanceLine>
+  const style = { fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-inactive)' } as const
+  if (b.outputMs === null) return <span style={style}>{t`Keyboard → speaker: can't be measured for this sound output`}</span>
   const total = (st.avgInputMs ?? 0) + (st.avgHandleMs ?? 0) + b.synthBlockMs + b.chainMs + b.outputMs
-  return <GlanceLine>{t`Key → speaker on this computer: about`} <span style={{ color: 'var(--text-amber)' }}>{Math.round(total)} ms</span></GlanceLine>
+  return <span style={style}>{t`Keyboard → speaker on this computer: about`} <span style={{ color: 'var(--text-amber)' }}>{Math.round(total)} ms</span></span>
 }
+
+// "No keyboards connected" — at the right of the Keyboards tab row, only while none is
+function NoKeyboardsAside() {
+  const devices = useMidiSettings(s => s.devices)
+  const error = useMidiSettings(s => s.accessError)
+  if (error || devices.some(d => d.connected)) return null
+  return <span style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-ui)', color: 'var(--text-amber)' }}>{t`No keyboards connected`}</span>
+}
+
+export const TAB_ASIDES: Record<string, ComponentType> = { noKeyboards: NoKeyboardsAside, keyToSpeaker: KeyToEarGlance }
 
 // ── Audio delay offset ───────────────────────────────────────────────────────
 function LatencyOffsetControl() {
@@ -356,7 +382,7 @@ function DelayCheckControl() {
     : (st.avgInputMs ?? 0) + (st.avgHandleMs ?? 0) + b.synthBlockMs + b.chainMs + b.outputMs
   return (
     <div style={{ display: 'grid', gap: 1 }}>
-      {line(t`Notes measured`, st.notes ? String(st.notes) : t`none yet — play a few notes`)}
+      {line(t`Notes measured`, st.notes ? String(st.notes) : t`none yet`)}
       {line(t`Key reaching Orfeo`, st.avgInputMs === null ? '—' : `${ms(st.avgInputMs, 1)} (${t`worst`} ${ms(st.worstInputMs, 1)})`)}
       {line(t`Orfeo handling the key`, st.avgHandleMs === null ? '—' : `${ms(st.avgHandleMs, 1)} (${t`worst`} ${ms(st.worstHandleMs, 1)})`)}
       {line(t`Synth getting its turn`, b.externalOutput ? t`external` : `≤ ${ms(b.synthBlockMs, 1)}`)}
@@ -370,7 +396,6 @@ function DelayCheckExtra() {
   return (
     <>
       <HelpText>{t`The sound output part is set by Windows and your sound card: wired headphones or a USB audio interface lower it, Bluetooth raises it a lot.`}</HelpText>
-      <NativeSharedHint />
       <HelpText>{t`Start over forgets the notes measured so far; the fixed parts of the trip don't change.`}</HelpText>
       <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 6 }}>
         <ActionBtn onClick={exportPerformanceLog} icon={<FileDown size={11} strokeWidth={1.5} />}>{t`Save log…`}</ActionBtn>
@@ -378,17 +403,6 @@ function DelayCheckExtra() {
       </div>
     </>
   )
-}
-
-// Native set to share the sound card: say where the shorter delay is
-function NativeSharedHint() {
-  const engine = useStore(s => s.audioEngine)
-  const mode = useNativeAudio(s => s.status?.mode)
-  const wantsExclusive = useMidiSettings(s => s.nativeExclusive)
-  if (engine !== 'native' || mode !== 'shared') return null
-  return <HelpText>{wantsExclusive
-    ? t`Low latency is chosen, but another app was using the sound card when Orfeo started, so Orfeo is sharing it — close that app and switch Low latency off and on again under Settings › Audio › Sound engine.`
-    : t`Orfeo is sharing the sound card with other apps, which adds Windows' usual delay. For the shortest delay switch Low latency on under Settings › Audio › Sound engine.`}</HelpText>
 }
 
 // ── Reset & repair ───────────────────────────────────────────────────────────
@@ -415,7 +429,8 @@ function ToolsControl() {
 
 export const MIDI_DEFS: SettingDef[] = [
   { id: 'midiKeyboards', icon: KeyboardMusic, kind: 'choice', Control: KeyboardsControl, Extra: KeyboardsExtra },
-  { id: 'liveResponse', icon: Zap, kind: 'choice', Control: LiveResponseControl, Glance: KeyToEarGlance },
+  { id: 'midiReconnect', icon: Plug, kind: 'switch', Control: ReconnectControl, Extra: ReconnectExtra },
+  { id: 'liveResponse', icon: Zap, kind: 'choice', Control: LiveResponseControl, notice: true },
   { id: 'latencyOffset', icon: Timer, kind: 'choice', Control: LatencyOffsetControl, Glance: LatencyOffsetGlance },
   { id: 'gmOutput', icon: Speaker, kind: 'choice', Control: GmOutputControl },
   { id: 'touchResponse', icon: Feather, kind: 'choice', Control: TouchControl, Extra: TouchExtra },

@@ -12,6 +12,10 @@ export const PRACTICE_DEFS: SettingDef[] = [
   {
     id: 'stepThrough', icon: StepForward, kind: 'switch',
     Control: () => { const v = useStore(s => s.stepThroughEnabled); return <Switch value={v} onChange={useStore.getState().setStepThroughEnabled} label={t`Step Through`} /> },
+    Description: () => {
+      const arrow = (a: string) => <span style={{ color: 'var(--text-amber)', fontStyle: 'normal' }}>{a}</span>
+      return <>{t`Each press of`} {arrow('←')} {t`or`} {arrow('→')} {t`(or the arrows in the keyboard bar) steps back or forward to the next note or chord, plays it, lights it and moves the playhead there. Shift jumps a whole bar.`}</>
+    },
   },
   {
     id: 'chordPrompter', icon: BookOpen, kind: 'switch',
