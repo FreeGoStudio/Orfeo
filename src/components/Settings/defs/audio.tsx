@@ -4,6 +4,7 @@ import { useStore } from '../../../store'
 import { t } from '../../../utils/i18n'
 import { OptionBtn, Switch, SettingsDropdown, SoundfontActionLink, HelpText } from '../controls'
 import { getSamplesSampleRate, getSamplesBufferSec } from '../../../hooks/useSamplesEngine'
+import { MarqueeText } from '../../MarqueeText'
 import {
   useSoundfontState, useOutputLatency, chooseSamplesFromQuick, selectSoundfont,
   downloadSoundfont, deleteSoundfont, importSoundfont, allSoundfonts,
@@ -34,7 +35,8 @@ function useDefaultOutputName(): string {
   useEffect(() => {
     const read = () => navigator.mediaDevices?.enumerateDevices?.().then(list => {
       const d = list.find(x => x.kind === 'audiooutput' && x.deviceId === 'default') ?? list.find(x => x.kind === 'audiooutput')
-      setName((d?.label ?? '').replace(/^Default - /, ''))
+      // "Default - Speakers (Yeti Stereo Microphone) (b58e:9e84)" → "Speakers (Yeti Stereo Microphone)"
+      setName((d?.label ?? '').replace(/^Default - /, '').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)$/i, ''))
     }).catch(() => {})
     void read()
     navigator.mediaDevices?.addEventListener?.('devicechange', read)
@@ -45,11 +47,14 @@ function useDefaultOutputName(): string {
 
 const rowStyle = { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 10, alignItems: 'baseline', marginTop: 4,
   fontSize: 10, fontFamily: 'var(--font-ui)', lineHeight: 1.4 } as const
-function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+// `marquee`: a long name (a sound card's) that scrolls into view on hover when it doesn't fit
+function InfoRow({ label, children, marquee }: { label: string; children?: ReactNode; marquee?: string }) {
   return (
     <div style={rowStyle}>
       <span style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span style={{ color: 'var(--text-default)', textAlign: 'right', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
+      {marquee !== undefined
+        ? <div style={{ display: 'flex', minWidth: 0, textAlign: 'right' }}><MarqueeText name={marquee} spanStyle={{ color: 'var(--text-default)' }} /></div>
+        : <span style={{ color: 'var(--text-default)', textAlign: 'right', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>}
     </div>
   )
 }
@@ -73,11 +78,11 @@ function SoundEngineGlance() {
 
   if (audioEngine === 'native') {
     if (phase === 'failed') return <HelpText>{t`Native engine unavailable:`} {error}</HelpText>
-    if (phase !== 'running' || !native) return <InfoRow label={t`Your sound card`}>{t`starting…`}</InfoRow>
-    if (native.mode === 'none') return <InfoRow label={t`Your sound card`}>{t`waiting for a sound card…`}</InfoRow>
+    if (phase !== 'running' || !native) return <InfoRow label={t`Sound card`}>{t`starting…`}</InfoRow>
+    if (native.mode === 'none') return <InfoRow label={t`Sound card`}>{t`waiting for a sound card…`}</InfoRow>
     return (
       <div style={{ marginTop: 6 }}>
-        <InfoRow label={t`Your sound card`}>{native.deviceName}</InfoRow>
+        <InfoRow label={t`Sound card`} marquee={native.deviceName} />
         <InfoRow label={t`Mode`}>{native.mode === 'exclusive' ? amber(t`Exclusive (low latency)`) : t`Shared`} · {kHz(native.rate)} · {msOf(native.bufferFrames / native.rate)} {t`buffer`}</InfoRow>
         {latency}
         {/* Exclusive asked for, but the card couldn't do it: say why */}
@@ -88,7 +93,7 @@ function SoundEngineGlance() {
   const rate = getSamplesSampleRate(), buffer = getSamplesBufferSec()
   return (
     <div style={{ marginTop: 6 }}>
-      <InfoRow label={t`Your sound card`}>{audioEngine === 'gm' && gmExternal ? gmExternal : defaultName || t`Windows' default output`}</InfoRow>
+      <InfoRow label={t`Sound card`} marquee={audioEngine === 'gm' && gmExternal ? gmExternal : defaultName || t`Windows' default output`} />
       <InfoRow label={t`Mode`}>{audioEngine === 'gm' && gmExternal ? t`External instrument` : <>{t`Shared`}{audioEngine === 'samples' && samplesStatus === 'ready' && rate > 0 && <> · {kHz(rate)}{buffer > 0 && <> · {msOf(buffer)} {t`buffer`}</>}</>}</>}</InfoRow>
       {latency}
     </div>
