@@ -5,6 +5,11 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
+## [Unreleased]
+
+### Fixed
+- **Orfeo's native mode now mixes songs exactly like Samples.** Parts placed to one side of the stereo picture, like the piano in Toto's "Rosanna", the guitars or a panned horn section, came out 1.5–3 dB quieter in native mode, while parts in the middle got slightly louder. Their reverb stayed as loud as before, so those parts sounded pushed to the back of the mix. Native mode now places parts left and right exactly as Samples does, and its chorus is as strong as Samples'. Measured part by part on eight songs, every part is now within about 1 dB of Samples. Before, the difference was up to 3 dB. This works for every song, with nothing to set.
+
 ## [1.5.2] — 22. 10. 2026 — Studio interfaces, instrument changes, security
 
 **In short**

@@ -529,9 +529,7 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
             for ch in 0..16 {
                 let st = &mut mix.strips[ch];
                 let target = if tr.channel_muted[ch] { 0.0 } else { 1.0 };
-                let theta = (st.pan + 1.0) * std::f32::consts::FRAC_PI_4; // equal-power pan
-                let (pl, pr) = (theta.cos() * std::f32::consts::SQRT_2, theta.sin() * std::f32::consts::SQRT_2);
-                let (pl, pr) = (pl.min(1.0), pr.min(1.0));
+                let (pl, pr) = pan_gains(st.pan);
                 let (bl, br) = if ch == LIVE_CH && !song_uses_channel(&tr, LIVE_CH) { (&mut ll, &mut lr) } else { (&mut sl, &mut sr) };
                 let (cl, cr) = (&chans[2 * ch], &chans[2 * ch + 1]);
                 let mut peak = 0f32;
@@ -544,7 +542,9 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
                 fmax_atomic(&stats.channel_peaks[ch], peak);
             }
 
-            for i in 0..avail { sl[i] += fx[0][i] + fx[2][i]; sr[i] += fx[1][i] + fx[3][i]; }
+            // FluidSynth's chorus comes back 3 dB quieter than the Samples engine's (measured
+            // on the same sound sets); its reverb already matches
+            for i in 0..avail { sl[i] += fx[0][i] + fx[2][i] * CHORUS_MATCH; sr[i] += fx[1][i] + fx[3][i] * CHORUS_MATCH; }
 
             // ── Song bus: master → auto-level → compressor → safety limiter → tone, + clicks → ceiling (-1 dBFS look-ahead);
             //    live bus: master → tone, added after; then Windows' volume (when the engine applies it) and the soft clip ──
@@ -647,6 +647,33 @@ fn pro_audio_priority() -> Mmcss {
     match unsafe { AvSetMmThreadCharacteristicsW(windows::core::w!("Pro Audio"), &mut index) } {
         Ok(h) => { unsafe { let _ = AvSetMmThreadPriority(h, AVRT_PRIORITY_HIGH); } Mmcss(Some(h)) }
         Err(_) => Mmcss(None),
+    }
+}
+
+const CHORUS_MATCH: f32 = std::f32::consts::SQRT_2;
+
+/// Pan as the Samples engine (and the SoundFont standard) does it: equal power,
+/// so a part moved to one side gets louder there, not just quieter on the
+/// other. FluidSynth renders each channel centred (each side at -3 dB), so the
+/// gains are relative to centre: 1 / 1 there, up to √2 / 0 fully to one side.
+fn pan_gains(pan: f32) -> (f32, f32) {
+    let theta = (pan.clamp(-1.0, 1.0) + 1.0) * std::f32::consts::FRAC_PI_4;
+    (theta.cos() * std::f32::consts::SQRT_2, theta.sin() * std::f32::consts::SQRT_2)
+}
+
+#[cfg(test)]
+mod pan_tests {
+    use super::pan_gains;
+    #[test]
+    fn pan_matches_the_samples_engine() {
+        // the Samples synth's pan law, relative to its centre (cos/sin of 45°)
+        let samples = |pan: f32| { let a = (pan + 1.0) * std::f32::consts::FRAC_PI_4; (a.cos() / 0.5f32.sqrt(), a.sin() / 0.5f32.sqrt()) };
+        for pan in [-1.0f32, -0.6, -0.2, 0.0, 0.33, 0.67, 1.0] {
+            let (l, r) = pan_gains(pan);
+            let (sl, sr) = samples(pan);
+            assert!((l - sl).abs() < 1e-4 && (r - sr).abs() < 1e-4, "pan {pan}: {l},{r} vs {sl},{sr}");
+        }
+        assert!((pan_gains(0.0).0 - 1.0).abs() < 1e-5);
     }
 }
 
