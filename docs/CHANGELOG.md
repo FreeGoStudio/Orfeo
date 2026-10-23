@@ -14,6 +14,7 @@
   - **Low latency mode** (Native): two buttons, Shared and Exclusive, each explaining what it does. Exclusive warns that Orfeo takes over the whole sound card.
   - **Setup** shows the same engine buttons and rows.
   - **MIDI Keyboard:** the cards sit three across, at equal height. *Reconnect automatically* has its own card. "No keyboards connected" and your keyboard-to-speaker delay sit at the right of the tab row. The *Sound & Latency* tab has the Delay check, a *Playing live* card rewritten to be easier to follow, and the delay offset with General MIDI sound.
+- **Tooltips can be switched off.** A new *Tooltips* switch under *Appearance*, in Settings and in Setup, is on by default. Turn it off once you know your way around, and the hints stop popping up when you point at buttons, knobs and icons. A knob still shows its value while you turn it. Windows' own small tips, such as file names, aren't affected.
 - **Choose whether a keyboard switches Native to Exclusive.** A new switch under *MIDI Keyboard › Sound & Latency*, on by default. It's recommended when you play along on a keyboard and nothing else on the computer needs sound. Off: Native stays in the mode you choose.
 - **The Library's "Right-click for options" hint** now appears just above the song, inside the Library, and only after you rest on a song for 3 seconds, not every time the mouse passes over.
 - **DEV MODE** has its own line under the version number, with a tip saying what it is.

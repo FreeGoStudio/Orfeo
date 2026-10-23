@@ -809,6 +809,7 @@ export default function MasterStrip() {
             content={{ title: 'Master Volume', description: `${Math.round(masterVolume * 100)}%` }}
             placement="left"
             visible={volumeHover || volumeDragging}
+            readout={volumeDragging}
           />
         </div>
         {/* dB readout — centered, directly above the VOLUME label below (both

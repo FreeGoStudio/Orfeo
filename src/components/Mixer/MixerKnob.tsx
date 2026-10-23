@@ -184,6 +184,7 @@ export default function MixerKnob({
           anchorRect={hover ? wrapperRef.current?.getBoundingClientRect() ?? null : null}
           content={disabled && disabledHint ? { title: label ?? title ?? '', description: disabledHint } : { title: title ?? '', description }}
           visible={hover}
+          readout={dragging.current}
         />
       )}
       <svg

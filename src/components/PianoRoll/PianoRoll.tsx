@@ -319,7 +319,8 @@ function LoopOverlay() {
   // Tooltip visibility: only while a region is actively selected — showing
   // it on every hover over the roll (even with nothing selected yet) read
   // as a permanent, naggy tooltip.
-  const showTooltip = !!midi && !noteEditorActive && hasSelection && mousePos !== null
+  // (a hint, so it follows Settings › Appearance › Tooltips; this redraws on every mouse move anyway)
+  const showTooltip = !!midi && !noteEditorActive && hasSelection && mousePos !== null && useStore.getState().tooltipsEnabled
 
   // Edit mode disables loop overlay pointer events to pass them to PixiJS
   if (noteEditorActive) return null

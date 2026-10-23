@@ -92,6 +92,7 @@ export default function VolumeKnob() {
           content={{ title: 'Volume', description: `${pct}%` }}
           placement="left"
           visible={hover || isDragging}
+          readout={isDragging}
         />
         {Array.from({ length: BAR_COUNT }, (_, i) => {
           const h      = BAR_MIN_H + (BAR_MAX_H - BAR_MIN_H) * (i / (BAR_COUNT - 1))

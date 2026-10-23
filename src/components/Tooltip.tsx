@@ -1,5 +1,6 @@
 import { useRef, useState, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useStore } from '../store'
 
 // ── Tooltip — dark background, amber border, amber title row + a muted
 // description row underneath. Built for the Console Mixer (knobs, icons,
@@ -52,10 +53,13 @@ function naiveRect(anchor: DOMRect, placement: Placement, w: number, h: number) 
 // the box's real rendered size (text length varies per call site), then a
 // layout effect clamps/flips against the real viewport and reveals it — all
 // before the browser paints, so there's no visible jump.
-export function TooltipBox({ anchorRect, content, visible, placement = 'top', oneLine = false, muted = false }: {
+export function TooltipBox({ anchorRect, content, visible, placement = 'top', oneLine = false, muted = false, readout = false }: {
   anchorRect: DOMRect | null
   content: TooltipContent | null
   visible: boolean
+  // A live value while you drag (a knob's percentage): shown even with
+  // tooltips switched off (Settings › Appearance), which hides only the hints
+  readout?: boolean
   placement?: Placement
   // Plain, single-tip styling (white/normal-case/normal-weight, no amber
   // heading) instead of the amber-title + muted-description pair — for
@@ -95,7 +99,8 @@ export function TooltipBox({ anchorRect, content, visible, placement = 'top', on
     setPos({ top, left })
   }, [visible, anchorRect, content?.title, content?.description, placement, oneLine])
 
-  if (!visible || !anchorRect || !content) return null
+  const tooltipsOn = useStore(s => s.tooltipsEnabled)
+  if (!visible || !anchorRect || !content || (!tooltipsOn && !readout)) return null
 
   return createPortal(
     <div

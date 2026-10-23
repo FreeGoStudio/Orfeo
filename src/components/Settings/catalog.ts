@@ -26,7 +26,7 @@ export type SettingId =
   | 'displaySystem' | 'accidentals' | 'chordTracking' | 'chordReading' | 'chordNaming'
   | 'keyRange' | 'showOctaves' | 'showNoteNames' | 'reflectPianoRoll' | 'preciseScrubTime'
   | 'rollZoom' | 'barNumbers' | 'playbar' | 'visualEffects'
-  | 'theme' | 'appZoom' | 'starmap'
+  | 'theme' | 'appZoom' | 'tooltips' | 'starmap'
   | 'midiKeyboards' | 'midiReconnect' | 'liveResponse' | 'latencyOffset' | 'gmOutput' | 'touchResponse' | 'duplicateFilter'
   | 'pedalsControls' | 'delayCheck' | 'midiTools'
 
@@ -164,6 +164,9 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'appZoom', group: 'appearance', name: t`App Zoom`, summary: t`Make everything in Orfeo bigger or smaller.`,
     description: t`Makes everything in Orfeo bigger or smaller. Ctrl + / Ctrl − / Ctrl 0 work exactly as in a web browser. Click reset to go back to 100%.`,
     keywords: 'zoom scale size bigger smaller ctrl' },
+  { id: 'tooltips', group: 'appearance', name: t`Tooltips`, summary: t`Hints that pop up when you point at a control.`,
+    description: t`The hints that pop up when you point at a button, knob or icon. Turn them off once you know your way around. A knob still shows its value while you turn it.`,
+    keywords: 'tooltips hints help hover popup tips' },
   { id: 'starmap', group: 'appearance', name: t`Starmap`, summary: t`Adds the Starmap view to the Scales Explorer.`,
     description: t`Makes the Starmap available in the Scales Explorer: switch it on in the explorer's Starmap row to swap the Circle of Fifths for a ring of the 12 notes. The chord you hear is drawn as a glowing star joining its notes, gliding from chord to chord — every major chord is the same shape turned, every minor chord its mirror image.`,
     keywords: 'starmap star shape circle scales explorer chord geometry' },
@@ -213,7 +216,7 @@ export const QUICK_LAYOUT: Record<SettingsGroupId, QuickItem[]> = {
   'notation': ['displaySystem', 'accidentals', 'chordTracking'],
   'keyboard': ['keyRange', 'showOctaves', 'showNoteNames'],
   'piano-roll': ['rollZoom', 'barNumbers', 'playbar'],
-  'appearance': ['appZoom'],
+  'appearance': ['appZoom', 'tooltips'],
   // Settings window only for now
   'midi': [],
 }
