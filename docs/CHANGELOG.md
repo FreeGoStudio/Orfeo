@@ -15,6 +15,9 @@
   - *Notation & Chords* is now **Chords & Notation**, with the chord settings first.
   - *Keyboard* is now **Virtual Keyboard**.
   - Playback and Piano Roll fit on one row, with no scrolling.
+  - The MIDI Keyboard tabs (Keyboards, Sound & Latency) fit without scrolling, even with three keyboards connected.
+  - On the Editing and Piano Roll pages, only the first column grows when its cards need more room. The other columns keep their size.
+  - In *Playing live*, the two part headings are amber so they stand out. A pedal or control that hasn't been touched yet now reads *not detected*.
 - **Engine and playing-mode buttons explain themselves.** Pointing at GM, Studio or Native, or at Low latency, Balanced or Stable, shows a one-line hint of what each is best for. You can switch these hints off with the other tooltips.
 - **Long names scroll instead of being cut off** — the sound card and its mode in Audio, and keyboard names in the MIDI Keyboard list. *Only ticked* is now *Select*.
 
