@@ -966,6 +966,7 @@ export const useStore = create<OrfeoStore>((set, get) => ({
     'midi-files-library': false,
     'playback-editing': false,
     practice: false,
+    editing: false,
     notation: false,
     keyboard: false,
     'piano-roll': false,

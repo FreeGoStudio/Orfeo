@@ -287,5 +287,6 @@ export interface TapSession {
 // ── Settings window / Quick Settings group ids — same keys the drawer's
 // fold state (settingsGroupsCollapsed) already uses. ─────────────────────
 export type SettingsGroupId =
-  | 'audio' | 'midi-files-library' | 'playback-editing' | 'practice'
+  // 'playback-editing' is the Playback group (its id kept so saved choices still apply)
+  | 'audio' | 'midi-files-library' | 'playback-editing' | 'practice' | 'editing'
   | 'notation' | 'keyboard' | 'piano-roll' | 'appearance' | 'midi'

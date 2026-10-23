@@ -5,6 +5,19 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
+## [Unreleased]
+
+### Changed
+- **Settings pages in a clearer order.**
+  - MIDI Keyboard now comes right after Audio.
+  - Playback & Editing is split into **Playback** and a new **Editing** page. Editing holds hand assignment, the MIDI Note Editor and the track colour level meters.
+  - *Reflect on keyboard* and *Starmap* move to Practice, and *Show precise scrub time* moves to Playback.
+  - *Notation & Chords* is now **Chords & Notation**, with the chord settings first.
+  - *Keyboard* is now **Virtual Keyboard**.
+  - Playback and Piano Roll fit on one row, with no scrolling.
+- **Engine and playing-mode buttons explain themselves.** Pointing at GM, Studio or Native, or at Low latency, Balanced or Stable, shows a one-line hint of what each is best for. You can switch these hints off with the other tooltips.
+- **Long names scroll instead of being cut off** — the sound card and its mode in Audio, and keyboard names in the MIDI Keyboard list. *Only ticked* is now *Select*.
+
 ## [1.5.3] — 23. 10. 2026 — Native mode sounds like Studio, clearer Settings
 
 **In short**

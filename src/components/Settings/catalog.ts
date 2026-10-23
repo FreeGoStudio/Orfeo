@@ -16,7 +16,8 @@ export interface GroupTab {
   stack?: SettingId[][]     // explicit columns, top to bottom; every column ends at the same line
   aside?: string            // id of a small live readout at the right of the tab row (defs/midi.tsx TAB_ASIDES)
 }
-export interface GroupInfo { id: SettingsGroupId; name: string; intro: string; manualUrl: string; tabs?: GroupTab[] }
+// `stack`: explicit columns for an untabbed group (top to bottom); every column ends at the same line
+export interface GroupInfo { id: SettingsGroupId; name: string; intro: string; manualUrl: string; tabs?: GroupTab[]; stack?: SettingId[][] }
 
 export type SettingId =
   | 'soundEngine' | 'soundFonts' | 'autoLevel'
@@ -41,19 +42,22 @@ export interface SettingInfo {
 
 export const GROUPS: GroupInfo[] = [
   { id: 'audio', name: t`Audio`, intro: t`Set your audio preferences`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files' },
-  { id: 'midi-files-library', name: t`MIDI Files & Library`, intro: t`Organise your library`, manualUrl: 'https://orfeo.cc/docs/managing-midi-files' },
-  { id: 'playback-editing', name: t`Playback & Editing`, intro: t`Shape playback and edits`, manualUrl: 'https://orfeo.cc/docs/editing-midi-files' },
-  { id: 'practice', name: t`Practice`, intro: t`Tools for practising`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files' },
-  { id: 'notation', name: t`Notation & Chords`, intro: t`Name notes and chords`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files/how-orfeo-reads-chords' },
-  { id: 'keyboard', name: t`Keyboard`, intro: t`Set up the keyboard`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
-  { id: 'piano-roll', name: t`Piano Roll`, intro: t`Tune the falling notes`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll' },
-  { id: 'appearance', name: t`Appearance`, intro: t`Change the look`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
   { id: 'midi', name: t`MIDI Keyboard`, intro: t`Manage your keyboards`, manualUrl: 'https://orfeo.cc/docs/settings/midi-keyboard-settings',
     tabs: [
       { name: t`Keyboards`, ids: ['midiKeyboards', 'midiTools', 'midiReconnect'], columns: 3, aside: 'noKeyboards' },
       { name: t`Sound & Latency`, ids: ['delayCheck', 'liveResponse', 'latencyOffset', 'gmOutput'], stack: [['delayCheck'], ['liveResponse'], ['latencyOffset', 'gmOutput']], aside: 'keyToSpeaker' },
       { name: t`Touch & pedals`, ids: ['touchResponse', 'pedalsControls', 'duplicateFilter'] },
     ] },
+  { id: 'midi-files-library', name: t`MIDI Files & Library`, intro: t`Organise your library`, manualUrl: 'https://orfeo.cc/docs/managing-midi-files' },
+  { id: 'playback-editing', name: t`Playback`, intro: t`Shape playback`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files',
+    stack: [['tapTempo'], ['tempoWarnings', 'preciseScrubTime'], ['countIn', 'loopRegion', 'focusMode']] },
+  { id: 'practice', name: t`Practice`, intro: t`Tools for practising`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files' },
+  { id: 'editing', name: t`Editing`, intro: t`Edit your songs`, manualUrl: 'https://orfeo.cc/docs/editing-midi-files' },
+  { id: 'notation', name: t`Chords & Notation`, intro: t`Read chords and notes`, manualUrl: 'https://orfeo.cc/docs/practicing-with-midi-files/how-orfeo-reads-chords' },
+  { id: 'keyboard', name: t`Virtual Keyboard`, intro: t`Set up the keyboard`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-virtual-keyboard' },
+  { id: 'piano-roll', name: t`Piano Roll`, intro: t`Tune the falling notes`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files/the-piano-roll',
+    stack: [['visualEffects'], ['rollZoom'], ['barNumbers', 'playbar']] },
+  { id: 'appearance', name: t`Appearance`, intro: t`Change the look`, manualUrl: 'https://orfeo.cc/docs/settings/appearance-settings' },
 ]
 
 export const SETTINGS: SettingInfo[] = [
@@ -75,9 +79,6 @@ export const SETTINGS: SettingInfo[] = [
     description: t`Adds a transcript icon to every file in your Library — click it to create a chord chart PDF in the ORFEO folder.`,
     keywords: 'pdf chart transcript export' },
   // ── Playback & Editing
-  { id: 'noteEditor', group: 'playback-editing', name: t`MIDI Note Editor`, summary: t`Edit notes directly on the piano roll.`,
-    description: t`Shows the note-editing icon in the Tracks panel, to edit notes directly on the piano roll.`,
-    keywords: 'edit notes editor' },
   { id: 'tapTempo', group: 'playback-editing', name: t`Tap Tempo`, summary: t`A TAP pad for fixing songs whose bar lines don't match the music.`,
     description: t`Adds a red TAP pad next to the tempo, for fixing songs whose bar lines and metronome don't match the music.`,
     keywords: 'tap tempo bpm metronome beat' },
@@ -87,9 +88,12 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'countIn', group: 'playback-editing', name: t`Count-in`, summary: t`Clicks 1–4 bars before the music starts.`,
     description: t`Clicks 1–4 bars at the song's tempo before Play, skipping empty bars at the start, so you come in on time. Also in the metronome's right-click menu.`,
     keywords: 'count in metronome click bars' },
-  { id: 'handAssignment', group: 'playback-editing', name: t`Hand Assignment`, summary: t`Colours each piano note by the hand that plays it.`,
+  { id: 'handAssignment', group: 'editing', name: t`Hand Assignment`, summary: t`Colours each piano note by the hand that plays it.`,
     description: t`Automatic hand assignment for piano that colours each note by the hand that plays it — a guideline, not a verified transcript. For an exact split, use the MIDI Note Editor's hand tool to assign notes to the left and right hand yourself.`,
     keywords: 'left right hand fingers split' },
+  { id: 'noteEditor', group: 'editing', name: t`MIDI Note Editor`, summary: t`Edit notes directly on the piano roll.`,
+    description: t`Shows the note-editing icon in the Tracks panel, to edit notes directly on the piano roll.`,
+    keywords: 'edit notes editor' },
   { id: 'loopRegion', group: 'playback-editing', name: t`Loop region`, summary: t`A strip for picking a section to loop.`,
     description: t`Shows a strip to select and loop a section. Alt+click and drag to select, then click the loop icon.`,
     keywords: 'loop repeat section' },
@@ -109,16 +113,10 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'handTags', group: 'practice', name: t`Hand tags`, summary: t`Small L/R letters on hand-coloured keys.`,
     description: t`Prints a small L/R badge on hand-coloured keys, for colourblind players who can't rely on blue vs. pink alone.`,
     keywords: 'left right colorblind colourblind letters' },
-  { id: 'trackVu', group: 'practice', name: t`Track color VU meters`, summary: t`Track colour lines pulse with each track's level.`,
+  { id: 'trackVu', group: 'editing', name: t`Track color VU meters`, summary: t`Track colour lines pulse with each track's level.`,
     description: t`Each track's colour line in the Tracks panel pulses with its playback level, without opening the Mixer Console.`,
     keywords: 'vu meter level mixer' },
   // ── Notation & Chords
-  { id: 'displaySystem', group: 'notation', name: t`Display system`, summary: t`How note names are written everywhere in Orfeo.`,
-    description: t`Your preferred note-naming system for notation and labels: UK/US (C D E F G A B), EU (C D E F G A H), Solfège (Do Re Mi…), or hide note names.`,
-    keywords: 'note names english german solfege do re mi' },
-  { id: 'accidentals', group: 'notation', name: t`Accidentals`, summary: t`Spell the black keys as sharps or flats.`,
-    description: t`Your preferred spelling for the black keys: sharps (A# D# G#…) or flats (Bb Eb Ab…).`,
-    keywords: 'sharps flats enharmonic black keys' },
   { id: 'chordTracking', group: 'notation', name: t`Chord tracking`, summary: t`Which instruments the chord display listens to.`,
     description: t`What the live chord display and the Lock-A-Chord window follow during playback: Auto (the chord instruments), Harmony (everything but drums) or Follow (one instrument or group you choose).`,
     keywords: 'auto harmony follow chord detection' },
@@ -128,6 +126,12 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'chordNaming', group: 'notation', name: t`Chord naming`, summary: t`Chord names as abbreviations or symbols.`,
     description: t`How chord qualities are written, everywhere a chord name appears: abbreviations (Cm7, Gaug) or symbols (G+, F°7).`,
     keywords: 'symbols abbreviations chord names' },
+  { id: 'displaySystem', group: 'notation', name: t`Display system`, summary: t`How note names are written everywhere in Orfeo.`,
+    description: t`Your preferred note-naming system for notation and labels: UK/US (C D E F G A B), EU (C D E F G A H), Solfège (Do Re Mi…), or hide note names.`,
+    keywords: 'note names english german solfege do re mi' },
+  { id: 'accidentals', group: 'notation', name: t`Accidentals`, summary: t`Spell the black keys as sharps or flats.`,
+    description: t`Your preferred spelling for the black keys: sharps (A# D# G#…) or flats (Bb Eb Ab…).`,
+    keywords: 'sharps flats enharmonic black keys' },
   // ── Keyboard
   { id: 'keyRange', group: 'keyboard', name: t`Key range`, summary: t`Number of keys on the on-screen keyboard.`,
     description: t`Number of keys on the on-screen keyboard: 61, 73 or 88.`,
@@ -138,10 +142,10 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'showNoteNames', group: 'keyboard', name: t`Show note names`, summary: t`Note names on the keyboard keys.`,
     description: t`Display note names on the on-screen keyboard for easier identification.`,
     keywords: 'note names labels keys' },
-  { id: 'reflectPianoRoll', group: 'keyboard', name: t`Reflect piano roll on keyboard`, summary: t`Light the sounding notes while paused or scrubbing.`,
+  { id: 'reflectPianoRoll', group: 'practice', name: t`Reflect on keyboard`, summary: t`Light the sounding notes while paused or scrubbing.`,
     description: t`While paused or scrubbing, the keyboard keeps lighting whatever notes are sounding at the playhead.`,
     keywords: 'scrub paused light keys' },
-  { id: 'preciseScrubTime', group: 'keyboard', name: t`Show precise scrub time`, summary: t`Show the position to the millisecond.`,
+  { id: 'preciseScrubTime', group: 'playback-editing', name: t`Show precise scrub time`, summary: t`Show the position to the millisecond.`,
     description: t`Shows the position readout down to the millisecond, at all times — useful for matching an exact spot in the song.`,
     keywords: 'time position milliseconds scrub' },
   // ── Piano Roll
@@ -167,8 +171,8 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'tooltips', group: 'appearance', name: t`Tooltips`, summary: t`Hints that pop up when you point at a control.`,
     description: t`The hints that pop up when you point at a button, knob or icon. Turn them off once you know your way around. A knob still shows its value while you turn it.`,
     keywords: 'tooltips hints help hover popup tips' },
-  { id: 'starmap', group: 'appearance', name: t`Starmap`, summary: t`Adds the Starmap view to the Scales Explorer.`,
-    description: t`Makes the Starmap available in the Scales Explorer: switch it on in the explorer's Starmap row to swap the Circle of Fifths for a ring of the 12 notes. The chord you hear is drawn as a glowing star joining its notes, gliding from chord to chord — every major chord is the same shape turned, every minor chord its mirror image.`,
+  { id: 'starmap', group: 'practice', name: t`Starmap`, summary: t`Adds the Starmap view to the Scales Explorer.`,
+    description: t`Makes the Starmap available in the Scales Explorer: switch it on in the explorer's Starmap row to swap the Circle of Fifths for a constellation of the 12 notes.`,
     keywords: 'starmap star shape circle scales explorer chord geometry' },
   // ── MIDI Keyboard
   { id: 'midiKeyboards', group: 'midi', name: t`Keyboards`, summary: t`Which connected keyboards Orfeo listens to.`,
@@ -211,8 +215,9 @@ export type QuickItem = SettingId | { heading: string }
 export const QUICK_LAYOUT: Record<SettingsGroupId, QuickItem[]> = {
   'audio': ['soundEngine'],
   'midi-files-library': ['showDemo'],
-  'playback-editing': ['focusMode', 'tapTempo', 'handAssignment'],
+  'playback-editing': ['focusMode', 'tapTempo'],
   'practice': ['stepThrough', 'chordPrompter'],
+  'editing': ['handAssignment'],
   'notation': ['displaySystem', 'accidentals', 'chordTracking'],
   'keyboard': ['keyRange', 'showOctaves', 'showNoteNames'],
   'piano-roll': ['rollZoom', 'barNumbers', 'playbar'],

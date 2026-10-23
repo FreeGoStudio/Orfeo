@@ -203,7 +203,9 @@ export default function SettingsWindow() {
                       })()}
                     </>
                   ) : (
-                    <CardGrid ids={SETTINGS.filter(s => s.group === g.id).map(s => s.id)} width={width} />
+                    g.stack
+                      ? <ColumnCards ids={SETTINGS.filter(s => s.group === g.id).map(s => s.id)} width={width} stack={g.stack} />
+                      : <CardGrid ids={SETTINGS.filter(s => s.group === g.id).map(s => s.id)} width={width} />
                   )}
                 </>
               ) : results.length === 0 ? (
