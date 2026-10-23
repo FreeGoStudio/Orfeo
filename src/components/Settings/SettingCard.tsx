@@ -1,9 +1,14 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { SETTING_BY_ID, type SettingId } from './catalog'
 import { DEFS } from './defs'
 import { BetaBadge, SurfaceContext } from './controls'
 
 const always = () => true
+
+// Catalog text with **bold** words: the stars mark what to emphasise
+export function richText(text: string): ReactNode {
+  return text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <b key={i} style={{ fontWeight: 600, color: 'var(--text-default)' }}>{part}</b> : part))
+}
 
 // ── One setting in the Settings window: icon + name (switch on the right),
 // full description, then its controls, glance lines and follow-up options.
@@ -18,7 +23,7 @@ export function SettingCard({ id }: { id: SettingId }) {
   const controlFirst = def.layout === 'controlFirst'
   const description = (
     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', lineHeight: 1.5, fontFamily: 'var(--font-ui)', fontStyle: 'italic', marginTop: controlFirst ? 10 : 0 }}>
-      {Description ? <Description /> : info.description}
+      {Description ? <Description /> : richText(info.description)}
     </div>
   )
   return (

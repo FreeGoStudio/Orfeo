@@ -1,6 +1,7 @@
 import { SETTING_BY_ID, type SettingId } from './catalog'
 import { DEFS } from './defs'
 import { SurfaceContext } from './controls'
+import { richText } from './SettingCard'
 
 const always = () => true
 const nameStyle = {
@@ -21,7 +22,7 @@ export function QuickRow({ id }: { id: SettingId }) {
   if (!useVisible()) return null
   const { Control, Glance, NameSuffix, NameRight, QuickExtra } = def
   const name = <span style={nameStyle}>{info.name}{NameSuffix && <> <NameSuffix /></>}</span>
-  const summary = <div style={summaryStyle}>{info.summary}</div>
+  const summary = <div style={summaryStyle}>{richText(info.summary)}</div>
   return (
     <SurfaceContext.Provider value="setup">
       <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--border-row)' }}>
@@ -40,7 +41,7 @@ export function QuickRow({ id }: { id: SettingId }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', columnGap: 8 }}>
               {name}{NameRight ? <NameRight /> : <span />}
             </div>
-            <div style={{ ...summaryStyle, marginBottom: 7 }}>{info.summary}</div>
+            <div style={{ ...summaryStyle, marginBottom: 7 }}>{richText(info.summary)}</div>
             <Control />
           </>
         )}

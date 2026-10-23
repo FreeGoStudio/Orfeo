@@ -3,7 +3,8 @@ import type { SettingsGroupId } from '../../types'
 
 // ── Every setting's words, once. The Settings window shows `description`;
 // Setup (the drawer) shows `summary` under each name; search reads name + description +
-// keywords. Controls live in defs/*.tsx, keyed by the same ids. ──────────
+// keywords. Controls live in defs/*.tsx, keyed by the same ids. A summary or
+// description may mark **bold** words (SettingCard.tsx richText). ─────────
 
 // `tabs`: a big group can split its cards into tabs in the Settings window
 // (two cards across instead of three, so each has room). Search ignores tabs.
