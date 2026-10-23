@@ -12,6 +12,7 @@ export interface GroupTab {
   ids: SettingId[]
   columns?: 2 | 3           // cards across (default 2); 3 = one row of equal-height cards
   wide?: SettingId[]        // full-width cards under the others
+  stack?: SettingId[][]     // explicit columns, top to bottom; every column ends at the same line
   aside?: string            // id of a small live readout at the right of the tab row (defs/midi.tsx TAB_ASIDES)
 }
 export interface GroupInfo { id: SettingsGroupId; name: string; intro: string; manualUrl: string; tabs?: GroupTab[] }
@@ -49,7 +50,7 @@ export const GROUPS: GroupInfo[] = [
   { id: 'midi', name: t`MIDI Keyboard`, intro: t`Manage your keyboards`, manualUrl: 'https://orfeo.cc/docs/settings/midi-keyboard-settings',
     tabs: [
       { name: t`Keyboards`, ids: ['midiKeyboards', 'midiTools', 'midiReconnect'], columns: 3, aside: 'noKeyboards' },
-      { name: t`Sound & Latency`, ids: ['delayCheck', 'latencyOffset', 'gmOutput'], columns: 3, wide: ['liveResponse'], aside: 'keyToSpeaker' },
+      { name: t`Sound & Latency`, ids: ['delayCheck', 'liveResponse', 'latencyOffset', 'gmOutput'], stack: [['delayCheck'], ['liveResponse'], ['latencyOffset', 'gmOutput']], aside: 'keyToSpeaker' },
       { name: t`Touch & pedals`, ids: ['touchResponse', 'pedalsControls', 'duplicateFilter'] },
     ] },
 ]

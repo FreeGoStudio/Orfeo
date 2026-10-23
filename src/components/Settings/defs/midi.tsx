@@ -183,7 +183,7 @@ function LiveResponseControl() {
   const autoLow = useMidiSettings(s => s.autoLowLatency)
   const heading = (s: string) => <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>{s}</div>
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: 24, rowGap: 12 }}>
+    <div style={{ display: 'grid', rowGap: 14 }}>
       <div style={{ minWidth: 0 }}>
         {heading(engine === 'gm' ? t`With GM` : engine === 'native' ? t`With Native` : t`With Studio`)}
         {engine === 'gm' && <HelpText>{t`GM plays your keys at once: there's nothing between your keys and the synth.`}</HelpText>}
@@ -206,7 +206,7 @@ function LiveResponseControl() {
       </div>
       <div style={{ minWidth: 0 }}>
         {heading(t`When a keyboard is plugged in`)}
-        <SwitchRow label={t`Switch to Exclusive when a keyboard is connected`} value={autoLow} onChange={x => set({ autoLowLatency: x })} />
+        <SwitchRow label={t`Auto-switch to Exclusive`} value={autoLow} onChange={x => set({ autoLowLatency: x })} />
         <HelpText>{t`Recommended when you play along on a keyboard and nothing else on the computer needs sound: plugging a keyboard in switches Native to Exclusive, for the shortest delay; unplugging the last one switches back to Shared. Off: Native stays in the mode you choose.`}</HelpText>
       </div>
     </div>

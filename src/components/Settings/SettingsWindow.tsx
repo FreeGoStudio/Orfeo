@@ -31,9 +31,10 @@ function CardGrid({ ids, width, layoutCount = ids.length }: { ids: SettingId[]; 
 // Tabbed groups: two independent columns (cards alternate left/right in
 // catalog order), so a short card never stretches to match a tall neighbour;
 // each column's last card grows so both columns end at the same line
-function ColumnCards({ ids, width }: { ids: SettingId[]; width: number }) {
-  const cols = gridColumns(2, width)
-  const columns = Array.from({ length: cols }, (_, c) => ids.filter((_, i) => i % cols === c))
+function ColumnCards({ ids, width, stack }: { ids: SettingId[]; width: number; stack?: SettingId[][] }) {
+  const cols = stack ? gridColumns(stack.length, width) : gridColumns(2, width)
+  // explicit columns when they fit; otherwise the cards flow as usual
+  const columns = stack && cols === stack.length ? stack : Array.from({ length: cols }, (_, c) => ids.filter((_, i) => i % cols === c))
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: CARD_GAP, alignItems: 'stretch' }}>
       {columns.map((col, c) => (
@@ -195,7 +196,7 @@ export default function SettingsWindow() {
                         return (
                           <>
                             {/* Two across by default: tabbed groups have the busier cards */}
-                            {tb.columns === 3 ? <CardGrid ids={tb.ids} width={width} layoutCount={3} /> : <ColumnCards ids={tb.ids} width={width} />}
+                            {tb.columns === 3 ? <CardGrid ids={tb.ids} width={width} layoutCount={3} /> : <ColumnCards ids={tb.ids} width={width} stack={tb.stack} />}
                             {tb.wide?.map(id => <div key={id} style={{ marginTop: CARD_GAP }}><SettingCard id={id} /></div>)}
                           </>
                         )
