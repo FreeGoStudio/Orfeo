@@ -472,7 +472,7 @@ export default function LoopRegionStrip() {
         title={hasSelection ? 'Loop region set' : 'Select a bar range'}
         description={hasSelection
           ? 'Click outside the selection to clear it, or drag its handles to adjust.'
-          : 'Drag to select a bar range, or Alt+drag on the waterfall above for precise timing.'}
+          : 'Drag to select a bar range, or Alt+drag \non the waterfall above for precise timing.'}
         wrapperStyle={{ width: '100%', display: 'block' }}
       >
       <canvas
@@ -497,7 +497,7 @@ export default function LoopRegionStrip() {
           is what made this so easy to falsely "verify" as working. ────────── */}
       <div className="app-no-drag" style={{ position: 'absolute', left: 'calc(100% + 8px)', top: 0, height: STRIP_H, display: 'flex', alignItems: 'center', gap: 6 }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Tooltip title="Select bar range" description="Opens a popup to type an exact start/end bar for the loop region.">
+          <Tooltip title="Select bar range" description="Type an exact start/end bar for the loop region.">
           <button
             ref={iconBtnRef}
             onClick={handleIconClick}

@@ -343,7 +343,7 @@ export default function TrackPanel() {
             </Tooltip>
             <Tooltip
               title={!midi ? 'Open a MIDI file first' : midiEditorOpen ? 'MIDI Playback Editor is open' : 'MIDI Playback Editor'}
-              description={!midi ? 'Load a MIDI file to edit its playback.' : midiEditorOpen ? "Already open — check for it among your other windows." : 'Edit what you want to hear and see: rename tracks, reassign instruments, change color, merge/split ...'}
+              description={!midi ? 'Load a MIDI file to edit its playback.' : midiEditorOpen ? "Already open — check for it among your other windows." : 'Edit what you want to hear and see: rename tracks, reassign instruments, merge/split ...'}
               wrapperStyle={{ marginTop: 8 }}
             >
             <button
@@ -365,7 +365,7 @@ export default function TrackPanel() {
             {noteEditorEnabled && midi && (
               <Tooltip
                 title={noteEditorActive ? 'Exit note edit mode' : 'MIDI note editor'}
-                description={noteEditorActive ? 'Returns to normal playback view.' : 'Add, delete and move individual notes directly on the piano roll. (Advanced)'}
+                description={noteEditorActive ? 'Returns to normal playback view.' : 'Add, delete and move individual notes directly on the piano roll. Assign notes to Left/Right hand.'}
                 wrapperStyle={{ marginTop: 8 }}
               >
               <button
@@ -386,7 +386,7 @@ export default function TrackPanel() {
               </button>
               </Tooltip>
             )}
-            <Tooltip title="Console Mixer" description="Adjust volume, pan, and effects for every track and apply compression." wrapperStyle={{ marginTop: 8 }}>
+            <Tooltip title="Console Mixer" description={"Adjust volume, pan, chorus, and reverb \nfor every track and apply compression."} wrapperStyle={{ marginTop: 8 }}>
             <button
               onClick={() => useStore.getState().setMixerOpen(true)}
               style={{
@@ -439,7 +439,7 @@ export default function TrackPanel() {
                 </span>
                 <Tooltip
                   title={allVisible ? 'Hide all tracks' : 'Show all tracks'}
-                  description={allVisible ? 'Hide every track’s notes on the\nPiano Roll — turn individual ones back on anytime' : 'Show every track’s notes on the\nPiano Roll again'}
+                  description={allVisible ? 'Hide every track’s notes on the Piano Roll \n— turn individual ones back on anytime' : 'Show every track’s notes \non the Piano Roll again'}
                 >
                 <button
                   onClick={handleVisibleAll}

@@ -335,7 +335,7 @@ export default function TopBar() {
             from hit-testing once it's nested inside Tooltip's wrapper div,
             which would otherwise still show the tooltip over reserved-but-
             hidden blank space. */}
-        <Tooltip title="Reset tempo" description="Restores the song's original BPM, undoing any speed adjustment." placement="bottom"
+        <Tooltip title="Reset tempo" description="Restores the original BPM" placement="bottom"
           wrapperStyle={{ visibility: isTempoChanged ? 'visible' : 'hidden', flexShrink: 0 }}
         >
           <button
@@ -378,7 +378,7 @@ export default function TopBar() {
           <ArrowBtn onClick={() => handleTranspose(-1)} disabled={!midi || transpose <= -12} title="Transpose down" description={"Shifts the detected key down\nby a semitone (max −12)."}><ChevronDown size={10} /></ArrowBtn>
         </div>
         {/* ── Reset — space always reserved so its appearance never shifts the transport controls ── */}
-        <Tooltip title="Reset key" description="Clears the transpose, back to the song's originally detected key." placement="bottom"
+        <Tooltip title="Reset key" description={"Restores the original key"} placement="bottom"
           wrapperStyle={{ visibility: transpose !== 0 ? 'visible' : 'hidden', flexShrink: 0 }}
         >
           <button
@@ -568,7 +568,7 @@ export default function TopBar() {
         {/* BAR COUNTER — only when a file is loaded */}
         {midi && (
           <>
-            <Tooltip title={`Bar ${currentBar} of ${totalBars}`} description={"Your current position in the song,\ncounted in bars."} placement="bottom">
+            <Tooltip title={`Bar ${currentBar} of ${totalBars}`} description={"Position in the song,\ncounted in bars."} placement="bottom">
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 var(--space-3)' }}>
                 <div style={{
                   background: 'var(--bg-tile)', borderRadius: 4, padding: '2px 6px',
@@ -621,7 +621,7 @@ export default function TopBar() {
           title={metronomeEnabled ? 'Metronome on' : 'Metronome off'}
           description={countInEnabled
             ? t`Click to toggle metronome ON/OFF. Right-click for volume and count-in.`
-            : t`Clicks along with the beat while a file plays.\nClick to toggle, right-click for volume and count-in.`}
+            : t`Click to turn it ON, right-click \nfor volume and count-in.`}
           placement="bottom"
           disabled={!!metroMenu}
         >
@@ -661,10 +661,10 @@ export default function TopBar() {
 
         {/* MIDI — the keyboard being played; click opens its settings */}
         <Tooltip
-          title={midiDeviceConnected ? midiDeviceName : t`No MIDI keyboard connected`}
+          title={midiDeviceConnected ? midiDeviceName : t`No connected keyboards`}
           description={midiDeviceConnected
             ? (midiOthers ? t`Also connected: ${midiOthers}` + '\n' + t`Click for MIDI keyboard settings.` : t`Ready to play. Click for MIDI keyboard settings.`)
-            : t`Connect a MIDI keyboard by USB. Click for MIDI keyboard settings.`}
+            : t`Connect one by USB. Click to \nopen MIDI keyboard settings.`}
           placement="bottom"
           wrapperStyle={{ flexShrink: 0 }}
         >
