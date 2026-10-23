@@ -5,7 +5,12 @@
      list of 2–4 one-line bullets, then ### New / ### Changed / ### Fixed.
      Newest version at the top. -->
 
-## [Unreleased]
+## [1.5.3] — 23. 10. 2026 — Native mode sounds like Studio, clearer Settings
+
+**In short**
+- Orfeo's native mode now sounds like Studio: the same balance, placement, room and punch, measured song by song.
+- Both sound engines play a song's own volume swells and fades, and tracks sharing a channel now share its mix.
+- Clearer Settings: the engines are now GM, Studio and Native, with a Shared or Exclusive choice for Native. The MIDI Keyboard page is tidier, and tooltips can be switched off.
 
 ### Changed
 - **Clearer Settings.**
@@ -20,11 +25,11 @@
 - **DEV MODE** has its own line under the version number, with a tip saying what it is.
 
 ### Fixed
-- **Orfeo's native mode now mixes songs exactly like Samples.** Parts placed to one side of the stereo picture, like the piano in Toto's "Rosanna", the guitars or a panned horn section, came out 1.5–3 dB quieter in native mode, while parts in the middle got slightly louder. Their reverb stayed as loud as before, so those parts sounded pushed to the back of the mix. Instruments recorded in stereo, like the piano and horns in many sound sets, were also squeezed to one side, losing their width. Native mode now places every note left and right exactly as Samples does, keeping stereo instruments as wide as they are. Measured part by part on eight songs and two sound sets, every part is now within about 1 dB of Samples in level and in its left–right placement. Before, levels differed by up to 4 dB and placement by up to 13 dB. This works for every song, with nothing to set.
-- **Orfeo's native mode no longer sounds thin next to Samples.** It played about 4 dB hotter into its peak limiter, which then flattened the bass and drum hits all the time, so loud songs lost their punch and the midrange came forward. Its level now matches Samples before any limiting. Its ceiling sits just under full scale, as Samples' does. Measured on whole songs, both engines now sound the same within about 1 dB in every octave, from the deepest bass to the top.
+- **Orfeo's native mode now mixes songs exactly like Studio.** Parts placed to one side of the stereo picture, like the piano in Toto's "Rosanna", the guitars or a panned horn section, came out 1.5–3 dB quieter in native mode, while parts in the middle got slightly louder. Their reverb stayed as loud as before, so those parts sounded pushed to the back of the mix. Instruments recorded in stereo, like the piano and horns in many sound sets, were also squeezed to one side, losing their width. Native mode now places every note left and right exactly as Studio does, keeping stereo instruments as wide as they are. Measured part by part on eight songs and two sound sets, every part is now within about 1 dB of Studio in level and in its left–right placement. Before, levels differed by up to 4 dB and placement by up to 13 dB. This works for every song, with nothing to set.
+- **Orfeo's native mode no longer sounds thin next to Studio.** It played about 4 dB hotter into its peak limiter, which then flattened the bass and drum hits all the time, so loud songs lost their punch and the midrange came forward. Its level now matches Studio before any limiting. Its ceiling sits just under full scale, as Studio's does. Measured on whole songs, both engines now sound the same within about 1 dB in every octave, from the deepest bass to the top.
 - **Parts that share a MIDI channel now share its mix.** Many files set a channel's volume, panning, reverb and chorus once, then add more tracks on that channel without repeating them. Orfeo gave those extra tracks full volume, centre position and no effects. In "Rosanna", for example, a pad, an organ and a lead came out too loud and dry, or in the wrong place. Every track now takes its channel's settings from the song, wherever in the file they're written.
 - **Both sound engines now play a song's own volume moves.** Many arrangements fade parts in and out, bring a guitar up for its solo, or swell the strings, as in "La Vie En Rose", where the strings swell over 600 times. Both engines used to hold every part at its starting volume, so those moves were lost. Now they play as written. The Console faders still work as before: pulling one down turns the whole part down, swells included.
-- **Orfeo's native mode now puts songs in the same room as Samples.** It used FluidSynth's own reverb and chorus, which sound different from Samples'. Now it uses exactly the same reverb and chorus as Samples, fed the same way: each part's amount from the song, plus the touch the sound set gives each instrument. Measured on several songs with two sound sets, they're within about 1 dB of Samples. Switching engines no longer changes how close or far away the music sounds.
+- **Orfeo's native mode now puts songs in the same room as Studio.** It used FluidSynth's own reverb and chorus, which sound different from Studio's. Now it uses exactly the same reverb and chorus as Studio, fed the same way: each part's amount from the song, plus the touch the sound set gives each instrument. Measured on several songs with two sound sets, they're within about 1 dB of Studio. Switching engines no longer changes how close or far away the music sounds.
 
 ## [1.5.2] — 22. 10. 2026 — Studio interfaces, instrument changes, security
 
