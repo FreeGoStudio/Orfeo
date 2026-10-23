@@ -60,6 +60,34 @@ export function parseMidiBuffer(buffer: ArrayBuffer, fileName: string, filePath 
   const tracks: ParsedTrack[] = []
   let pianoFamilyIndex = 0
 
+  // ── A channel's mix belongs to the channel, not to one track: MIDI files often
+  // set a channel's volume, pan, reverb and chorus once — in the part's first
+  // track, or in a track with no notes at all — and later tracks on the same
+  // channel just play on. So every track takes its channel's controller moves
+  // from the whole file, earliest first (the Console fader starts at the
+  // channel's first volume, and both engines play its later moves).
+  const channelCC = new Map<number, Map<number, { time: number; value: number }[]>>()
+  midi.tracks.forEach((track, i) => {
+    const ch = track.channel ?? i
+    const ccs = (track as any).controlChanges
+    if (!ccs) return
+    for (const n of [7, 10, 11, 91, 93]) {
+      const arr = ccs[n]
+      if (!Array.isArray(arr) || arr.length === 0) continue
+      const byCC = channelCC.get(ch) ?? new Map()
+      const list = byCC.get(n) ?? []
+      for (const e of arr) list.push({ time: e.time ?? 0, value: e.value })
+      byCC.set(n, list)
+      channelCC.set(ch, byCC)
+    }
+  })
+  for (const byCC of channelCC.values()) {
+    for (const [n, list] of byCC) {
+      list.sort((a, b) => a.time - b.time)
+      byCC.set(n, list.filter((e, i) => i === 0 || e.value !== list[i - 1].value))
+    }
+  }
+
   midi.tracks.forEach((track, i) => {
     if (track.notes.length === 0) return
     const isDrum = track.channel === 9
@@ -87,14 +115,11 @@ export function parseMidiBuffer(buffer: ArrayBuffer, fileName: string, filePath 
       trackIndex: tracks.length,
     }))
 
-    // ── Extract first-occurrence CC values for mixer initialization ───────────
+    // ── The channel's first value of a controller, for the mixer's starting point
     // @tonejs/midi normalizes CC values to 0–1. CC10 pan: 0.5 = center.
-    const parseCC = (n: number): number | undefined => {
-      const ccs = (track as any).controlChanges
-      if (!ccs) return undefined
-      const arr = ccs[n]
-      return Array.isArray(arr) && arr.length > 0 ? arr[0].value : undefined
-    }
+    const channel = track.channel ?? i
+    const channelEvents = (n: number) => channelCC.get(channel)?.get(n)
+    const parseCC = (n: number): number | undefined => channelEvents(n)?.[0]?.value
 
     // ── Sustain pedal (CC64) — full transition list, not just the first value.
     // MIDI: value ≥ 64 = down; @tonejs/midi normalizes to 0–1, so ≥ 0.5.
@@ -107,15 +132,6 @@ export function parseMidiBuffer(buffer: ArrayBuffer, fileName: string, filePath 
           .filter((e: { down: boolean }, i: number, arr: { down: boolean }[]) => i === 0 || e.down !== arr[i - 1].down)
       : undefined
 
-    // ── Volume (CC7) and expression (CC11) through the song, repeats dropped
-    const controlEvents = (n: number) => {
-      const arr = (track as any).controlChanges?.[n]
-      if (!Array.isArray(arr) || arr.length === 0) return undefined
-      return arr
-        .map((e: any) => ({ time: e.time ?? 0, value: e.value }))
-        .sort((a: { time: number }, b: { time: number }) => a.time - b.time)
-        .filter((e: { value: number }, i: number, a: { value: number }[]) => i === 0 || e.value !== a[i - 1].value)
-    }
 
     const parsedTrack: any = {
       index: tracks.length,
@@ -126,14 +142,15 @@ export function parseMidiBuffer(buffer: ArrayBuffer, fileName: string, filePath 
       isDrum,
       color,
       notes,
-      channel: track.channel ?? i,
+      channel,
       _cc7:  parseCC(7),
       _cc10: parseCC(10),
       _cc91: parseCC(91),
       _cc93: parseCC(93),
       sustainEvents,
-      volumeEvents: controlEvents(7),
-      expressionEvents: controlEvents(11),
+      // the channel's volume (CC7) and expression (CC11) through the song
+      volumeEvents: channelEvents(7),
+      expressionEvents: channelEvents(11),
     }
 
     tracks.push(parsedTrack)

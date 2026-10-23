@@ -16,9 +16,12 @@ import { programTimeline } from './programTimeline'
 import { volumeRatio } from './songVolume'
 import type { ControlEvent, ParsedTrack } from '../types'
 
-// FluidSynth at gain 1 sits ~6 dB under the Samples engine (which boosts ×3);
-// this brings Native to the same loudness at the same master volume
-export const NATIVE_BOOST = 2.0
+// Brings Native to the Samples engine's loudness at the same master volume.
+// Measured from the speakers at a low master volume, where neither engine's
+// limiter acts (compressor off): matched there, both reach their limiters at
+// the same point, so loud passages keep the same punch. (Matching loudness at
+// a high volume instead hides a hotter engine behind its own limiter.)
+export const NATIVE_BOOST = 1.37
 
 type Tracks = ReturnType<typeof useStore.getState>['tracks']
 const activeMidiData = (): any => (NES.dirty && NES.editMidi) ? NES.editMidi : useStore.getState().midi

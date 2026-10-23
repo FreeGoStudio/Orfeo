@@ -316,8 +316,9 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
         comp.set(comp_enabled, comp_preset);
         let mut agc = AutoLevel::new(rate as f32);
         let mut safety = Compressor::safety(rate as f32);
-        // never above -1 dBFS, on any sound card; holds the song and clicks back 2 ms
-        let mut ceiling = Brickwall::new(rate as f32, -1.0, 0.002, 0.08);
+        // never above -0.1 dBFS (where the Samples engine's limiter lets peaks reach), on
+        // any sound card; holds the song and clicks back 2 ms
+        let mut ceiling = Brickwall::new(rate as f32, -0.1, 0.002, 0.08);
         // the Samples engine's room: every channel's reverb send, summed, into its plate
         let mut plate = Reverb::new(rate as f32);
         let mut plate_in = vec![0f32; n];
@@ -567,7 +568,7 @@ fn audio_thread(fluid_dir: PathBuf, soundfonts: Vec<PathBuf>, mut mode: OutputMo
             plate.process(&plate_in[..avail], &mut sl[..avail], &mut sr[..avail]);
             chorus.process(&chorus_in[..avail], &mut sl[..avail], &mut sr[..avail]);
 
-            // ── Song bus: master → auto-level → compressor → safety limiter → tone, + clicks → ceiling (-1 dBFS look-ahead);
+            // ── Song bus: master → auto-level → compressor → safety limiter → tone, + clicks → ceiling (-0.1 dBFS look-ahead);
             //    live bus: master → tone, added after; then Windows' volume (when the engine applies it) and the soft clip ──
             let use_tone = mix.tone_db.abs() > 0.01;
             let mut mpeak = 0f32;

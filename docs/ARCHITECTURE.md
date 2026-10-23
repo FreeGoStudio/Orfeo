@@ -238,7 +238,7 @@ channel set to the wrong instrument for the rest of the session.
   not assumed: render the same song through both synths and compare each
   part's level, reverb and chorus (local tool, docs/Tools/engine-parity).
   It runs auto-level → compressor → safety limiter (no look-ahead) → tone on the song bus only, then
-  a look-ahead brickwall (`Brickwall`, -1 dBFS ceiling, 2 ms, song + clicks only), adds live
+  a look-ahead brickwall (`Brickwall`, -0.1 dBFS ceiling — where the Samples engine's safety limiter lets peaks reach — 2 ms, song + clicks only), adds live
   keys, metronome clicks (own bus, not on the master fader) and count-in clicks
   on its own clock, and soft-clips. Exclusive mode (~3–4 ms periods; *Low latency*, on only
   while a MIDI keyboard is connected, not saved) with automatic shared fallback. An exclusive stream skips Windows' software
