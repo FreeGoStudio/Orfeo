@@ -8,7 +8,8 @@
 ## [Unreleased]
 
 ### New
-- **Rate Orfeo** (Microsoft Store version). A star next to *Check for updates* opens the Store's review window right over Orfeo: pick the stars, write a few words, done. Every fifth time you open Orfeo, a small note offers the same, with *Later* and *Don't show again*. It stops for good once you've rated Orfeo.
+- **"Enjoying Orfeo?"** Every fifth time you open Orfeo, a small note in the corner offers ways to help it grow: a review, the Orfeo community on Reddit, or a coffee on Ko-fi. *Disable for 30 days* pauses it, and Settings › Appearance turns it off.
+- **Rate Orfeo** (Microsoft Store version). A star next to *Check for updates* opens the Store's review window right over Orfeo: pick the stars, write a few words, done. In this version the note offers the same, with *Later* and *Don't show again*, and stops for good once you've rated Orfeo.
 
 ### Changed
 - **Settings pages in a clearer order.**

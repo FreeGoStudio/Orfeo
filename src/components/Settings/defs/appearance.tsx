@@ -1,4 +1,4 @@
-import { Palette, ZoomIn, RotateCcw, Sparkles, MessageSquare } from 'lucide-react'
+import { Palette, ZoomIn, RotateCcw, Sparkles, MessageSquare, Heart } from 'lucide-react'
 import { useStore } from '../../../store'
 import { t } from '../../../utils/i18n'
 import { AppBgBtn, ZoomStepper, GlanceLine, InlineIcon, Switch, useSurface } from '../controls'
@@ -45,6 +45,10 @@ export const APPEARANCE_DEFS: SettingDef[] = [
   {
     id: 'tooltips', icon: MessageSquare, kind: 'switch',
     Control: () => { const v = useStore(s => s.tooltipsEnabled); return <Switch value={v} onChange={useStore.getState().setTooltipsEnabled} label={t`Tooltips`} /> },
+  },
+  {
+    id: 'supportNote', icon: Heart, kind: 'switch',
+    Control: () => { const v = useStore(s => s.supportNoteEnabled); return <Switch value={v} onChange={useStore.getState().setSupportNoteEnabled} label={t`Enjoying Orfeo?`} /> },
   },
   {
     id: 'starmap', icon: Sparkles, kind: 'switch',

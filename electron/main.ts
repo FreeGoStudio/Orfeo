@@ -1881,50 +1881,57 @@ ipcMain.handle('update:install', () => {
   autoUpdater.quitAndInstall()
 })
 
-// ── Rate Orfeo (Microsoft Store build only) ─────────────────────────────────
-// The Store's own review window, opened over Orfeo by a small helper
-// (native/orfeo-review, shipped beside the audio add-on). A star button next to the
-// update check opens it any time; on every REVIEW_EVERY-th launch the renderer
-// also shows a small note offering it, until the person rates Orfeo or picks
-// "Don't show again". ORFEO_REVIEW_TEST=1 shows both in dev to check the look
-// (the review window itself only opens in the Store build).
-const REVIEW_EVERY = 5
+// ── "Enjoying Orfeo?" note + Rate Orfeo ────────────────────────────────────
+// Every NOTE_EVERY-th launch the renderer shows a small note, unless it's
+// switched off in Settings › Appearance:
+//   Store build — offers the Store's own review window (a star beside the
+//     update check opens it any time), until the person rates Orfeo or picks
+//     "Don't show again". A small helper (native/orfeo-review, shipped beside
+//     the audio add-on) opens it, so a failure there can never close Orfeo.
+//   Every other build — review, community and sponsor links, and "Disable
+//     for 30 days".
+// ORFEO_NOTE_TEST=store or =other shows that note in dev at every launch (the
+// review window itself only opens in the Store build).
+const NOTE_EVERY = 5
+const NOTE_SNOOZE_MS = 30 * 24 * 3600 * 1000
 const STORE_REVIEW_URL = 'ms-windows-store://review/?ProductId=9NJ9Q01P8JQD'
-const reviewTest = !app.isPackaged && process.env.ORFEO_REVIEW_TEST === '1'
-const reviewAvailable = updateMode === 'store' || reviewTest
-let reviewLaunchCounted = false
-type ReviewPrefs = { launches: number; done: boolean }
-function reviewPrefs(): ReviewPrefs {
-  const r = loadPrefs().storeReview
-  return { launches: typeof r?.launches === 'number' ? r.launches : 0, done: r?.done === true }
-}
-ipcMain.handle('review:info', () => {
-  if (!reviewAvailable) return { available: false, prompt: false }
-  const r = reviewPrefs()
-  // Counted once per launch, not per window reload
-  if (!reviewLaunchCounted && !r.done) {
-    reviewLaunchCounted = true
-    r.launches++
-    savePrefs({ storeReview: r })
+const noteTest = app.isPackaged ? undefined : process.env.ORFEO_NOTE_TEST
+const storeNote = noteTest ? noteTest === 'store' : updateMode === 'store'
+let noteLaunchCounted = false
+type NotePrefs = { launches: number; done: boolean; snoozeUntil: number }
+function notePrefs(): NotePrefs {
+  const r = loadPrefs().supportNote
+  return {
+    launches: typeof r?.launches === 'number' ? r.launches : 0,
+    done: r?.done === true,
+    snoozeUntil: typeof r?.snoozeUntil === 'number' ? r.snoozeUntil : 0,
   }
-  return { available: true, prompt: !r.done && (reviewTest || r.launches % REVIEW_EVERY === 0) }
+}
+const saveNotePrefs = (change: Partial<NotePrefs>) => savePrefs({ supportNote: { ...notePrefs(), ...change } })
+ipcMain.handle('note:info', () => {
+  const r = notePrefs()
+  // Counted once per launch, not per window reload
+  if (!noteLaunchCounted) { noteLaunchCounted = true; r.launches++; saveNotePrefs({ launches: r.launches }) }
+  const due = r.launches % NOTE_EVERY === 0 && Date.now() >= r.snoozeUntil && !(storeNote && r.done)
+  return { store: storeNote, prompt: !!noteTest || due }
 })
 ipcMain.handle('review:request', async () => {
-  if (!reviewAvailable || !mainWin || mainWin.isDestroyed()) return 'error'
-  // A separate little program opens it (native/orfeo-review), so a failure
-  // there can never close Orfeo; its exit code is the answer
+  if (!storeNote || !mainWin || mainWin.isDestroyed()) return 'error'
+  // A separate little program opens it, so a failure there can never close
+  // Orfeo; its exit code is the answer
   const hwnd = mainWin.getNativeWindowHandle().readBigUInt64LE(0).toString()
   const code = await new Promise<number>((resolve) => {
     execFile(join(nativeDir(), 'orfeo-review.exe'), [hwnd], { windowsHide: true },
       (err) => resolve(err ? (typeof err.code === 'number' ? err.code : 3) : 0))
   })
   const status: string = ['succeeded', 'canceled', 'network-error'][code] ?? 'error'
-  if (status === 'succeeded') savePrefs({ storeReview: { ...reviewPrefs(), done: true } })
+  if (status === 'succeeded') saveNotePrefs({ done: true })
   // The window couldn't open here: the Store app's review page instead
   else if (status === 'error' && updateMode === 'store') void shell.openExternal(STORE_REVIEW_URL)
   return status
 })
-ipcMain.handle('review:never', () => savePrefs({ storeReview: { ...reviewPrefs(), done: true } }))
+ipcMain.handle('note:never', () => saveNotePrefs({ done: true }))
+ipcMain.handle('note:snooze', () => saveNotePrefs({ snoozeUntil: Date.now() + NOTE_SNOOZE_MS }))
 
 // ── Portable mode: redirect userData to a folder next to the exe ─────────────
 // PORTABLE_EXECUTABLE_DIR is injected by electron-builder when running as a

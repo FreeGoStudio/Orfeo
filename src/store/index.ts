@@ -468,6 +468,9 @@ interface OrfeoStore {
   // Orfeo's own tooltips (hints on hover); live value readouts while dragging stay
   tooltipsEnabled: boolean
   setTooltipsEnabled: (v: boolean) => void
+  // The "Enjoying Orfeo?" note every 5th launch (components/SupportNote.tsx)
+  supportNoteEnabled: boolean
+  setSupportNoteEnabled: (v: boolean) => void
   setAutoCollapseDrawers: (v: boolean) => void
 
   // ── Tracks panel's per-track color line doubles as a mini VU meter during
@@ -1024,6 +1027,8 @@ export const useStore = create<OrfeoStore>((set, get) => ({
   setStepThroughEnabled: (stepThroughEnabled) => set({ stepThroughEnabled }),
   tooltipsEnabled: true,
   setTooltipsEnabled: (tooltipsEnabled) => set({ tooltipsEnabled }),
+  supportNoteEnabled: true,
+  setSupportNoteEnabled: (supportNoteEnabled) => set({ supportNoteEnabled }),
   setAutoCollapseDrawers: (autoCollapseDrawers) => set({ autoCollapseDrawers }),
 
   trackVuColorEnabled: true,
@@ -1206,6 +1211,7 @@ async function restoreLibraryPrefs() {
     if (typeof prefs.autoCollapseDrawers === 'boolean') store.setAutoCollapseDrawers(prefs.autoCollapseDrawers)
     if (typeof prefs.stepThroughEnabled === 'boolean') store.setStepThroughEnabled(prefs.stepThroughEnabled)
     if (typeof prefs.tooltipsEnabled === 'boolean') store.setTooltipsEnabled(prefs.tooltipsEnabled)
+    if (typeof prefs.supportNoteEnabled === 'boolean') store.setSupportNoteEnabled(prefs.supportNoteEnabled)
     if (typeof prefs.trackVuColorEnabled === 'boolean') store.setTrackVuColorEnabled(prefs.trackVuColorEnabled)
     if (typeof prefs.autoMuteNonKeyboard === 'boolean') store.setAutoMuteNonKeyboard(prefs.autoMuteNonKeyboard)
     if (prefs.settingsGroupsCollapsed && typeof prefs.settingsGroupsCollapsed === 'object' && !Array.isArray(prefs.settingsGroupsCollapsed)) {
@@ -1302,6 +1308,7 @@ let _prevShowNoteNamesOnKeyboard: boolean | null = null
 let _prevAutoCollapseDrawers: boolean | null = null
 let _prevStepThroughEnabled: boolean | null = null
 let _prevTooltipsEnabled: boolean | null = null
+let _prevSupportNoteEnabled: boolean | null = null
 let _prevTrackVuColorEnabled: boolean | null = null
 let _prevAutoMuteNonKeyboard: boolean | null = null
 let _prevSettingsGroupsCollapsed: string | null = null
@@ -1367,6 +1374,7 @@ const _unsubPrefs = useStore.subscribe((state) => {
     _prevAutoCollapseDrawers = state.autoCollapseDrawers
     _prevStepThroughEnabled = state.stepThroughEnabled
     _prevTooltipsEnabled = state.tooltipsEnabled
+    _prevSupportNoteEnabled = state.supportNoteEnabled
     _prevTrackVuColorEnabled = state.trackVuColorEnabled
     _prevAutoMuteNonKeyboard = state.autoMuteNonKeyboard
     _prevSettingsGroupsCollapsed = JSON.stringify(state.settingsGroupsCollapsed)
@@ -1435,6 +1443,7 @@ const _unsubPrefs = useStore.subscribe((state) => {
     state.autoCollapseDrawers !== _prevAutoCollapseDrawers ||
     state.stepThroughEnabled !== _prevStepThroughEnabled ||
     state.tooltipsEnabled !== _prevTooltipsEnabled ||
+    state.supportNoteEnabled !== _prevSupportNoteEnabled ||
     state.trackVuColorEnabled !== _prevTrackVuColorEnabled ||
     state.autoMuteNonKeyboard !== _prevAutoMuteNonKeyboard ||
     JSON.stringify(state.settingsGroupsCollapsed) !== _prevSettingsGroupsCollapsed ||
@@ -1495,6 +1504,7 @@ const _unsubPrefs = useStore.subscribe((state) => {
     _prevAutoCollapseDrawers = state.autoCollapseDrawers
     _prevStepThroughEnabled = state.stepThroughEnabled
     _prevTooltipsEnabled = state.tooltipsEnabled
+    _prevSupportNoteEnabled = state.supportNoteEnabled
     _prevTrackVuColorEnabled = state.trackVuColorEnabled
     _prevAutoMuteNonKeyboard = state.autoMuteNonKeyboard
     _prevSettingsGroupsCollapsed = JSON.stringify(state.settingsGroupsCollapsed)
@@ -1561,6 +1571,7 @@ const _unsubPrefs = useStore.subscribe((state) => {
       autoCollapseDrawers: state.autoCollapseDrawers,
       stepThroughEnabled: state.stepThroughEnabled,
       tooltipsEnabled: state.tooltipsEnabled,
+      supportNoteEnabled: state.supportNoteEnabled,
       trackVuColorEnabled: state.trackVuColorEnabled,
       autoMuteNonKeyboard: state.autoMuteNonKeyboard,
       settingsGroupsCollapsed: state.settingsGroupsCollapsed,

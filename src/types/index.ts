@@ -239,10 +239,11 @@ declare global {
       installUpdate:       () => Promise<void>
       onUpdateStatus:      (fn: (data: UpdateStatus) => void) => void
       offUpdateStatus:     () => void
-      // Rate Orfeo (Microsoft Store build only)
-      getReviewInfo:       () => Promise<ReviewInfo>
+      // "Enjoying Orfeo?" note + Rate Orfeo (Store build)
+      getSupportNoteInfo:  () => Promise<SupportNoteInfo>
       requestReview:       () => Promise<'succeeded' | 'canceled' | 'network-error' | 'error'>
-      neverAskReview:      () => Promise<void>
+      neverShowSupportNote: () => Promise<void>
+      snoozeSupportNote:   () => Promise<void>
       // App zoom (Ctrl +/−/0)
       getZoom:             () => Promise<{ percent: number; steps: number[]; max: number }>
       setZoom:             (percent: number) => Promise<{ percent: number; capped: boolean } | null>
@@ -262,10 +263,10 @@ export type UpdateInfo = {
   downloadUrl: string
 }
 
-// ── Rate Orfeo — decided in electron/main.ts: `available` only in the
-// Microsoft Store build; `prompt` on every 5th launch until rated or
-// "Don't show again"
-export type ReviewInfo = { available: boolean; prompt: boolean }
+// ── "Enjoying Orfeo?" note — decided in electron/main.ts: `store` = the
+// Microsoft Store build (its note and star offer the Store's review window);
+// `prompt` = show the note this launch (every 5th, unless paused or done)
+export type SupportNoteInfo = { store: boolean; prompt: boolean }
 
 export type UpdateStatus = {
   state: 'idle' | 'checking' | 'up-to-date' | 'downloading' | 'ready' | 'error' | 'unavailable'

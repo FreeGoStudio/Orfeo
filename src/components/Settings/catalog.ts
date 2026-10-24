@@ -28,7 +28,7 @@ export type SettingId =
   | 'displaySystem' | 'accidentals' | 'chordTracking' | 'chordReading' | 'chordNaming'
   | 'keyRange' | 'showOctaves' | 'showNoteNames' | 'reflectPianoRoll' | 'preciseScrubTime'
   | 'rollZoom' | 'barNumbers' | 'playbar' | 'visualEffects'
-  | 'theme' | 'appZoom' | 'tooltips' | 'starmap'
+  | 'theme' | 'appZoom' | 'tooltips' | 'supportNote' | 'starmap'
   | 'midiKeyboards' | 'midiReconnect' | 'liveResponse' | 'latencyOffset' | 'gmOutput' | 'touchResponse' | 'duplicateFilter'
   | 'pedalsControls' | 'delayCheck' | 'midiTools'
 
@@ -173,6 +173,9 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'tooltips', group: 'appearance', name: t`Tooltips`, summary: t`Hints that pop up when you point at a control.`,
     description: t`The hints that pop up when you point at a button, knob or icon. Turn them off once you know your way around. A knob still shows its value while you turn it.`,
     keywords: 'tooltips hints help hover popup tips' },
+  { id: 'supportNote', group: 'appearance', name: t`Enjoying Orfeo?`, summary: t`A small note now and then with ways to support Orfeo.`,
+    description: t`Every fifth time you open Orfeo, a small note in the corner offers ways to help it grow, such as a review. Turn it off and it never appears.`,
+    keywords: 'support review rate rating reddit community sponsor ko-fi donate note reminder enjoying' },
   { id: 'starmap', group: 'practice', name: t`Starmap`, summary: t`Adds the Starmap view to the Scales Explorer.`,
     description: t`Makes the Starmap available in the Scales Explorer: switch it on in the explorer's Starmap row to swap the Circle of Fifths for a constellation of the 12 notes.`,
     keywords: 'starmap star shape circle scales explorer chord geometry' },

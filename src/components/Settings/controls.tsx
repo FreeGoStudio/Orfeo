@@ -6,7 +6,7 @@ import { useStore } from '../../store'
 import { TRACK_COLOR_PALETTE } from '../../utils/colors'
 import Tooltip, { useTooltip } from '../Tooltip'
 import { useUpdateState, pressUpdateButton } from '../../hooks/useUpdateCheck'
-import { useStoreReview, requestStoreReview } from '../../hooks/useStoreReview'
+import { useSupportNote, requestStoreReview } from '../../hooks/useSupportNote'
 import { t } from '../../utils/i18n'
 
 // ── Which panel a control is drawn in — Setup (the drawer) or the Settings
@@ -562,10 +562,10 @@ export function RollZoomStepper() {
 }
 
 // ── Rate Orfeo — Microsoft Store build only; opens the Store's review window
-// over Orfeo (hooks/useStoreReview.ts). Sits beside the update check. ─────
+// over Orfeo (hooks/useSupportNote.ts). Sits beside the update check. ─────
 export function RateButton({ placement = 'left' }: { placement?: 'left' | 'right' | 'top' | 'bottom' }) {
-  const available = useStoreReview((s) => s.available)
-  if (!available) return null
+  const store = useSupportNote((s) => s.store)
+  if (!store) return null
   return (
     <Tooltip title={t`Rate Orfeo in the Microsoft Store`} oneLine wrapperStyle={{ flexShrink: 0 }} placement={placement}>
       <button
