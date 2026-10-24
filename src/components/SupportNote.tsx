@@ -9,7 +9,7 @@ import { t } from '../utils/i18n'
 //     Don't show again; rating or "Don't show again" ends it for good.
 //   Every other build: Review · Join the community · Sponsor, and "Disable
 //     for 30 days"; the × waits for the next 5th launch. ─────────────────────
-const REVIEW_URL = 'https://orfeo.cc/review'
+const REVIEW_URL = 'https://alternativeto.net/software/orfeo/about/'
 const COMMUNITY_URL = 'https://www.reddit.com/r/Orfeo_Piano/'
 const SPONSOR_URL = 'https://ko-fi.com/squarebow'
 
