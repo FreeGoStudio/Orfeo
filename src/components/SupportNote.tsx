@@ -38,7 +38,7 @@ const btn = (primary: boolean): React.CSSProperties => ({
 
 export function SupportNote() {
   const open = useSupportNote((s) => s.noteOpen)
-  const store = useSupportNote((s) => s.store)
+  const store = useSupportNote((s) => s.preview?.store ?? s.store)
   if (!open) return null
   const visit = (url: string) => { closeSupportNote('later'); window.electronAPI.openExternal(url) }
   return (

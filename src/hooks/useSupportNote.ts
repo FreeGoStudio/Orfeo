@@ -6,12 +6,20 @@ import type { SupportNoteInfo } from '../types'
 // ── The "Enjoying Orfeo?" note (components/SupportNote.tsx) and the Store
 // build's Rate Orfeo star. Main decides which build this is and whether the
 // note is due this launch (note:info in electron/main.ts). ─────────────────
-export const useSupportNote = create<SupportNoteInfo & { noteOpen: boolean }>(() => ({
-  store: false, prompt: false, noteOpen: false,
+// `preview`: shown from the test-build button in Settings › Appearance — which
+// version's note, and closing it saves nothing
+export const useSupportNote = create<SupportNoteInfo & { noteOpen: boolean; preview: { store: boolean } | null }>(() => ({
+  store: false, prompt: false, noteOpen: false, preview: null,
 }))
 
 // Not at startup: the note appears once Orfeo has been open a little while
 const NOTE_DELAY_MS = 30_000
+
+// Test builds: show either version's note right away, over the app
+export function previewSupportNote(store: boolean) {
+  useStore.getState().closeSettingsWindow()
+  useSupportNote.setState({ noteOpen: true, preview: { store } })
+}
 
 export function useSupportNoteService() {
   useEffect(() => {
@@ -28,14 +36,16 @@ export function useSupportNoteService() {
 }
 
 export async function requestStoreReview() {
-  useSupportNote.setState({ noteOpen: false })
+  useSupportNote.setState({ noteOpen: false, preview: null })
   await window.electronAPI.requestReview().catch(() => {})
 }
 
 // 'later' — until the next 5th launch · 'never' — the Store note's "Don't show
 // again" · 'snooze' — "Disable for 30 days"
 export function closeSupportNote(how: 'later' | 'never' | 'snooze') {
-  useSupportNote.setState({ noteOpen: false })
+  const { preview } = useSupportNote.getState()
+  useSupportNote.setState({ noteOpen: false, preview: null })
+  if (preview) return
   if (how === 'never') void window.electronAPI.neverShowSupportNote()
   if (how === 'snooze') void window.electronAPI.snoozeSupportNote()
 }

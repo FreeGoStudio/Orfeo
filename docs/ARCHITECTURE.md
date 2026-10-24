@@ -327,6 +327,12 @@ each key press.
   off and reloads the window (stored in `localStorage` as `orfeo-dev-tools`);
   while they're on, the top bar shows **DEV MODE** next to the version.
   Deliberately not in the manual or SHORTCUTS.md.
+- **Every feature is testable from Settings in dev mode.** Anything that only
+  happens on its own (on a schedule, in one kind of build, with certain
+  hardware) gets a dashed *"… · test builds only"* panel in its own Settings
+  card, shown only while `simAvailable` is true, that triggers it on demand
+  without saving anything. Examples: the simulated keyboards (MIDI Keyboard →
+  Keyboards) and the "Enjoying Orfeo?" note preview, both versions (Appearance).
 
 ---
 
