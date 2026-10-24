@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, createContext, useContext, type ReactNode } from 'react'
 import {
-  ChevronDown, ChevronLeft, ChevronRight, Palette, ToggleLeft, ToggleRight, ZoomIn, ZoomOut, RotateCcw, CloudDownload,
+  ChevronDown, ChevronLeft, ChevronRight, Palette, ToggleLeft, ToggleRight, ZoomIn, ZoomOut, RotateCcw, CloudDownload, Star,
 } from 'lucide-react'
 import { useStore } from '../../store'
 import { TRACK_COLOR_PALETTE } from '../../utils/colors'
 import Tooltip, { useTooltip } from '../Tooltip'
 import { useUpdateState, pressUpdateButton } from '../../hooks/useUpdateCheck'
+import { useStoreReview, requestStoreReview } from '../../hooks/useStoreReview'
 import { t } from '../../utils/i18n'
 
 // ── Which panel a control is drawn in — Setup (the drawer) or the Settings
@@ -557,6 +558,30 @@ export function RollZoomStepper() {
         onClick={() => { const i = ZOOM_STEPS.indexOf(zoomLevel); if (i < ZOOM_STEPS.length - 1) setZoomLevel(ZOOM_STEPS[i + 1]) }}
       >+</ZoomStepBtn>
     </div>
+  )
+}
+
+// ── Rate Orfeo — Microsoft Store build only; opens the Store's review window
+// over Orfeo (hooks/useStoreReview.ts). Sits beside the update check. ─────
+export function RateButton({ placement = 'left' }: { placement?: 'left' | 'right' | 'top' | 'bottom' }) {
+  const available = useStoreReview((s) => s.available)
+  if (!available) return null
+  return (
+    <Tooltip title={t`Rate Orfeo in the Microsoft Store`} oneLine wrapperStyle={{ flexShrink: 0 }} placement={placement}>
+      <button
+        onClick={() => void requestStoreReview()}
+        style={{
+          flexShrink: 0, display: 'flex', alignItems: 'center',
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          color: 'var(--text-muted)', padding: '4px 2px', marginRight: 6,
+          transition: 'color 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-amber)'}
+        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+      >
+        <Star size={13} strokeWidth={1.5} />
+      </button>
+    </Tooltip>
   )
 }
 

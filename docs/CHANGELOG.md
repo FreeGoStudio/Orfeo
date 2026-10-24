@@ -7,6 +7,9 @@
 
 ## [Unreleased]
 
+### New
+- **Rate Orfeo** (Microsoft Store version). A star next to *Check for updates* opens the Store's review window right over Orfeo: pick the stars, write a few words, done. Every fifth time you open Orfeo, a small note offers the same, with *Later* and *Don't show again*. It stops for good once you've rated Orfeo.
+
 ### Changed
 - **Settings pages in a clearer order.**
   - MIDI Keyboard now comes right after Audio.

@@ -19,7 +19,7 @@ import { detectKeyFromTracks, parseKeySignature } from '../../utils/keyDetection
 import FileInfoModal from '../FileInfoModal'
 import Tooltip, { TooltipBox, useTooltip } from '../Tooltip'
 import { ContextMenu, ContextMenuItem, ContextMenuDivider, ContextMenuLabel } from '../ContextMenu'
-import { UpdateButton } from '../Settings/controls'
+import { UpdateButton, RateButton } from '../Settings/controls'
 import QuickSettings from '../Settings/QuickSettings'
 
 // ── Spin keyframe for transcript loading animation ────────────────────────────
@@ -1732,6 +1732,7 @@ export default function SettingsPanel() {
               <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>User Manual</span>
             </button>
             </Tooltip>
+            <RateButton />
             <UpdateButton />
           </div>
 

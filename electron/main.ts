@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu, utilityProcess, MessageChannelMain, type UtilityProcess } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join, basename, dirname, extname } from 'path'
+import { execFile } from 'child_process'
 import { readFileSync, writeFileSync, existsSync, readdirSync, createWriteStream, statSync } from 'fs'
 import { mkdir, access, copyFile, readdir, rename, rmdir } from 'fs/promises'
 import { Midi } from '@tonejs/midi'
@@ -1879,6 +1880,51 @@ ipcMain.handle('update:install', () => {
   if (updateMode !== 'auto') return
   autoUpdater.quitAndInstall()
 })
+
+// ── Rate Orfeo (Microsoft Store build only) ─────────────────────────────────
+// The Store's own review window, opened over Orfeo by a small helper
+// (native/orfeo-review, shipped beside the audio add-on). A star button next to the
+// update check opens it any time; on every REVIEW_EVERY-th launch the renderer
+// also shows a small note offering it, until the person rates Orfeo or picks
+// "Don't show again". ORFEO_REVIEW_TEST=1 shows both in dev to check the look
+// (the review window itself only opens in the Store build).
+const REVIEW_EVERY = 5
+const STORE_REVIEW_URL = 'ms-windows-store://review/?ProductId=9NJ9Q01P8JQD'
+const reviewTest = !app.isPackaged && process.env.ORFEO_REVIEW_TEST === '1'
+const reviewAvailable = updateMode === 'store' || reviewTest
+let reviewLaunchCounted = false
+type ReviewPrefs = { launches: number; done: boolean }
+function reviewPrefs(): ReviewPrefs {
+  const r = loadPrefs().storeReview
+  return { launches: typeof r?.launches === 'number' ? r.launches : 0, done: r?.done === true }
+}
+ipcMain.handle('review:info', () => {
+  if (!reviewAvailable) return { available: false, prompt: false }
+  const r = reviewPrefs()
+  // Counted once per launch, not per window reload
+  if (!reviewLaunchCounted && !r.done) {
+    reviewLaunchCounted = true
+    r.launches++
+    savePrefs({ storeReview: r })
+  }
+  return { available: true, prompt: !r.done && (reviewTest || r.launches % REVIEW_EVERY === 0) }
+})
+ipcMain.handle('review:request', async () => {
+  if (!reviewAvailable || !mainWin || mainWin.isDestroyed()) return 'error'
+  // A separate little program opens it (native/orfeo-review), so a failure
+  // there can never close Orfeo; its exit code is the answer
+  const hwnd = mainWin.getNativeWindowHandle().readBigUInt64LE(0).toString()
+  const code = await new Promise<number>((resolve) => {
+    execFile(join(nativeDir(), 'orfeo-review.exe'), [hwnd], { windowsHide: true },
+      (err) => resolve(err ? (typeof err.code === 'number' ? err.code : 3) : 0))
+  })
+  const status: string = ['succeeded', 'canceled', 'network-error'][code] ?? 'error'
+  if (status === 'succeeded') savePrefs({ storeReview: { ...reviewPrefs(), done: true } })
+  // The window couldn't open here: the Store app's review page instead
+  else if (status === 'error' && updateMode === 'store') void shell.openExternal(STORE_REVIEW_URL)
+  return status
+})
+ipcMain.handle('review:never', () => savePrefs({ storeReview: { ...reviewPrefs(), done: true } }))
 
 // ── Portable mode: redirect userData to a folder next to the exe ─────────────
 // PORTABLE_EXECUTABLE_DIR is injected by electron-builder when running as a

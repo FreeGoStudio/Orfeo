@@ -216,6 +216,12 @@ business days).
   started by hand in Partner Center has to be submitted or deleted there first.
 - Without the one-time setup below it stops and says what's missing; the
   `.appx` is in the Release run's `store-package` artifact for a manual upload.
+- **Rate Orfeo** (Store build only): a star beside the update check, plus a
+  note every 5th launch, opens the Store's review window. A small helper,
+  `native/orfeo-review` (built by `npm run native:build`), opens it, so a
+  failure there can never close Orfeo. It only works with the Store identity;
+  `ORFEO_REVIEW_TEST=1 npm run dev` shows the star and the note to check how
+  they look, and the review window itself can only be tried in the Store build.
 
 One-time setup (Partner Center + GitHub):
 

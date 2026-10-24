@@ -78,6 +78,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installUpdate:       () => ipcRenderer.invoke('update:install'),
   onUpdateStatus:      (fn: (data: any) => void) => ipcRenderer.on('update:status', (_e, data) => fn(data)),
   offUpdateStatus:     () => ipcRenderer.removeAllListeners('update:status'),
+  // Rate Orfeo (Microsoft Store build only)
+  getReviewInfo:      () => ipcRenderer.invoke('review:info'),
+  requestReview:      () => ipcRenderer.invoke('review:request'),
+  neverAskReview:     () => ipcRenderer.invoke('review:never'),
   // App zoom (Ctrl +/−/0)
   getZoom:             () => ipcRenderer.invoke('zoom:get'),
   setZoom:             (percent: number) => ipcRenderer.invoke('zoom:set', percent),
