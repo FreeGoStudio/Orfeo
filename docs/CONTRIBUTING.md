@@ -69,7 +69,7 @@ npm run dev
 | `npm run preview` | Run the last `build` output without packaging | — |
 | `npm run typecheck` | `tsc --noEmit` — type-check only | — |
 | `npm run dist` | `build`, then package for the current platform | `release/` |
-| `npm run dist:portable` | Windows portable `.exe` only (no installer), as a **test build**: keeps the dev-only tools (simulated MIDI keyboard). Releases are built on GitHub without them | `release/` |
+| `npm run dist:portable` | Windows portable `.exe` only (no installer), for a quick local test | `release/` |
 
 <details>
 <summary><b>Cross-platform packaging</b></summary>
@@ -220,10 +220,8 @@ business days).
   "Enjoying Orfeo?" note every 5th launch (other builds get review, Reddit and
   Ko-fi links there instead), opens the Store's review window. A small helper,
   `native/orfeo-review` (built by `npm run native:build`), opens it, so a
-  failure there can never close Orfeo. It only works with the Store identity;
-  `ORFEO_NOTE_TEST=store npm run dev` (or `=other`) shows that build's note at
-  every launch to check how it looks, and the review window itself can only be
-  tried in the Store build.
+  failure there can never close Orfeo. It only works with the Store identity,
+  so the review window can only be tried in the Store build.
 
 One-time setup (Partner Center + GitHub):
 
