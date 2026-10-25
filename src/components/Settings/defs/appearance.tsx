@@ -55,8 +55,8 @@ function LanguageControl() {
         try { await setLanguage(e.target.value as LocalePreference) } catch { setError(true) } finally { setBusy(false) }
       }}>
       <option value="system">{tr('language.system')}</option>
-      <option value="zh-CN">简体中文</option>
       <option value="en">English</option>
+      <option value="zh-CN">简体中文</option>
     </select>
     {error && <div role="alert">{tr('language.error')}</div>}
   </div>
