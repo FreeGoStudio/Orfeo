@@ -1,3 +1,4 @@
+import { tr } from '../../../utils/i18n'
 import { Piano, Binary, CaseSensitive, Lightbulb, Clock } from 'lucide-react'
 import { useStore } from '../../../store'
 import type { KeyboardSize } from '../../../types'
@@ -20,18 +21,18 @@ export const KEYBOARD_DEFS: SettingDef[] = [
   { id: 'keyRange', icon: Piano, kind: 'choice', Control: KeyRangeControl },
   {
     id: 'showOctaves', icon: Binary, kind: 'switch',
-    Control: () => { const v = useStore(s => s.showOctaveLabels); return <Switch value={v} onChange={useStore.getState().setShowOctaveLabels} label="Show octaves" /> },
+    Control: () => { const v = useStore(s => s.showOctaveLabels); return <Switch value={v} onChange={useStore.getState().setShowOctaveLabels} label={tr("Show octaves")} /> },
   },
   {
     id: 'showNoteNames', icon: CaseSensitive, kind: 'switch',
-    Control: () => { const v = useStore(s => s.showNoteNamesOnKeyboard); return <Switch value={v} onChange={useStore.getState().setShowNoteNamesOnKeyboard} label="Show note names" /> },
+    Control: () => { const v = useStore(s => s.showNoteNamesOnKeyboard); return <Switch value={v} onChange={useStore.getState().setShowNoteNamesOnKeyboard} label={tr("Show note names")} /> },
   },
   {
     id: 'reflectPianoRoll', icon: Lightbulb, kind: 'switch',
-    Control: () => { const v = useStore(s => s.reflectPianoRollOnKeyboard); return <Switch value={v} onChange={useStore.getState().setReflectPianoRollOnKeyboard} label="Reflect piano roll on keyboard" /> },
+    Control: () => { const v = useStore(s => s.reflectPianoRollOnKeyboard); return <Switch value={v} onChange={useStore.getState().setReflectPianoRollOnKeyboard} label={tr("Reflect piano roll on keyboard")} /> },
   },
   {
     id: 'preciseScrubTime', icon: Clock, kind: 'switch',
-    Control: () => { const v = useStore(s => s.showPreciseScrubTime); return <Switch value={v} onChange={useStore.getState().setShowPreciseScrubTime} label="Show precise scrub time" /> },
+    Control: () => { const v = useStore(s => s.showPreciseScrubTime); return <Switch value={v} onChange={useStore.getState().setShowPreciseScrubTime} label={tr("Show precise scrub time")} /> },
   },
 ]

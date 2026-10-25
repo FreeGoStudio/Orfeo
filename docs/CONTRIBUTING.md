@@ -294,3 +294,78 @@ workflow stops with "Signing in to Partner Center failed".
 - [INSTALLATION.md](INSTALLATION.md) — installer vs. portable
 - [SHORTCUTS.md](SHORTCUTS.md) — keyboard and mouse reference
 - [CHANGELOG.md](CHANGELOG.md) — release history
+
+
+## Interface localization
+
+The application ships English (`en`) and Simplified Chinese (`zh-CN`) locally;
+no translation service or network access is used. **Settings → Appearance →
+Language** (also in Setup) offers Follow system, 简体中文, and English. Chinese
+system locales map to `zh-CN`; other system locales fall back to English. The
+system language is read at startup. An explicit preference is stored as
+`localePreference` in the existing `orfeo-prefs.json`. Old preference files need
+no migration.
+
+The main process owns persistence and exposes `locale:get`, `locale:set` and
+`locale:changed` through typed preload methods. Renderer initialization completes
+before the first React render, independently of library scanning. Main and
+renderer use separate i18next instances with shared, bundled resources. A failed
+preference write leaves the selection unchanged and shows an error.
+
+### Adding text
+
+- Put new messages under semantic keys in `src/i18n/locales/en.json` and
+  `zh-CN.json`. Components that display translated text call `useI18n()` and use
+  `tr('feature.message', { parameter: value })`. Do not remount the app on a
+  language change. Language-dependent memoized text must include `locale` in its
+  dependencies; preferably translate identifiers at the rendering boundary.
+- Existing tagged templates remain supported: ``t`Open ${name} in Settings` ``
+  uses the stable key `Open {{v0}} in Settings`. Translators may reorder the
+  placeholders. React escapes the result; never insert translations as raw HTML.
+- Keep messages in persistent UI state as `message(key, values)` or the `msg`
+  tagged template. Render with `renderMessage`. Confirmation dialogs accept
+  these descriptors and stay translated while open. Raw errors from third-party
+  tools can remain untranslated details; known application messages belong in
+  the catalogs.
+- For counts, use `tr('files.count', { count })`. English needs `_one` and
+  `_other`; Chinese needs `_other`. Do not build sentences by appending an `s`.
+- Keep internal setting IDs, MIDI metadata, file paths, user/track names and
+  music notation independent of UI language. Localize built-in instrument and
+  scale labels only where displayed. PDF contents, installers and external
+  documentation are outside the interface-localization scope.
+- Settings catalogs are factories (`getSettings`, `getGroups`,
+  `getSettingById`), not translated module-level constants. Search includes the
+  active language and English text. Avoid capturing a translated label at module
+  evaluation time.
+
+### Validation
+
+```sh
+npm run i18n:extract        # collect literal keys and tagged templates into English
+npm run i18n:check          # missing/empty translations, placeholders, plural forms
+npm run test:i18n           # locale mapping, fallback, interpolation, catalog/search
+npm run typecheck
+npm run build
+npm run test:i18n:electron  # run AFTER building, using an isolated temporary profile
+```
+
+Extraction does not produce translations. Add Chinese entries before running the
+check. For dynamic lookups (instrument names, scale names, known error strings),
+register their keys explicitly. Resources are imported into the build, including
+the main process; no packaged runtime dependency on external i18next files is
+required.
+
+The Electron test creates a temporary MIDI library and profile, checks live
+switching, playback continuity, dialogs, settings groups, bilingual search and
+restart persistence, and saves screenshots under the printed temporary path.
+For packaged startup/switch/restart checks, set `ORFEO_TEST_EXE` to the unpacked
+executable and run `npm run test:i18n:packaged`. This launches the executable
+directly and attaches to its renderer, avoiding Node-debugger preload timing
+issues during packaged relaunches. Neither test edits the normal user profile
+or requires a separate browser installation.
+
+To add another language, add its catalog, extend `Locale`/`LocalePreference`,
+`resolveLocale`, the bundled resource map and the language selector. Extend the
+catalog checks/tests and verify every visible surface in that language, including
+font fallback and narrow windows. Unsupported or missing translations fall back
+to English at runtime; missing translations still fail the resource check.

@@ -1,3 +1,4 @@
+import { tr, useI18n } from '../utils/i18n'
 import React, { useState, useCallback, useMemo, useEffect, useRef, type CSSProperties } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import ChevronPlayIcon from './ChevronPlayIcon'
@@ -30,6 +31,7 @@ function prevInversion(notes: Set<number>): Set<number> {
 
 // ── Floating draggable modal shown when any keys are Shift+Click locked ───────
 export default function LockedChordModal() {
+  useI18n()
   const lockedKeys              = useStore((s) => s.lockedKeys)
   const lockedColors            = useStore((s) => s.lockedColors)
   const setLockedKeys           = useStore((s) => s.setLockedKeys)
@@ -140,7 +142,7 @@ export default function LockedChordModal() {
   if (!modalOpen) return null
 
   return (
-    <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Lock-a-Chord" className="orfeo-modal-glow app-no-drag" style={{
+    <div ref={panelRef} role="dialog" aria-modal="true" aria-label={tr("Lock-a-Chord")} className="orfeo-modal-glow app-no-drag" style={{
       position: 'fixed',
       left: pos.x,
       top: pos.y,
@@ -171,9 +173,7 @@ export default function LockedChordModal() {
       >
         <OrfeoMark height={16} />
         {/* ── Title in amber to distinguish from other panels ──────────────── */}
-        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 14, fontWeight: 700, color: 'var(--text-amber)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          Lock-a-Chord
-        </span>
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 14, fontWeight: 700, color: 'var(--text-amber)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{tr("Lock-a-Chord")}</span>
         <button
           onClick={handleClose}
           style={modalCloseButtonStyle}
@@ -193,7 +193,7 @@ export default function LockedChordModal() {
           <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-dimmest)' }}>
             {lockedDisplay.ordinal}
             <span style={{ fontSize: 7, verticalAlign: 'super' }}>{ordinalSuffix(Number(lockedDisplay.ordinal))}</span>
-            {' inv'}
+            {tr(" inv")}
           </span>
         )}
       </div>
@@ -216,8 +216,7 @@ export default function LockedChordModal() {
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-amber)'; e.currentTarget.style.color = 'var(--text-amber)' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--text-inactive)'; e.currentTarget.style.color = 'var(--text-dimmest)' }}
         >
-          <ChevronPlayIcon size={10} /> Play
-        </button>
+          <ChevronPlayIcon size={10} />{tr(" Play")}</button>
         {/* Next inversion — Play icon normal */}
         <button
           onClick={() => applyInversion(nextInversion, 1)}

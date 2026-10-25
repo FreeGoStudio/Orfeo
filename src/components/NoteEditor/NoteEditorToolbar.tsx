@@ -1,3 +1,4 @@
+import { message as i18nMessage, msg, tr, useI18n } from '../../utils/i18n'
 import { useEffect, useState, useReducer, useRef, useCallback, useMemo } from 'react'
 import { PenLine, SquareDashed, CircleDashed, Hand, WholeWord, Music4, Save, Magnet } from 'lucide-react'
 import { useStore } from '../../store'
@@ -28,6 +29,7 @@ const QUANT_LABELS: Record<number, string> = { 4: '1/4', 8: '1/8', 16: '1/16', 3
 // Floating draggable toolbar — appears when noteEditorActive is true.
 // Reads/writes NES.* directly; subscribes to NES.onHistoryChange for re-renders.
 export default function NoteEditorToolbar() {
+  useI18n()
   const noteEditorActive        = useStore(s => s.noteEditorActive)
   const setNoteEditorActive     = useStore(s => s.setNoteEditorActive)
   const noteEditorEnabled       = useStore(s => s.noteEditorEnabled)
@@ -351,9 +353,9 @@ export default function NoteEditorToolbar() {
   const doReset = async () => {
     if (NES.dirty) {
       const choice = await confirmDialog({
-        title: 'Reset Note Editor',
-        message: 'Discard all changes in this editing session?',
-        buttons: ['Discard', 'Cancel'],
+        get title() { return i18nMessage("Reset Note Editor") },
+        message: i18nMessage("Discard all changes in this editing session?"),
+        buttons: [i18nMessage("Discard"), i18nMessage("Cancel")],
         destructiveIndex: 0,
       })
       if (choice !== 0) return
@@ -417,7 +419,8 @@ export default function NoteEditorToolbar() {
   // ── Renders "Label — description" text with the label dimmed-amber —
   // shared by tipLine1 and every icon's hover hint so they read as one
   // consistent system. ──────────────────────────────────────────────────
-  const renderTip = (text: string) => {
+  const renderTip = (source: string) => {
+    const text = tr(source)
     const dashIdx = text.indexOf(' — ')
     if (dashIdx === -1) return text
     return (
@@ -438,7 +441,7 @@ export default function NoteEditorToolbar() {
     <div
       ref={panelRef}
       role="toolbar"
-      aria-label="Note Editor toolbar"
+      aria-label={tr("Note Editor toolbar")}
       className="orfeo-modal-glow"
       style={{
         position: 'fixed',
@@ -469,7 +472,7 @@ export default function NoteEditorToolbar() {
           e.preventDefault()
           dragState.current = { startX: e.clientX, startY: e.clientY, startPosX: pos.x, startPosY: pos.y }
         }}
-        title="Drag to move"
+        title={tr("Drag to move")}
         style={{ display: 'grid', gridTemplateColumns: '168px 1fr 168px', alignItems: 'center', minHeight: 32, padding: '4px 8px', gap: 6, cursor: 'grab' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -480,16 +483,12 @@ export default function NoteEditorToolbar() {
             fontSize: 14, fontWeight: 700, letterSpacing: '0.08em',
             color: 'var(--text-amber)', textTransform: 'uppercase',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            MIDI NOTE EDITOR
-          </span>
+          }}>{tr("MIDI NOTE EDITOR")}</span>
         </div>
         <div style={{
           fontSize: 11, color: 'var(--text-muted)', textAlign: 'center',
           whiteSpace: 'normal', lineHeight: 1.3,
-        }}>
-          Click a track in the Tracks panel to solo it for editing
-        </div>
+        }}>{tr("Click a track in the Tracks panel to solo it for editing")}</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
           <button
             onMouseDown={e => e.stopPropagation()}
@@ -507,14 +506,14 @@ export default function NoteEditorToolbar() {
           between them, instead of stacked rows that fought the panel for
           height and made the tooltip row below feel cramped. ─────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', height: 40, padding: '4px 8px', gap: 10, borderTop: '1px solid var(--state-hover-bg)' }}>
-        <span style={rowLabelStyle}>TOOLS</span>
-        <ToolBtn active={activeTool === 'marquee'} onClick={() => setTool('marquee')} onHint={setIconHint} hint="Marquee — drag a box over a cluster to select it">
+        <span style={rowLabelStyle}>{tr("TOOLS")}</span>
+        <ToolBtn active={activeTool === 'marquee'} onClick={() => setTool('marquee')} onHint={setIconHint} hint={tr("Marquee — drag a box over a cluster to select it")}>
           <SquareDashed size={13} />
         </ToolBtn>
-        <ToolBtn active={activeTool === 'lasso'} onClick={() => setTool('lasso')} onHint={setIconHint} hint="Freehand select — drag through notes to select them">
+        <ToolBtn active={activeTool === 'lasso'} onClick={() => setTool('lasso')} onHint={setIconHint} hint={tr("Freehand select — drag through notes to select them")}>
           <CircleDashed size={13} />
         </ToolBtn>
-        <ToolBtn active={activeTool === 'pen'} onClick={() => setTool('pen')} onHint={setIconHint} hint="Pen — Alt+click to add, click a note to mark for delete">
+        <ToolBtn active={activeTool === 'pen'} onClick={() => setTool('pen')} onHint={setIconHint} hint={tr("Pen — Alt+click to add, click a note to mark for delete")}>
           <PenLine size={13} />
         </ToolBtn>
         <button onClick={doUndo} disabled={!canUndo} {...hintHandlers('Undo — revert the last edit (Ctrl+Z)')} style={iconBtnStyle(!canUndo)}><span style={{ display: 'inline-block', transform: 'rotate(-45deg)' }}>↺</span></button>
@@ -522,12 +521,12 @@ export default function NoteEditorToolbar() {
 
         <div style={{ flex: 1 }} />
 
-        <span style={rowLabelStyle}>MODES</span>
-        <ToolBtn active={showNoteNames} onClick={toggleNoteNames} onHint={setIconHint} hint="Note names — show pitch labels on notes">
+        <span style={rowLabelStyle}>{tr("MODES")}</span>
+        <ToolBtn active={showNoteNames} onClick={toggleNoteNames} onHint={setIconHint} hint={tr("Note names — show pitch labels on notes")}>
           <WholeWord size={16} />
         </ToolBtn>
 
-        <ToolBtn active={reassignHands} onClick={toggleReassignHands} onHint={setIconHint} hint="Reassign hands — show LH/RH colors and enable Assign LH/RH">
+        <ToolBtn active={reassignHands} onClick={toggleReassignHands} onHint={setIconHint} hint={tr("Reassign hands — show LH/RH colors and enable Assign LH/RH")}>
           <Hand size={13} />
         </ToolBtn>
 
@@ -552,7 +551,7 @@ export default function NoteEditorToolbar() {
           <IconVelocity />
         </button>
 
-        <ToolBtn active={snapEnabled} onClick={() => setSnap(!snapEnabled)} onHint={setIconHint} hint={snapEnabled ? 'Snap ON — moving, resizing or adding a note rounds its timing to the grid' : 'Snap OFF — moved/resized/added notes keep their exact dragged timing'}>
+        <ToolBtn active={snapEnabled} onClick={() => setSnap(!snapEnabled)} onHint={setIconHint} hint={snapEnabled ? tr("Snap ON — moving, resizing or adding a note rounds its timing to the grid") : tr("Snap OFF — moved/resized/added notes keep their exact dragged timing")}>
           <Magnet size={13} />
         </ToolBtn>
 
@@ -571,7 +570,7 @@ export default function NoteEditorToolbar() {
           {quantizeOpen && (
             <div
               role="listbox"
-              aria-label="Quantize grid resolution"
+              aria-label={tr("Quantize grid resolution")}
               onMouseDown={e => e.stopPropagation()}
               style={{
                 position: 'fixed',
@@ -621,7 +620,7 @@ export default function NoteEditorToolbar() {
           ) : (
             <>
               <div>{renderTip(tipLine1)}</div>
-              <div>{hintText || tipLine2}</div>
+              <div>{tr(hintText || tipLine2)}</div>
             </>
           )}
         </div>
@@ -638,9 +637,7 @@ export default function NoteEditorToolbar() {
             }}
             onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--accent-amber-strong)'; setIconHint('Reset — discard all edits and restore original') }}
             onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border2)'; setIconHint(null) }}
-          >
-            Reset
-          </button>
+          >{tr("Reset")}</button>
           <button
             onClick={() => void handleSave()}
             {...hintHandlers('Save & Reload — save edits as a new versioned copy (_ORFEO_vN)')}
@@ -650,8 +647,7 @@ export default function NoteEditorToolbar() {
               whiteSpace: 'nowrap', padding: '0 4px', gap: 5,
             }}
           >
-            <Save size={12} /> Save &amp; Reload
-          </button>
+            <Save size={12} />{tr(" Save & Reload")}</button>
         </div>
       </div>
 
@@ -663,27 +659,19 @@ export default function NoteEditorToolbar() {
           borderTop: '1px solid var(--state-hover-bg)',
           background: 'var(--accent-amber-tint-bg)',
         }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
-            Unsaved changes —
-          </span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{tr("Unsaved changes —")}</span>
           <button
             onClick={() => void doConfirmSaveAndClose()}
             style={{ ...btnBase, borderColor: 'var(--accent-amber-active-border)', color: 'var(--text-amber)', background: 'var(--accent-amber-active-bg)', fontSize: 11 }}
-          >
-            Save & Exit
-          </button>
+          >{tr("Save & Exit")}</button>
           <button
             onClick={doConfirmDiscardAndClose}
             style={{ ...btnBase, borderColor: 'var(--status-error-border)', color: 'var(--status-error)', fontSize: 11 }}
-          >
-            Discard
-          </button>
+          >{tr("Discard")}</button>
           <button
             onClick={() => setShowCloseConfirm(false)}
             style={{ ...btnBase, fontSize: 11 }}
-          >
-            Cancel
-          </button>
+          >{tr("Cancel")}</button>
         </div>
       )}
 

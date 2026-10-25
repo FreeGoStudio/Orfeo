@@ -1,4 +1,4 @@
-import { GROUPS, SETTINGS, type GroupInfo, type SettingInfo } from './catalog'
+import { getGroups, getSettings, type GroupInfo, type SettingInfo } from './catalog'
 
 export const MIN_CARD_WIDTH = 220
 export const CARD_GAP = 12
@@ -10,11 +10,12 @@ const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 export function searchSettings(query: string): { group: GroupInfo; settings: SettingInfo[] }[] {
   const words = norm(query).split(/\s+/).filter(Boolean)
   if (words.length === 0) return []
-  const hits = SETTINGS.filter(s => {
-    const hay = norm(`${s.name} ${s.description} ${s.keywords ?? ''}`)
+  const english = new Map(getSettings('en').map(s => [s.id, s]))
+  const hits = getSettings().filter(s => {
+    const hay = norm(`${s.name} ${s.description} ${s.keywords ?? ''} ${english.get(s.id)?.name ?? ''} ${english.get(s.id)?.description ?? ''}`)
     return words.every(w => hay.includes(w))
   })
-  return GROUPS
+  return getGroups()
     .map(group => ({ group, settings: hits.filter(s => s.group === group.id) }))
     .filter(r => r.settings.length > 0)
 }

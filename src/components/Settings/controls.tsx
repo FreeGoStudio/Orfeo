@@ -1,3 +1,4 @@
+import { t as tx, tr, useI18n, t } from '../../utils/i18n'
 import { useState, useRef, useEffect, createContext, useContext, type ReactNode } from 'react'
 import {
   ChevronDown, ChevronLeft, ChevronRight, Palette, ToggleLeft, ToggleRight, ZoomIn, ZoomOut, RotateCcw, CloudDownload,
@@ -6,7 +7,6 @@ import { useStore } from '../../store'
 import { TRACK_COLOR_PALETTE } from '../../utils/colors'
 import Tooltip, { useTooltip } from '../Tooltip'
 import { useUpdateState, pressUpdateButton } from '../../hooks/useUpdateCheck'
-import { t } from '../../utils/i18n'
 
 // ── Which panel a control is drawn in — Setup (the drawer) or the Settings
 // window — for the few controls that differ between the two. ─────────────
@@ -34,6 +34,7 @@ export function EyeClosed({ size = 24, strokeWidth = 2 }: { size?: number; strok
 
 // ── BETA badge — inline label pill for settings still being refined ──────────
 export function BetaBadge() {
+  useI18n()
   return (
     <span style={{
       fontSize: 8, fontWeight: 700, fontFamily: 'var(--font-ui)',
@@ -45,9 +46,7 @@ export function BetaBadge() {
       lineHeight: 1,
       opacity: 0.85,
       flexShrink: 0,
-    }}>
-      BETA
-    </span>
+    }}>{tr("BETA")}</span>
   )
 }
 
@@ -195,6 +194,7 @@ export function ZoomStepper({ percent, steps, max, onStep, onReset, tooltips = t
   onStep: (direction: 1 | -1) => void; onReset: () => void
   tooltips?: boolean
 }) {
+  useI18n()
   const atMin = percent <= steps[0]
   const atMax = percent >= max
   const chevronStyle = (disabled: boolean): React.CSSProperties => ({
@@ -205,7 +205,7 @@ export function ZoomStepper({ percent, steps, max, onStep, onReset, tooltips = t
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--border2)', borderRadius: 4, padding: '1px 6px' }}>
-        <MaybeTip on={tooltips} title="Zoom out">
+        <MaybeTip on={tooltips} title={tr("Zoom out")}>
         <button
           onClick={() => onStep(-1)}
           disabled={atMin}
@@ -215,7 +215,7 @@ export function ZoomStepper({ percent, steps, max, onStep, onReset, tooltips = t
         ><ZoomOut size={12} strokeWidth={1.5} /></button>
         </MaybeTip>
         <span style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-amber)', minWidth: 34, textAlign: 'center' }}>{percent}%</span>
-        <MaybeTip on={tooltips} title="Zoom in">
+        <MaybeTip on={tooltips} title={tr("Zoom in")}>
         <button
           onClick={() => onStep(1)}
           disabled={atMax}
@@ -225,7 +225,7 @@ export function ZoomStepper({ percent, steps, max, onStep, onReset, tooltips = t
         ><ZoomIn size={12} strokeWidth={1.5} /></button>
         </MaybeTip>
       </div>
-      <MaybeTip on={tooltips} title="Reset to 100%">
+      <MaybeTip on={tooltips} title={tr("Reset to 100%")}>
       <button
         onClick={onReset}
         disabled={percent === 100}
@@ -244,6 +244,7 @@ export function ZoomStepper({ percent, steps, max, onStep, onReset, tooltips = t
 // from under it. Self-contained popover with its own outside-click/Escape close,
 // same approach as MidiEditor's track ColorPopover. ─────────────────────────────
 export function HitEffectColorSwatch({ color, onChange }: { color: string | null; onChange: (c: string) => void }) {
+  useI18n()
   const [open, setOpen] = useState(false)
   const [hexInput, setHexInput] = useState(color ?? '#e8a027')
   const ref = useRef<HTMLDivElement>(null)
@@ -265,8 +266,8 @@ export function HitEffectColorSwatch({ color, onChange }: { color: string | null
   return (
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <Tooltip
-        title="Particle color"
-        description="Overrides every track's color for the effect flourish — the falling notes and key glow keep their own track colors."
+        title={tr("Particle color")}
+        description={tr("Overrides every track's color for the effect flourish — the falling notes and key glow keep their own track colors.")}
       >
       <button
         onClick={() => { setHexInput(color ?? '#e8a027'); setOpen(o => !o) }}
@@ -276,7 +277,7 @@ export function HitEffectColorSwatch({ color, onChange }: { color: string | null
         }}
       >
         <Palette size={13} strokeWidth={1.5} style={{ color: 'var(--text-amber)', flexShrink: 0 }} />
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>Color</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>{tr("Color")}</span>
         <span style={{
           width: 14, height: 14, borderRadius: 3, flexShrink: 0,
           background: color ?? 'var(--hand-lh)',
@@ -308,7 +309,7 @@ export function HitEffectColorSwatch({ color, onChange }: { color: string | null
             value={hexInput}
             onChange={e => commitHex(e.target.value)}
             placeholder="#e8a027"
-            aria-label="Hit-effect color, hex value"
+            aria-label={tr("Hit-effect color, hex value")}
             style={{
               width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--border2)',
               background: 'var(--bg-modal)', color: 'var(--text-default)', fontSize: 'var(--text-xs)',
@@ -521,6 +522,7 @@ export function HelpText({ children }: { children: ReactNode }) {
 // ── Piano-roll zoom — − / step dots / + (moved from the drawer unchanged)
 export const ROLL_ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3]
 export function RollZoomStepper() {
+  useI18n()
   const zoomLevel = useStore((s) => s.zoomLevel)
   const setZoomLevel = useStore((s) => s.setZoomLevel)
   const ZOOM_STEPS = ROLL_ZOOM_STEPS
@@ -538,7 +540,7 @@ export function RollZoomStepper() {
           transition: 'width 0.12s',
         }} />
         {ZOOM_STEPS.map((step, i) => (
-          <Tooltip key={step} title={`${Math.round(step * 100)}%`}>
+          <Tooltip key={step} title={tx`${Math.round(step * 100)}%`}>
           <button onClick={() => setZoomLevel(step)}
             style={{
               position: 'absolute',
@@ -563,28 +565,25 @@ export function RollZoomStepper() {
 // ── Update check button (+ its short status text) — drawer footer and the
 // Settings window header share one status (hooks/useUpdateCheck.ts). ─────
 export function UpdateButton({ placement = 'left', showStatus = true }: { placement?: 'left' | 'right' | 'top' | 'bottom'; showStatus?: boolean }) {
+  useI18n()
   const updateStatus = useUpdateState((s) => s.status)
   const updateInfo = useUpdateState((s) => s.info)
   return (
     <>
       {showStatus && updateInfo.mode === 'auto' && updateStatus.state === 'up-to-date' && (
-        <span style={{ fontSize: 9, color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>
-          Orfeo is up to date
-        </span>
+        <span style={{ fontSize: 9, color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>{tr("Orfeo is up to date")}</span>
       )}
       {showStatus && updateInfo.mode === 'auto' && updateStatus.state === 'ready' && (
-        <span style={{ fontSize: 9, color: 'var(--text-amber)', fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>
-          Update ready — click to install
-        </span>
+        <span style={{ fontSize: 9, color: 'var(--text-amber)', fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>{tr("Update ready — click to install")}</span>
       )}
       <Tooltip
         title={
           updateInfo.mode === 'manual'         ? t`Check for updates on orfeo.cc` :
           updateInfo.mode === 'store'          ? t`Updates come from the Microsoft Store — click to open Orfeo there` :
-          updateStatus.state === 'checking'    ? 'Checking for updates…' :
-          updateStatus.state === 'downloading' ? `Downloading update${updateStatus.percent ? ` — ${Math.round(updateStatus.percent)}%` : '…'}` :
-          updateStatus.state === 'ready'       ? `Update ${updateStatus.version ?? ''} ready — click to restart and install` :
-          updateStatus.state === 'error'       ? `${(updateStatus.message ?? 'Update check failed').slice(0, 160)} — click to open the download page` :
+          updateStatus.state === 'checking'    ? tr("Checking for updates…") :
+          updateStatus.state === 'downloading' ? tx`Downloading update${updateStatus.percent ? ` — ${Math.round(updateStatus.percent)}%` : '…'}` :
+          updateStatus.state === 'ready'       ? tx`Update ${updateStatus.version ?? ''} ready — click to restart and install` :
+          updateStatus.state === 'error'       ? tx`${(updateStatus.message ?? 'Update check failed').slice(0, 160)} — click to open the download page` :
           t`Check for updates`
         }
         oneLine

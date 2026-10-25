@@ -1,3 +1,4 @@
+import { useI18n, t } from '../utils/i18n'
 // ── ExplorerOctaveControl ────────────────────────────────────────────────────
 // "Octave ˄ ˅ ↺" — moves everything the Chord and Scales Explorers play up or
 // down by whole octaves (shared setting, so both explorers stay in step).
@@ -6,7 +7,6 @@
 import { ChevronUp, ChevronDown, RotateCcw } from 'lucide-react'
 import { useStore } from '../store'
 import Tooltip from './Tooltip'
-import { t } from '../utils/i18n'
 import { EXPLORER_OCTAVE_MIN, EXPLORER_OCTAVE_MAX, shiftNotesByOctaves } from '../utils/explorerShared'
 
 const LABEL_STYLE: React.CSSProperties = {
@@ -18,6 +18,7 @@ const LABEL_STYLE: React.CSSProperties = {
 // showLabel: false where the surrounding layout already names the control
 // (the Scales Explorer's settings column).
 export default function ExplorerOctaveControl({ showLabel = true }: { showLabel?: boolean }) {
+  useI18n()
   const octave = useStore(s => s.explorerOctave)
 
   const moveTo = (next: number) => {

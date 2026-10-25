@@ -1,3 +1,4 @@
+import type { Message } from '../i18n/core'
 // ── ConfirmDialog controller ────────────────────────────────────────────────
 // Imperative singleton — lets any renderer code await a themed confirm dialog
 // without IPC, native OS dialogs, or prop drilling.
@@ -7,10 +8,10 @@
 //   // choice === index of clicked button, or buttons.length - 1 for Escape/backdrop
 
 export type ConfirmOptions = {
-  title?: string
-  message: string
-  detail?: string
-  buttons: string[]       // last button = "safe" default (Escape / backdrop click)
+  title?: string | Message
+  message: string | Message
+  detail?: string | Message
+  buttons: (string | Message)[]       // last button = "safe" default (Escape / backdrop click)
   destructiveIndex?: number // index to render with destructive color (e.g. red)
 }
 

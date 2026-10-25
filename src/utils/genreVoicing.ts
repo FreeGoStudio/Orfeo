@@ -1,4 +1,3 @@
-import { t } from './i18n'
 
 export type Genre = 'classic' | 'coltrane' | 'cinematic' | 'roadhouse' | 'gospel' | 'ipanema' | 'carnival' | 'flamenco' | 'velvet'
 
@@ -7,10 +6,10 @@ export const GENRE_LABELS: Record<Genre, string> = {
   coltrane:  'Coltrane',
   cinematic: 'Cinematic',
   roadhouse: 'Roadhouse',
-  gospel:    t`Gospel`,
+  gospel:    'Gospel',
   ipanema:   'Ipanema',
   carnival:  'Carnival',
-  flamenco:  t`Flamenco`,
+  flamenco:  'Flamenco',
   velvet:    'Velvet',
 }
 

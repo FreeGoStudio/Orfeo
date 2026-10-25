@@ -1,3 +1,4 @@
+import { t as tx, tr, useI18n } from '../../utils/i18n'
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { ChevronRight, Eye, Volume2, VolumeX, ChevronDown, AudioLines, ListTree, SlidersVertical, GripVertical, Sparkles } from 'lucide-react'
 import { useStore, DEFAULT_MUTED_GROUPS } from '../../store'
@@ -45,6 +46,7 @@ function PencilSparklesIcon({ size = 16 }: { size?: number }) {
 
 // ── Track panel — collapsible right drawer with instrument group list and track controls
 export default function TrackPanel() {
+  useI18n()
   // ── Lightweight track display-signature — NOT the live `tracks` array. Same
   // root cause as MixerConsole.tsx/ChannelStrip.tsx/MasterStrip.tsx: every
   // fader/pan/chorus/reverb drag replaces the whole `tracks` array (new
@@ -220,7 +222,7 @@ export default function TrackPanel() {
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           height: '100%', paddingTop: 10,
         }}>
-          <Tooltip title="Open Tracks panel" description="Shows every track with its mute, solo, and visibility controls.">
+          <Tooltip title={tr("Open Tracks panel")} description={tr("Shows every track with its mute, solo, and visibility controls.")}>
           <button
             onClick={() => setTrackPanelOpen(true)}
             style={{
@@ -236,8 +238,8 @@ export default function TrackPanel() {
           </button>
           </Tooltip>
           <Tooltip
-            title={!midi ? 'Open a MIDI file first' : midiEditorOpen ? 'MIDI Playback Editor is open' : 'MIDI Playback Editor'}
-            description={!midi ? 'Load a MIDI file to edit its playback.' : midiEditorOpen ? "Already open — check for it among your other windows." : 'Edit what you want to hear and see: rename tracks, reassign instruments, merge/split ...'}
+            title={!midi ? tr("Open a MIDI file first") : midiEditorOpen ? tr("MIDI Playback Editor is open") : tr("MIDI Playback Editor")}
+            description={!midi ? tr("Load a MIDI file to edit its playback.") : midiEditorOpen ? tr("Already open — check for it among your other windows.") : tr("Edit what you want to hear and see: rename tracks, reassign instruments, merge/split ...")}
             wrapperStyle={{ marginTop: 8 }}
           >
           <button
@@ -258,8 +260,8 @@ export default function TrackPanel() {
           </Tooltip>
           {noteEditorEnabled && midi && (
             <Tooltip
-              title={noteEditorActive ? 'Exit note edit mode' : 'MIDI note editor'}
-              description={noteEditorActive ? 'Returns to normal playback view.' : 'Edit individual notes directly on the piano roll.'}
+              title={noteEditorActive ? tr("Exit note edit mode") : tr("MIDI note editor")}
+              description={noteEditorActive ? tr("Returns to normal playback view.") : tr("Edit individual notes directly on the piano roll.")}
               wrapperStyle={{ marginTop: 8 }}
             >
             <button
@@ -282,7 +284,7 @@ export default function TrackPanel() {
             </button>
             </Tooltip>
           )}
-          <Tooltip title="Console Mixer" description="Adjust volume, pan, and effects for every track individually." wrapperStyle={{ marginTop: 8 }}>
+          <Tooltip title={tr("Console Mixer")} description={tr("Adjust volume, pan, and effects for every track individually.")} wrapperStyle={{ marginTop: 8 }}>
           <button
             onClick={() => useStore.getState().setMixerOpen(true)}
             style={{
@@ -300,7 +302,7 @@ export default function TrackPanel() {
           {/* ── Dashed outline + low opacity — a same-shade disabled icon read as
               a normal, clickable nav icon until hovered; this makes "not yet
               shipped" visible at rest, not just on tooltip. ──────────────── */}
-          <Tooltip title="A dedicated Practice mode is planned but not built yet." oneLine wrapperStyle={{ marginTop: 8 }}>
+          <Tooltip title={tr("A dedicated Practice mode is planned but not built yet.")} oneLine wrapperStyle={{ marginTop: 8 }}>
           <div
             style={{
               color: 'var(--state-disabled)', padding: 3,
@@ -325,7 +327,7 @@ export default function TrackPanel() {
             paddingTop: 10,
             borderRight: '1px solid var(--bg-tile)',
           }}>
-            <Tooltip title="Close panel" oneLine placement="left">
+            <Tooltip title={tr("Close panel")} oneLine placement="left">
             <button
               onClick={() => setTrackPanelOpen(false)}
               style={{
@@ -342,8 +344,8 @@ export default function TrackPanel() {
             </button>
             </Tooltip>
             <Tooltip
-              title={!midi ? 'Open a MIDI file first' : midiEditorOpen ? 'MIDI Playback Editor is open' : 'MIDI Playback Editor'}
-              description={!midi ? 'Load a MIDI file to edit its playback.' : midiEditorOpen ? "Already open — check for it among your other windows." : 'Edit what you want to hear and see: rename tracks, reassign instruments, merge/split ...'}
+              title={!midi ? tr("Open a MIDI file first") : midiEditorOpen ? tr("MIDI Playback Editor is open") : tr("MIDI Playback Editor")}
+              description={!midi ? tr("Load a MIDI file to edit its playback.") : midiEditorOpen ? tr("Already open — check for it among your other windows.") : tr("Edit what you want to hear and see: rename tracks, reassign instruments, merge/split ...")}
               wrapperStyle={{ marginTop: 8 }}
             >
             <button
@@ -364,8 +366,8 @@ export default function TrackPanel() {
             </Tooltip>
             {noteEditorEnabled && midi && (
               <Tooltip
-                title={noteEditorActive ? 'Exit note edit mode' : 'MIDI note editor'}
-                description={noteEditorActive ? 'Returns to normal playback view.' : 'Add, delete and move individual notes directly on the piano roll. Assign notes to Left/Right hand.'}
+                title={noteEditorActive ? tr("Exit note edit mode") : tr("MIDI note editor")}
+                description={noteEditorActive ? tr("Returns to normal playback view.") : tr("Add, delete and move individual notes directly on the piano roll. Assign notes to Left/Right hand.")}
                 wrapperStyle={{ marginTop: 8 }}
               >
               <button
@@ -386,7 +388,7 @@ export default function TrackPanel() {
               </button>
               </Tooltip>
             )}
-            <Tooltip title="Console Mixer" description={"Adjust volume, pan, chorus, and reverb \nfor every track and apply compression."} wrapperStyle={{ marginTop: 8 }}>
+            <Tooltip title={tr("Console Mixer")} description={tr("Adjust volume, pan, chorus, and reverb \nfor every track and apply compression.")} wrapperStyle={{ marginTop: 8 }}>
             <button
               onClick={() => useStore.getState().setMixerOpen(true)}
               style={{
@@ -402,7 +404,7 @@ export default function TrackPanel() {
             </button>
             </Tooltip>
             {/* ── Dashed outline + low opacity — see collapsed-strip twin above ── */}
-            <Tooltip title="Practice mode - coming soon" oneLine wrapperStyle={{ marginTop: 8 }}>
+            <Tooltip title={tr("Practice mode - coming soon")} oneLine wrapperStyle={{ marginTop: 8 }}>
             <div
               style={{
                 color: 'var(--state-disabled)', padding: 3,
@@ -429,17 +431,15 @@ export default function TrackPanel() {
             gap: 'var(--space-2)',
           }}>
             <ListTree size={14} style={{ color: 'var(--text-inactive)', flexShrink: 0 }} />
-            <span style={{ color: 'var(--text-dimmest)', fontSize: 'var(--text-sm)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Tracks
-            </span>
+            <span style={{ color: 'var(--text-dimmest)', fontSize: 'var(--text-sm)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{tr("Tracks")}</span>
             {midi && (
               <>
                 <span style={{ color: 'var(--text-inactive)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)' }}>
                   {tracks.length}
                 </span>
                 <Tooltip
-                  title={allVisible ? 'Hide all tracks' : 'Show all tracks'}
-                  description={allVisible ? 'Hide every track’s notes on the Piano Roll \n— turn individual ones back on anytime' : 'Show every track’s notes \non the Piano Roll again'}
+                  title={allVisible ? tr("Hide all tracks") : tr("Show all tracks")}
+                  description={allVisible ? tr("Hide every track’s notes on the Piano Roll \n— turn individual ones back on anytime") : tr("Show every track’s notes \non the Piano Roll again")}
                 >
                 <button
                   onClick={handleVisibleAll}
@@ -455,8 +455,8 @@ export default function TrackPanel() {
                 {/* ── Mute-filter quick toggle — visible only when Selective Tracks Playback is on in Settings ── */}
                 {autoMuteNonKeyboard && (
                   <Tooltip
-                    title={isCurrentlyFiltered ? 'Piano, Bass & Drums Only' : 'Playing all tracks'}
-                    description={isCurrentlyFiltered ? 'Playing keyboards, bass & drums tracks only. Click to play all tracks.' : 'Click to mute everything except piano,\nbass & drums — good for practising'}
+                    title={isCurrentlyFiltered ? tr("Piano, Bass & Drums Only") : tr("Playing all tracks")}
+                    description={isCurrentlyFiltered ? tr("Playing keyboards, bass & drums tracks only. Click to play all tracks.") : tr("Click to mute everything except piano,\nbass & drums — good for practising")}
                     wrapperStyle={{ marginLeft: 'auto' }}
                   >
                   <button
@@ -480,7 +480,7 @@ export default function TrackPanel() {
                     }}
                   >
                     <svg width="6" height="7" viewBox="0 0 6 7" style={{ marginRight: 3, flexShrink: 0 }}><polygon points="0,0 6,3.5 0,7" fill="currentColor"/></svg>
-                    {isCurrentlyFiltered ? 'Focus ON' : 'Focus OFF'}
+                    {isCurrentlyFiltered ? tr("Focus ON") : tr("Focus OFF")}
                   </button>
                   </Tooltip>
                 )}
@@ -491,9 +491,7 @@ export default function TrackPanel() {
           {/* Track list */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
             {!midi && (
-              <div style={{ padding: '12px 14px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                Open a MIDI file to see tracks
-              </div>
+              <div style={{ padding: '12px 14px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{tr("Open a MIDI file to see tracks")}</div>
             )}
 
             {grouped.map(({ key, label, tracks: groupTracks }) => {
@@ -529,7 +527,7 @@ export default function TrackPanel() {
                         color: 'var(--text-inactive)',
                         cursor: isPiano ? 'pointer' : (hoveredHandle === handleId ? 'grab' : 'pointer'),
                       }}
-                      title={isPiano ? (collapsed ? 'Expand' : 'Collapse') : (collapsed ? 'Expand (drag to reorder)' : 'Collapse (drag to reorder)')}
+                      title={isPiano ? (collapsed ? tr("Expand") : tr("Collapse")) : (collapsed ? tr("Expand (drag to reorder)") : tr("Collapse (drag to reorder)"))}
                     >
                       {!isPiano && hoveredHandle === handleId
                         ? <GripVertical size={11} />
@@ -537,7 +535,7 @@ export default function TrackPanel() {
                     </button>
 
                     <span style={{ flex: 1, fontSize: 11, fontWeight: 700, lineHeight: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-dimmest)' }}>
-                      {label}
+                      {tr(label)}
                     </span>
 
                     {/* ── Collapsed: colored square per track — visual legend only. Its
@@ -547,7 +545,7 @@ export default function TrackPanel() {
                     {collapsed && (
                       <div style={{ display: 'flex', gap: 2 }}>
                         {groupTracks.map(t => (
-                          <Tooltip key={t.index} title={t.trackName ?? t.gmName} description="Track's color in the piano roll">
+                          <Tooltip key={t.index} title={t.trackName && t.trackName !== t.gmName ? t.trackName : tr(t.gmName)} description={tr("Track's color in the piano roll")}>
                             <div style={{ width: 7, height: 7, borderRadius: 2, background: t.color, flexShrink: 0 }} />
                           </Tooltip>
                         ))}
@@ -558,8 +556,8 @@ export default function TrackPanel() {
                       {groupTracks.length}
                     </span>
                     <Tooltip
-                      title={groupMuted ? `Unmute all ${label}` : `Mute all ${label}`}
-                      description={groupMuted ? `Unmute every track in ${label}` : `Mute every track in ${label} at once`}
+                      title={groupMuted ? tx`Unmute all ${tr(label)}` : tx`Mute all ${tr(label)}`}
+                      description={groupMuted ? tx`Unmute every track in ${tr(label)}` : tx`Mute every track in ${tr(label)} at once`}
                     >
                     <button
                       onClick={() => muteGroup(key, !groupMuted)}
@@ -630,6 +628,7 @@ function TrackRow({
   onDragStart?: () => void; onDragEnd?: () => void
   onDragOverRow?: (e: React.DragEvent) => void; onDropRow?: () => void
 }) {
+  useI18n()
   // Friendly channel/program label
   const ch = (track as any).channel != null ? (track as any).channel + 1 : track.index + 1
   const prog = track.isDrum ? 'drums' : `prog ${track.program + 1}`
@@ -712,7 +711,7 @@ function TrackRow({
           onMouseEnter={() => onHandleHover?.(true)}
           onMouseLeave={() => onHandleHover?.(false)}
           onClick={e => e.stopPropagation()}
-          title="Drag to reorder"
+          title={tr("Drag to reorder")}
           style={{
             width: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, cursor: isHandleHovered ? 'grab' : 'default',
@@ -739,34 +738,34 @@ function TrackRow({
         ) : (
           <div style={{ width: 3, height: 20, background: track.color, borderRadius: 2, flexShrink: 0, opacity: dimmed ? 0.6 : 1 }} />
         )}
-        <MarqueeText name={track.trackName ?? track.gmName} spanStyle={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-muted)' }} />
+        <MarqueeText name={track.trackName && track.trackName !== track.gmName ? track.trackName : tr(track.gmName)} spanStyle={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-muted)' }} />
       </div>
 
       {/* ── Row 2: track number (left) + M/S/V/K controls (right) ─────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3, paddingLeft: 26 }}>
-        <span style={{ fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>track {track.index + 1}</span>
+        <span style={{ fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>{tr("track")}{track.index + 1}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
           <IBtn onClick={onMute} active={track.muted}
-            title={track.muted ? 'Unmute' : 'Mute'}
-            description={track.muted ? "Unmute audio" : 'Mute audio'}
+            title={track.muted ? tr("Unmute") : tr("Mute")}
+            description={track.muted ? tr("Unmute audio") : tr("Mute audio")}
             activeColor="var(--status-error)">
             <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>M</span>
           </IBtn>
           <IBtn onClick={onSolo} active={track.solo}
-            title={track.solo ? 'Unsolo' : 'Solo'}
-            description={track.solo ? 'Unsolo track' : 'Solo track'}
+            title={track.solo ? tr("Unsolo") : tr("Solo")}
+            description={track.solo ? tr("Unsolo track") : tr("Solo track")}
             activeColor="var(--text-amber)">
             <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>S</span>
           </IBtn>
           <IBtn onClick={onVisible} active={!track.visible}
-            title={track.visible ? 'Hide in roll' : 'Show in roll'}
-            description={track.visible ? 'Hide notes on the Piano Roll' : "Show notes on the Piano Roll"}
+            title={track.visible ? tr("Hide in roll") : tr("Show in roll")}
+            description={track.visible ? tr("Hide notes on the Piano Roll") : tr("Show notes on the Piano Roll")}
             activeColor="var(--status-error-hover)" inactiveColor="var(--status-success-text)">
             {track.visible ? <Eye size={12} /> : <EyeClosed size={12} />}
           </IBtn>
           <IBtn onClick={onKeyboard} active={track.showOnKeyboard}
-            title={track.showOnKeyboard ? 'Lit on keyboard' : 'Not lit on keyboard'}
-            description={track.showOnKeyboard ? 'Notes light up on keyboard' : "Notes are not lit on keyboard"}
+            title={track.showOnKeyboard ? tr("Lit on keyboard") : tr("Not lit on keyboard")}
+            description={track.showOnKeyboard ? tr("Notes light up on keyboard") : tr("Notes are not lit on keyboard")}
             activeColor="var(--text-amber)">
             <PianoKeysIcon width={13} height={9} />
           </IBtn>
@@ -775,11 +774,11 @@ function TrackRow({
 
       {/* ── Row 3: MIDI channel + program + note count ────────────────────── */}
       <div style={{ display: 'flex', gap: 6, marginTop: 2, paddingLeft: 26 }}>
-        <span style={{ fontSize: 10, lineHeight: '11px', color: 'var(--text-track-meta)', fontFamily: 'var(--font-mono)' }}>ch {ch}</span>
+        <span style={{ fontSize: 10, lineHeight: '11px', color: 'var(--text-track-meta)', fontFamily: 'var(--font-mono)' }}>{tr("ch")}{ch}</span>
         <span style={{ fontSize: 10, lineHeight: '11px', color: 'var(--text-track-meta)', fontFamily: 'var(--font-mono)' }}>·</span>
         <span style={{ fontSize: 10, lineHeight: '11px', color: 'var(--text-track-meta)', fontFamily: 'var(--font-mono)' }}>{prog}</span>
         <span style={{ fontSize: 10, lineHeight: '11px', color: 'var(--text-track-meta)', fontFamily: 'var(--font-mono)' }}>·</span>
-        <span style={{ fontSize: 10, lineHeight: '11px', color: 'var(--text-track-meta)', fontFamily: 'var(--font-mono)' }}>{noteCount} notes</span>
+        <span style={{ fontSize: 10, lineHeight: '11px', color: 'var(--text-track-meta)', fontFamily: 'var(--font-mono)' }}>{noteCount}{tr(" notes")}</span>
       </div>
     </div>
   )

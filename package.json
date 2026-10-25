@@ -10,13 +10,18 @@
     "copyworklet": "node -e \"const fs=require('fs');fs.copyFileSync('node_modules/spessasynth_lib/dist/spessasynth_processor.min.js','public/spessasynth_processor.min.js')\"",
     "check:hand-engine": "node scripts/check-hand-engine-version.mjs",
     "dev": "npm run copyworklet && npm run check:hand-engine && electron-vite dev",
-    "build": "npm run copyworklet && npm run check:hand-engine && electron-vite build",
+    "build": "npm run i18n:check && npm run copyworklet && npm run check:hand-engine && electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run copyworklet && npm run check:hand-engine && npm run native:build && electron-vite build && electron-builder --win nsis portable appx",
-    "dist:portable": "npm run copyworklet && npm run check:hand-engine && npm run native:build && electron-vite build --mode test-build && electron-builder --win portable",
+    "dist": "npm run i18n:check && npm run copyworklet && npm run check:hand-engine && npm run native:build && electron-vite build && electron-builder --win nsis portable appx",
+    "dist:portable": "npm run i18n:check && npm run copyworklet && npm run check:hand-engine && npm run native:build && electron-vite build --mode test-build && electron-builder --win portable",
     "release:notes": "node scripts/release-notes.mjs",
-    "native:build": "node scripts/build-native.mjs"
+    "native:build": "node scripts/build-native.mjs",
+    "i18n:extract": "node scripts/i18n-extract.mjs --write",
+    "i18n:check": "node scripts/i18n-check.mjs",
+    "test:i18n": "tsx --test tests/i18n.test.ts",
+    "test:i18n:electron": "node tests/i18n-electron.mjs",
+    "test:i18n:packaged": "node tests/i18n-packaged.mjs"
   },
   "build": {
     "appId": "com.squarebow.orfeo",
@@ -143,6 +148,7 @@
     "electron-updater": "^6.8.9",
     "fuse.js": "^7.5.0",
     "gsap": "^3.15.0",
+    "i18next": "^26.5.10",
     "jazz-midi-electron": "^2.0.3",
     "jzz": "^1.9.6",
     "jzz-midi-smf": "^1.9.9",
@@ -151,6 +157,7 @@
     "pdfkit": "^0.20.2",
     "pixi-filters": "^6.1.5",
     "pixi.js": "^8.22.0",
+    "react-i18next": "^17.1.8",
     "soundfont-player": "^0.12.0",
     "spessasynth_lib": "^4.3.13",
     "tonal": "^6.4.0",
@@ -167,8 +174,10 @@
     "electron-builder": "^26.15.3",
     "electron-vite": "^3.1.0",
     "lucide-react": "^1.61.0",
+    "playwright": "^1.64.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.3"
   }
 }

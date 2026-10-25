@@ -1,4 +1,4 @@
-import { t } from '../../utils/i18n'
+import { translator, getLocaleState } from '../../utils/i18n'
 import type { SettingsGroupId } from '../../types'
 
 // ── Every setting's words, once. The Settings window shows `description`;
@@ -26,7 +26,7 @@ export type SettingId =
   | 'displaySystem' | 'accidentals' | 'chordTracking' | 'chordReading' | 'chordNaming'
   | 'keyRange' | 'showOctaves' | 'showNoteNames' | 'reflectPianoRoll' | 'preciseScrubTime'
   | 'rollZoom' | 'barNumbers' | 'playbar' | 'visualEffects'
-  | 'theme' | 'appZoom' | 'tooltips' | 'starmap'
+  | 'language' | 'theme' | 'appZoom' | 'tooltips' | 'starmap'
   | 'midiKeyboards' | 'midiReconnect' | 'liveResponse' | 'latencyOffset' | 'gmOutput' | 'touchResponse' | 'duplicateFilter'
   | 'pedalsControls' | 'delayCheck' | 'midiTools'
 
@@ -39,7 +39,7 @@ export interface SettingInfo {
   keywords?: string      // extra search words
 }
 
-export const GROUPS: GroupInfo[] = [
+export function getGroups(locale = getLocaleState().locale): GroupInfo[] { const { t } = translator(locale); return [
   { id: 'audio', name: t`Audio`, intro: t`Set your audio preferences`, manualUrl: 'https://orfeo.cc/docs/playing-midi-files' },
   { id: 'midi-files-library', name: t`MIDI Files & Library`, intro: t`Organise your library`, manualUrl: 'https://orfeo.cc/docs/managing-midi-files' },
   { id: 'playback-editing', name: t`Playback & Editing`, intro: t`Shape playback and edits`, manualUrl: 'https://orfeo.cc/docs/editing-midi-files' },
@@ -54,9 +54,10 @@ export const GROUPS: GroupInfo[] = [
       { name: t`Sound & Latency`, ids: ['delayCheck', 'liveResponse', 'latencyOffset', 'gmOutput'], stack: [['delayCheck'], ['liveResponse'], ['latencyOffset', 'gmOutput']], aside: 'keyToSpeaker' },
       { name: t`Touch & pedals`, ids: ['touchResponse', 'pedalsControls', 'duplicateFilter'] },
     ] },
-]
+] }
 
-export const SETTINGS: SettingInfo[] = [
+export function getSettings(locale = getLocaleState().locale): SettingInfo[] { const { t, tr } = translator(locale); return [
+  { id: 'language', group: 'appearance', name: tr('language.label'), summary: tr('language.description'), description: tr('language.description'), keywords: 'language locale 中文 简体 英文 English system 自动 系统' },
   // ── Audio
   { id: 'soundEngine', group: 'audio', name: t`Sound engine`, summary: t`GM is light and built in; Studio and Native sound like real instruments.`,
     description: t`GM uses the simple built-in synth. Studio plays real recorded instruments from a sound set. Native plays the same sound sets straight to your sound card, for the shortest delay when you play.`,
@@ -201,9 +202,9 @@ export const SETTINGS: SettingInfo[] = [
   { id: 'midiTools', group: 'midi', name: t`Reset & repair`, summary: t`Fix hanging notes or a confused keyboard.`,
     description: t`Clear stuck notes lets go of every key and pedal. Reset MIDI input also reconnects every keyboard. Reset settings puts everything on this page back to how it started.`,
     keywords: 'stuck hanging notes reset panic all notes off reconnect defaults' },
-]
+] }
 
-export const SETTING_BY_ID = Object.fromEntries(SETTINGS.map(s => [s.id, s])) as Record<SettingId, SettingInfo>
+export function getSettingById() { return Object.fromEntries(getSettings().map(s => [s.id, s])) as Record<SettingId, SettingInfo> }
 
 // ── Quick Settings: the drawing's shortlist, in its order. A { heading }
 // entry is a small sub-heading row (the Keyboard group's "Labels"). ─────
@@ -216,7 +217,7 @@ export const QUICK_LAYOUT: Record<SettingsGroupId, QuickItem[]> = {
   'notation': ['displaySystem', 'accidentals', 'chordTracking'],
   'keyboard': ['keyRange', 'showOctaves', 'showNoteNames'],
   'piano-roll': ['rollZoom', 'barNumbers', 'playbar'],
-  'appearance': ['appZoom', 'tooltips'],
+  'appearance': ['language', 'appZoom', 'tooltips'],
   // Settings window only for now
   'midi': [],
 }

@@ -1,5 +1,6 @@
+import { useI18n } from '../../utils/i18n'
 import { useId, type ReactNode } from 'react'
-import { SETTING_BY_ID, type SettingId } from './catalog'
+import { getSettingById, type SettingId } from './catalog'
 import { DEFS } from './defs'
 import { BetaBadge, SurfaceContext } from './controls'
 
@@ -13,7 +14,8 @@ export function richText(text: string): ReactNode {
 // ── One setting in the Settings window: icon + name (switch on the right),
 // full description, then its controls, glance lines and follow-up options.
 export function SettingCard({ id }: { id: SettingId }) {
-  const def = DEFS[id], info = SETTING_BY_ID[id]
+  useI18n()
+  const def = DEFS[id], info = getSettingById()[id]
   const useVisible = def.useVisible ?? always
   const visible = useVisible()
   const labelId = useId()

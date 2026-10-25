@@ -1,7 +1,7 @@
+import { t as tx, message as i18nMessage, msg, tr, useI18n, t } from '../../../utils/i18n'
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { KeyboardMusic, Zap, Timer, Speaker, Feather, Copy, Footprints, Stethoscope, Wrench, RefreshCw, FileDown, Plug } from 'lucide-react'
 import { useStore } from '../../../store'
-import { t } from '../../../utils/i18n'
 import { OptionBtn, Switch, SettingsDropdown, HelpText, GlanceLine, ZoomStepBtn } from '../controls'
 import { useMidiSettings, MIDI_DEFAULTS, type ControlKind, type LiveResponse, type VelocityCurve } from '../../../store/midiSettings'
 import { rescanMidiDevices, clearStuckNotes, resetMidiInput } from '../../../hooks/useMidiInput'
@@ -79,6 +79,7 @@ const useDiag = () => useMidiSettings(s => s.diagVersion)
 
 // ── Keyboards ────────────────────────────────────────────────────────────────
 function KeyboardsControl() {
+  useI18n()
   const devices = useMidiSettings(s => s.devices)
   const activity = useMidiSettings(s => s.activity)
   const listenMode = useMidiSettings(s => s.listenMode)
@@ -127,15 +128,18 @@ function KeyboardsExtra() {
 
 // ── Reconnect automatically ──────────────────────────────────────────────────
 function ReconnectControl() {
+  useI18n()
   const v = useMidiSettings(s => s.autoReconnect)
   return <Switch value={v} onChange={x => set({ autoReconnect: x })} label={t`Reconnect automatically`} />
 }
 function ReconnectExtra() {
+  useI18n()
   return <div style={{ marginTop: 10 }}><ActionBtn onClick={() => void rescanMidiDevices()} icon={<RefreshCw size={11} strokeWidth={1.5} />}>{t`Rescan keyboards`}</ActionBtn></div>
 }
 
 // ── Development builds only: pretend keyboards are plugged in ────────────────
 function SimulatorPanel() {
+  useI18n()
   useMidiSettings(s => s.devices)  // re-render on plug / unplug
   const [target, setTarget] = useState(sim.models[0].key)
   const plugged = sim.isPlugged(target)
@@ -150,7 +154,7 @@ function SimulatorPanel() {
       <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 6 }}>
         {sim.models.map(m => (
           <OptionBtn key={m.key} active={target === m.key} onClick={() => setTarget(m.key)}>
-            {m.key === 's88' ? 'S88 MK3' : m.key === 'mpk' ? 'MPK mini' : 'Launchkey'}
+            {m.key === 's88' ? tr("S88 MK3") : m.key === 'mpk' ? tr("MPK mini") : tr("Launchkey")}
           </OptionBtn>
         ))}
       </div>
@@ -172,10 +176,11 @@ function SimulatorPanel() {
 
 // ── Live playing response ────────────────────────────────────────────────────
 const RESPONSES: { v: LiveResponse; label: string }[] = [
-  { v: 'low', label: t`Low latency` }, { v: 'balanced', label: t`Balanced` }, { v: 'stable', label: t`Stable` },
+  { v: 'low', get label() { return t`Low latency` } }, { v: 'balanced', get label() { return t`Balanced` } }, { v: 'stable', get label() { return t`Stable` } },
 ]
 
 function LiveResponseControl() {
+  useI18n()
   const v = useMidiSettings(s => s.liveResponse)
   const engine = useStore(s => s.audioEngine)
   const started = getStartedStable()  // null until the Studio engine has started
@@ -215,6 +220,7 @@ function LiveResponseControl() {
 
 // "Keyboard → speaker on this computer: about 44 ms" — at the right of the tab row
 function KeyToEarGlance() {
+  useI18n()
   useDiag()
   useMidiSettings(s => s.liveResponse)
   const [, tick] = useState(0)
@@ -224,11 +230,12 @@ function KeyToEarGlance() {
   const style = { fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-inactive)' } as const
   if (b.outputMs === null) return <span style={style}>{t`Keyboard → speaker: can't be measured for this sound output`}</span>
   const total = (st.avgInputMs ?? 0) + (st.avgHandleMs ?? 0) + b.synthBlockMs + b.chainMs + b.outputMs
-  return <span style={style}>{t`Keyboard → speaker on this computer: about`} <span style={{ color: 'var(--text-amber)' }}>{Math.round(total)} ms</span></span>
+  return <span style={style}>{t`Keyboard → speaker on this computer: about`} <span style={{ color: 'var(--text-amber)' }}>{Math.round(total)}{tr(" ms")}</span></span>
 }
 
 // "No keyboards connected" — at the right of the Keyboards tab row, only while none is
 function NoKeyboardsAside() {
+  useI18n()
   const devices = useMidiSettings(s => s.devices)
   const error = useMidiSettings(s => s.accessError)
   if (error || devices.some(d => d.connected)) return null
@@ -239,6 +246,7 @@ export const TAB_ASIDES: Record<string, ComponentType> = { noKeyboards: NoKeyboa
 
 // ── Audio delay offset ───────────────────────────────────────────────────────
 function LatencyOffsetControl() {
+  useI18n()
   const v = useMidiSettings(s => s.latencyOffsetMs)
   return (
     <>
@@ -249,6 +257,7 @@ function LatencyOffsetControl() {
   )
 }
 function LatencyOffsetGlance() {
+  useI18n()
   useMidiSettings(s => s.latencyOffsetMs)
   useStore(s => s.audioEngine)
   const [, tick] = useState(0)
@@ -258,20 +267,21 @@ function LatencyOffsetGlance() {
   const measured = b.outputMs === null ? null : Math.round(b.outputMs)
   return (
     <GlanceLine>
-      {t`Measured`} {measured === null ? t`— not measurable` : `${measured} ms`} · {t`used`} <span style={{ color: 'var(--text-amber)' }}>{Math.max(0, (measured ?? 0) + off)} ms</span>
+      {t`Measured`} {measured === null ? t`— not measurable` : tx`${measured} ms`} · {t`used`} <span style={{ color: 'var(--text-amber)' }}>{Math.max(0, (measured ?? 0) + off)}{tr(" ms")}</span>
     </GlanceLine>
   )
 }
 
 // ── General MIDI sound ───────────────────────────────────────────────────────
 function GmOutputControl() {
+  useI18n()
   const gmOutput = useMidiSettings(s => s.gmOutput)
   const outputs = useMidiSettings(s => s.outputs)
   const missing = gmOutput && !outputs.some(o => o.port === gmOutput)
   const options = [
-    { value: '', label: t`Orfeo's built-in synth` },
+    { value: '', get label() { return t`Orfeo's built-in synth` } },
     ...outputs.map(o => ({ value: o.port, label: o.name })),
-    ...(missing ? [{ value: gmOutput, label: t`${gmOutput} (not connected)` }] : []),
+    ...(missing ? [{ value: gmOutput, get label() { return t`${gmOutput} (not connected)` } }] : []),
   ]
   return (
     <>
@@ -284,7 +294,7 @@ function GmOutputControl() {
 
 // ── Touch response ───────────────────────────────────────────────────────────
 const CURVES: { v: VelocityCurve; label: string }[] = [
-  { v: 'soft', label: t`Soft` }, { v: 'normal', label: t`Normal` }, { v: 'hard', label: t`Hard` }, { v: 'fixed', label: t`Fixed` },
+  { v: 'soft', get label() { return t`Soft` } }, { v: 'normal', get label() { return t`Normal` } }, { v: 'hard', get label() { return t`Hard` } }, { v: 'fixed', get label() { return t`Fixed` } },
 ]
 function TouchControl() {
   const v = useMidiSettings(s => s.velocityCurve)
@@ -295,6 +305,7 @@ function TouchControl() {
   )
 }
 function TouchExtra() {
+  useI18n()
   const curve = useMidiSettings(s => s.velocityCurve)
   const fixed = useMidiSettings(s => s.fixedVelocity)
   const min = useMidiSettings(s => s.minVelocity)
@@ -313,14 +324,16 @@ function TouchExtra() {
 
 // ── Double-note filter ───────────────────────────────────────────────────────
 function DuplicateControl() {
+  useI18n()
   const v = useMidiSettings(s => s.duplicateFilterMs)
   return (
     <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-      {[0, 10, 20, 40].map(x => <OptionBtn key={x} active={v === x} onClick={() => set({ duplicateFilterMs: x })}>{x === 0 ? t`Off` : `${x} ms`}</OptionBtn>)}
+      {[0, 10, 20, 40].map(x => <OptionBtn key={x} active={v === x} onClick={() => set({ duplicateFilterMs: x })}>{x === 0 ? t`Off` : tx`${x} ms`}</OptionBtn>)}
     </div>
   )
 }
 function DuplicateGlance() {
+  useI18n()
   useDiag()
   const on = useMidiSettings(s => s.duplicateFilterMs) > 0
   if (!on) return null
@@ -329,17 +342,18 @@ function DuplicateGlance() {
 
 // ── Pedals & controls ────────────────────────────────────────────────────────
 const CONTROL_LABELS: { k: ControlKind; label: string }[] = [
-  { k: 'sustain', label: t`Sustain pedal` },
-  { k: 'sostenuto', label: t`Sostenuto pedal` },
-  { k: 'soft', label: t`Soft pedal` },
-  { k: 'pitchBend', label: t`Pitch bend` },
-  { k: 'modWheel', label: t`Modulation wheel` },
-  { k: 'channelPressure', label: t`Aftertouch (keyboard)` },
-  { k: 'polyPressure', label: t`Aftertouch (per key)` },
-  { k: 'expression', label: t`Expression pedal` },
-  { k: 'volume', label: t`Volume slider` },
+  { k: 'sustain', get label() { return t`Sustain pedal` } },
+  { k: 'sostenuto', get label() { return t`Sostenuto pedal` } },
+  { k: 'soft', get label() { return t`Soft pedal` } },
+  { k: 'pitchBend', get label() { return t`Pitch bend` } },
+  { k: 'modWheel', get label() { return t`Modulation wheel` } },
+  { k: 'channelPressure', get label() { return t`Aftertouch (keyboard)` } },
+  { k: 'polyPressure', get label() { return t`Aftertouch (per key)` } },
+  { k: 'expression', get label() { return t`Expression pedal` } },
+  { k: 'volume', get label() { return t`Volume slider` } },
 ]
 function PedalsControl() {
+  useI18n()
   const controls = useMidiSettings(s => s.controls)
   const detected = useMidiSettings(s => s.detected)
   const sustainDown = useMidiSettings(s => s.sustainDown)
@@ -358,11 +372,13 @@ function PedalsControl() {
   )
 }
 function PedalsExtra() {
+  useI18n()
   return <HelpText>{t`The volume slider is off at first: many keyboards send it from a fader meant for recording software, which would quietly turn Orfeo down.`}</HelpText>
 }
 
 // ── Delay check ──────────────────────────────────────────────────────────────
 function DelayCheckControl() {
+  useI18n()
   useDiag()
   useMidiSettings(s => s.liveResponse)
   const engine = useStore(s => s.audioEngine)
@@ -393,6 +409,7 @@ function DelayCheckControl() {
   )
 }
 function DelayCheckExtra() {
+  useI18n()
   return (
     <>
       <HelpText>{t`The sound output part is set by Windows and your sound card: wired headphones or a USB audio interface lower it, Bluetooth raises it a lot.`}</HelpText>
@@ -407,11 +424,12 @@ function DelayCheckExtra() {
 
 // ── Reset & repair ───────────────────────────────────────────────────────────
 function ToolsControl() {
+  useI18n()
   const resetSettings = async () => {
     const choice = await confirmDialog({
-      title: t`Reset MIDI keyboard settings?`,
-      message: t`Everything on this page goes back to how it started. Your keyboards stay connected.`,
-      buttons: [t`Reset`, t`Cancel`], destructiveIndex: 0,
+      get title() { return msg`Reset MIDI keyboard settings?` },
+      get message() { return msg`Everything on this page goes back to how it started. Your keyboards stay connected.` },
+      buttons: [msg`Reset`, msg`Cancel`], destructiveIndex: 0,
     })
     if (choice !== 0) return
     const hadGmOutput = useMidiSettings.getState().gmOutput !== MIDI_DEFAULTS.gmOutput

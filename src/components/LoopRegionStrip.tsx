@@ -1,3 +1,4 @@
+import { tr, useI18n } from '../utils/i18n'
 // ── Loop Region Strip — interactive 24px timeline strip below the scrub bar ──
 // Canvas-based; width matches the scrub slider via identical spacer layout.
 // Draws: note density ticks, selection region with handles, live playhead.
@@ -119,6 +120,7 @@ interface DragState {
 
 // ── LoopRegionStrip — canvas timeline for drag-to-select loop sections ───────
 export default function LoopRegionStrip() {
+  useI18n()
   const canvasRef    = useRef<HTMLCanvasElement>(null)
   const storeRef     = useRef(useStore.getState())
   const densityRef   = useRef<number[]>([])
@@ -469,10 +471,10 @@ export default function LoopRegionStrip() {
     <>
       {/* ── Canvas — fills the shared 400px wrapper in TopBar ─────────────── */}
       <Tooltip
-        title={hasSelection ? 'Loop region set' : 'Select a bar range'}
+        title={hasSelection ? tr("Loop region set") : tr("Select a bar range")}
         description={hasSelection
-          ? 'Click outside the selection to clear it, or drag its handles to adjust.'
-          : 'Drag to select a bar range, or Alt+drag \non the waterfall above for precise timing.'}
+          ? tr("Click outside the selection to clear it, or drag its handles to adjust.")
+          : tr("Drag to select a bar range, or Alt+drag \non the waterfall above for precise timing.")}
         wrapperStyle={{ width: '100%', display: 'block' }}
       >
       <canvas
@@ -497,7 +499,7 @@ export default function LoopRegionStrip() {
           is what made this so easy to falsely "verify" as working. ────────── */}
       <div className="app-no-drag" style={{ position: 'absolute', left: 'calc(100% + 8px)', top: 0, height: STRIP_H, display: 'flex', alignItems: 'center', gap: 6 }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Tooltip title="Select bar range" description="Type an exact start/end bar for the loop region.">
+          <Tooltip title={tr("Select bar range")} description={tr("Type an exact start/end bar for the loop region.")}>
           <button
             ref={iconBtnRef}
             onClick={handleIconClick}
@@ -523,8 +525,7 @@ export default function LoopRegionStrip() {
               fontSize: 10,
               whiteSpace: 'nowrap',
               letterSpacing: '0.02em',
-            }}>
-              bars {loopBarRange.startBar}–{loopBarRange.endBar}
+            }}>{tr("bars ")}{loopBarRange.startBar}–{loopBarRange.endBar}
             </span>
           )}
 
@@ -563,13 +564,11 @@ export default function LoopRegionStrip() {
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
-            }}>
-              Bar Range
-            </div>
+            }}>{tr("Bar Range")}</div>
 
             {/* From row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-dimmest)', fontFamily: 'var(--font-ui)', minWidth: 28 }}>From</span>
+              <span style={{ fontSize: 10, color: 'var(--text-dimmest)', fontFamily: 'var(--font-ui)', minWidth: 28 }}>{tr("From")}</span>
               <input
                 type="text"
                 inputMode="numeric"
@@ -601,7 +600,7 @@ export default function LoopRegionStrip() {
 
             {/* To row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-dimmest)', fontFamily: 'var(--font-ui)', minWidth: 28 }}>To</span>
+              <span style={{ fontSize: 10, color: 'var(--text-dimmest)', fontFamily: 'var(--font-ui)', minWidth: 28 }}>{tr("To")}</span>
               <input
                 type="text"
                 inputMode="numeric"
@@ -641,9 +640,7 @@ export default function LoopRegionStrip() {
               }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-amber-strip-apply-bg-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-amber-strip-apply-bg)'}
-            >
-              Apply
-            </button>
+            >{tr("Apply")}</button>
           </div>,
           document.body,
         )}

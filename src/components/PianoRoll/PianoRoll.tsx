@@ -1,3 +1,4 @@
+import { tr, useI18n } from '../../utils/i18n'
 import React, { useEffect, useRef, useState } from 'react'
 import { Application, Graphics } from 'pixi.js'
 import type { Track } from '@tonejs/midi'
@@ -206,6 +207,7 @@ function xToMidi(x: number, layout: KeyLayout[], midiMin: number, midiMax: numbe
 
 // ── LoopOverlay — amber band + draggable boundary lines over the waterfall ────
 function LoopOverlay() {
+  useI18n()
   const loopStart          = useStore(s => s.loopStart)
   const loopEnd            = useStore(s => s.loopEnd)
   const loopRegionActive   = useStore(s => s.loopRegionActive)
@@ -377,12 +379,8 @@ function LoopOverlay() {
             fontFamily: 'var(--font-ui)', fontSize: 9, fontWeight: 700,
             textTransform: 'uppercase', letterSpacing: '0.08em',
             color: 'var(--accent-amber-tooltip-text)',
-          }}>
-            Loop region set
-          </span>
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-tooltip-secondary)' }}>
-            Drag to reorder, right-click to clear
-          </span>
+          }}>{tr("Loop region set")}</span>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-tooltip-secondary)' }}>{tr("Drag to reorder, right-click to clear")}</span>
         </div>
       )}
     </div>
@@ -390,6 +388,7 @@ function LoopOverlay() {
 }
 
 export default function PianoRoll() {
+  useI18n()
   const containerRef      = useRef<HTMLDivElement>(null)
   const appRef            = useRef<Application | null>(null)
   const gridRef           = useRef<Graphics | null>(null)
@@ -1714,12 +1713,12 @@ export default function PianoRoll() {
         if (hasSelection) {
           if (NES.reassignHandsMode) {
             options.push({
-              label: 'Assign to Left Hand',
+              get label() { return tr("Assign to Left Hand") },
               swatchColor: 'var(--hand-lh)',
               onClick: () => { assignSelectedHand('L'); setContextMenu(null) },
             })
             options.push({
-              label: 'Assign to Right Hand',
+              get label() { return tr("Assign to Right Hand") },
               swatchColor: 'var(--hand-rh)',
               onClick: () => { assignSelectedHand('R'); setContextMenu(null) },
             })
@@ -1731,12 +1730,12 @@ export default function PianoRoll() {
             })
           }
           options.push({
-            label: 'Deselect',
+            get label() { return tr("Deselect") },
             onClick: () => { editSelectedNotes.clear(); setContextMenu(null) },
           })
         }
-        options.push({ label: 'Undo', disabled: !NES.history.canUndo, onClick: () => { doHistoryUndo(); setContextMenu(null) } })
-        options.push({ label: 'Redo', disabled: !NES.history.canRedo, onClick: () => { doHistoryRedo(); setContextMenu(null) } })
+        options.push({ get label() { return tr("Undo") }, disabled: !NES.history.canUndo, onClick: () => { doHistoryUndo(); setContextMenu(null) } })
+        options.push({ get label() { return tr("Redo") }, disabled: !NES.history.canRedo, onClick: () => { doHistoryRedo(); setContextMenu(null) } })
         // Delete always last — destructive action shouldn't be the first
         // thing a right-click reaches for.
         if (hasSelection) {
@@ -2188,7 +2187,7 @@ export default function PianoRoll() {
       {contextMenu && (
         <div
           role="menu"
-          aria-label="Note actions"
+          aria-label={tr("Note actions")}
           onMouseDown={e => e.stopPropagation()}
           style={{
             position: 'fixed',

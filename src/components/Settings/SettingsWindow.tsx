@@ -1,11 +1,11 @@
+import { tr, useI18n, t } from '../../utils/i18n'
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { BookOpen, Search, X } from 'lucide-react'
 import { useStore } from '../../store'
-import { t } from '../../utils/i18n'
 import Tooltip from '../Tooltip'
 import OrfeoMark from '../OrfeoMark'
-import { GROUPS, SETTINGS, type SettingId } from './catalog'
+import { getGroups, getSettings, type SettingId } from './catalog'
 import { searchSettings, gridColumns, CARD_GAP } from './search'
 import { SettingCard } from './SettingCard'
 import { UpdateButton } from './controls'
@@ -47,6 +47,7 @@ function ColumnCards({ ids, width, stack }: { ids: SettingId[]; width: number; s
 }
 
 export default function SettingsWindow() {
+  useI18n()
   const open = useStore(s => s.settingsWindowOpen)
   const group = useStore(s => s.settingsWindowGroup)
   const [query, setQuery] = useState('')
@@ -104,7 +105,7 @@ export default function SettingsWindow() {
 
   if (!open) return null
   const close = () => useStore.getState().closeSettingsWindow()
-  const g = GROUPS.find(x => x.id === group) ?? GROUPS[0]
+  const g = getGroups().find(x => x.id === group) ?? getGroups()[0]
   const results = query.trim() ? searchSettings(query) : null
 
   return createPortal(
@@ -140,7 +141,7 @@ export default function SettingsWindow() {
         <div style={{ display: 'grid', gridTemplateColumns: '210px minmax(0, 1fr)', minHeight: 0 }}>
           <nav style={{ borderRight: '1px solid var(--border2)', display: 'grid', gridTemplateRows: 'minmax(0, 1fr) auto', minHeight: 0 }}>
             <div style={{ overflowY: 'auto', padding: '6px 0' }}>
-            {GROUPS.map(x => {
+            {getGroups().map(x => {
               const Icon = GROUP_ICONS[x.id]
               const active = !results && x.id === group
               return (
@@ -157,10 +158,10 @@ export default function SettingsWindow() {
             </div>
             {/* ── ORFEO + version (opens GitHub) | update check ── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', padding: '8px 10px 8px 14px', borderTop: '1px solid var(--border-row)' }}>
-              <Tooltip title="Open Orfeo on GitHub" oneLine placement="top">
+              <Tooltip title={tr("Open Orfeo on GitHub")} oneLine placement="top">
                 <button onClick={() => window.electronAPI.openExternal('https://github.com/Squarebow/Orfeo')}
                   style={{ display: 'flex', alignItems: 'baseline', gap: 7, background: 'none', border: 'none', cursor: 'pointer', padding: 0, minWidth: 0 }}>
-                  <span style={{ color: 'var(--text-amber)', fontSize: 'var(--text-sm)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--font-ui)' }}>ORFEO</span>
+                  <span style={{ color: 'var(--text-amber)', fontSize: 'var(--text-sm)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--font-ui)' }}>{tr("ORFEO")}</span>
                   <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>v{displayVersion(__APP_VERSION__)}</span>
                 </button>
               </Tooltip>
@@ -203,7 +204,7 @@ export default function SettingsWindow() {
                       })()}
                     </>
                   ) : (
-                    <CardGrid ids={SETTINGS.filter(s => s.group === g.id).map(s => s.id)} width={width} />
+                    <CardGrid ids={getSettings().filter(s => s.group === g.id).map(s => s.id)} width={width} />
                   )}
                 </>
               ) : results.length === 0 ? (

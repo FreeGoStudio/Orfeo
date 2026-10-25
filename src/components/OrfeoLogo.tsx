@@ -1,5 +1,7 @@
+import { tr, useI18n } from '../utils/i18n'
 // ── ORFEO wordmark — inline SVG text, used in the TopBar left section ────────
 export default function OrfeoLogo() {
+  useI18n()
   return (
     <svg width="80" height="22" viewBox="0 0 80 22" fill="none" xmlns="http://www.w3.org/2000/svg">
       <text
@@ -9,9 +11,7 @@ export default function OrfeoLogo() {
         fontWeight="700"
         letterSpacing="2"
         fill="var(--text-amber)"
-      >
-        ORFEO
-      </text>
+      >{tr("ORFEO")}</text>
     </svg>
   )
 }

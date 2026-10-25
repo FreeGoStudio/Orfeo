@@ -1,3 +1,4 @@
+import { message as i18nMessage, msg } from './i18n'
 import { createNoteEditorHistory } from './noteEditorHistory'
 import { midiToEditableCopy } from './noteEditorCommands'
 import type { ToneNote } from './noteEditorCommands'
@@ -143,10 +144,10 @@ export function buildNoteEditSummary(descriptions: string[]): string {
 export async function confirmDiscardDirtyNoteEdits(message: string): Promise<boolean> {
   if (NES.dirty) {
     const choice = await confirmDialog({
-      title: 'Unsaved Changes',
+      title: i18nMessage("Unsaved Changes"),
       message,
-      detail: 'Your note edits will be lost if you discard.',
-      buttons: ['Save', 'Discard', 'Cancel'],
+      detail: i18nMessage("Your note edits will be lost if you discard."),
+      buttons: [i18nMessage("Save"), i18nMessage("Discard"), i18nMessage("Cancel")],
     })
     if (choice === 2) return false // Cancel
     if (choice === 0) {            // Save

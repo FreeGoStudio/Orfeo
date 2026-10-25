@@ -1,8 +1,8 @@
+import { t as tx, tr, useI18n, t } from '../../utils/i18n'
 import { useMemo, useState, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
 import { useStore } from '../../store'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { stepEvents } from '../../utils/stepThrough'
-import { t } from '../../utils/i18n'
 import Tooltip from '../Tooltip'
 import type { KeyboardSize } from '../../types'
 import { getWhiteKeys, noteToLeftPct, computeTaggedBoundaryCurve, interpolateTaggedCurve, type TaggedBoundarySample } from '../../utils/handBoundaries'
@@ -47,6 +47,7 @@ function useSmoothedPct(rawPct: number | null): number | null {
 
 // ── Bottom bar: keyboard size selector, dock/float toggle, note counter ───────
 export default function KeyboardControls() {
+  useI18n()
   const keyboardSize  = useStore((s) => s.keyboardSize)
   const keyboardMode  = useStore((s) => s.keyboardMode)
   const setKeyboardSize = useStore((s) => s.setKeyboardSize)
@@ -138,7 +139,7 @@ export default function KeyboardControls() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', justifySelf: 'start', minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
           {SIZES.map((size) => (
-            <Tooltip key={size} title={`Switch to ${size}-key layout`} oneLine>
+            <Tooltip key={size} title={tx`Switch to ${size}-key layout`} oneLine>
             <button
               onClick={() => setKeyboardSize(size)}
               style={{
@@ -161,10 +162,10 @@ export default function KeyboardControls() {
 
         {/* ── Dock / Float toggle — hidden in Presentation Mode ────────────────── */}
         {!presentationMode && <Tooltip
-          title={isDocked ? (undockBlocked ? "Can't float yet" : 'Float keyboard') : 'Dock keyboard'}
+          title={isDocked ? (undockBlocked ? tr("Can't float yet") : tr("Float keyboard")) : tr("Dock keyboard")}
           description={isDocked
-            ? (undockBlocked ? 'Close the open modal first — it shares the keyboard\'s anchor point.' : 'Detaches the keyboard so it can be moved and resized independently.')
-            : 'Reattaches the keyboard to the bottom of the window.'}
+            ? (undockBlocked ? tr("Close the open modal first — it shares the keyboard's anchor point.") : tr("Detaches the keyboard so it can be moved and resized independently."))
+            : tr("Reattaches the keyboard to the bottom of the window.")}
         >
         <button
           onClick={() => { if (isDocked && undockBlocked) return; setKeyboardMode(isDocked ? 'floating' : 'docked') }}
@@ -176,7 +177,7 @@ export default function KeyboardControls() {
             opacity: isDocked && undockBlocked ? 0.35 : 1,
             color: isDocked ? 'var(--text-muted)' : 'var(--text-amber)',
             fontSize: 'var(--text-xs)', fontFamily: 'var(--font-ui)',
-            padding: '2px 6px', borderRadius: 4,
+            padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0,
             transition: 'color 0.15s',
             position: 'relative', zIndex: 3,
           }}
@@ -194,7 +195,7 @@ export default function KeyboardControls() {
               <line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>
             </svg>
           )}
-          {isDocked ? 'Docked' : 'Floating'}
+          {isDocked ? tr("Docked") : tr("Floating")}
         </button>
         </Tooltip>}
       </div>
@@ -205,9 +206,7 @@ export default function KeyboardControls() {
         {!practiceLineActive && !presentationMode && (
           <span ref={hintRef} style={{ display: 'inline-flex', alignItems: 'center', gap: 28, transform: `translateX(${hintShift}px)` }}>
             {stepThroughEnabled && <StepArrow dir={-1} enabled={hasSong} />}
-            <span style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', userSelect: 'none', whiteSpace: 'nowrap' }}>
-              Shift+Click three keys or more to build &amp; lock a chord
-            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-ui)', userSelect: 'none', whiteSpace: 'nowrap' }}>{tr("Shift+Click three keys or more to build & lock a chord")}</span>
             {stepThroughEnabled && <StepArrow dir={1} enabled={hasSong} />}
           </span>
         )}
@@ -241,10 +240,10 @@ export default function KeyboardControls() {
           <>
             <div style={{ ...lineStyle, left: `${pct}%` }} />
             <div style={{ ...labelBase, left: 0, width: `${pct}%`, justifyContent: 'flex-end', paddingRight: 6 }}>
-              <span style={textStyle}>Left Hand</span>
+              <span style={textStyle}>{tr("Left Hand")}</span>
             </div>
             <div style={{ ...labelBase, left: `${pct}%`, right: 0, justifyContent: 'flex-start', paddingLeft: 'var(--space-2)' }}>
-              <span style={textStyle}>Right Hand</span>
+              <span style={textStyle}>{tr("Right Hand")}</span>
             </div>
           </>
         )
@@ -255,8 +254,8 @@ export default function KeyboardControls() {
 
       {/* ── Presentation Mode toggle — replaces Docked/NoteCounter in PM footer ─ */}
       <Tooltip
-        title={presentationMode ? 'Exit Presentation Mode' : 'Presentation Mode'}
-        description={presentationMode ? 'Press Esc to leave, or click here.' : 'Distraction-free fullscreen view.\nF11 to open, Esc to close.'}
+        title={presentationMode ? tr("Exit Presentation Mode") : tr("Presentation Mode")}
+        description={presentationMode ? tr("Press Esc to leave, or click here.") : tr("Distraction-free fullscreen view.\nF11 to open, Esc to close.")}
       >
       <button
         onClick={() => setPresentationMode(!presentationMode)}
@@ -302,17 +301,18 @@ export default function KeyboardControls() {
 
 // ── Shows total note + track count when a file is loaded ─────────────────────
 function NoteCounter() {
+  useI18n()
   const midi = useStore((s) => s.midi)
   if (!midi) return null
   return (
     <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)' }}>
-      {midi.noteCount.toLocaleString()} notes · {midi.tracks.length} tracks
-    </span>
+      {midi.noteCount.toLocaleString()}{tr(" notes ·")}{midi.tracks.length}{tr(" tracks")}</span>
   )
 }
 
 // ── Step Through arrows either side of the hint: same as ← / → (Shift: a bar) ──
 function StepArrow({ dir, enabled }: { dir: 1 | -1; enabled: boolean }) {
+  useI18n()
   const [hover, setHover] = useState(false)
   const Icon = dir === 1 ? ArrowRight : ArrowLeft
   return (

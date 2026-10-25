@@ -1,3 +1,4 @@
+import { renderMessage, tr, useI18n } from '../utils/i18n'
 // ── ConfirmDialog — themed confirm/alert modal, portal-rendered ───────────────
 // Mount <ConfirmDialogHost /> once in App.tsx; it renders nothing when idle.
 // Trigger via confirmDialog() from confirmController.ts (imperative API).
@@ -10,6 +11,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap'
 // ── ConfirmDialogHost ─────────────────────────────────────────────────────────
 // Always-mounted; renders a modal only when a confirmDialog() call is pending.
 export function ConfirmDialogHost() {
+  useI18n()
   const [state, setState] = useState<ConfirmState | null>(null)
 
   useEffect(() => subscribeConfirm(setState), [])
@@ -45,7 +47,7 @@ export function ConfirmDialogHost() {
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={state.title || 'Confirm'}
+        aria-label={state.title ? renderMessage(state.title) : tr("Confirm")}
         className="orfeo-modal-glow"
         style={{
           background: 'var(--bg-modal)',
@@ -67,11 +69,11 @@ export function ConfirmDialogHost() {
             textTransform: 'uppercase',
             marginBottom: 10,
           }}>
-            {state.title}
+            {renderMessage(state.title)}
           </div>
         )}
         <div style={{ color: 'var(--text-default)', fontSize: 'var(--text-base)', lineHeight: 1.5 }}>
-          {state.message}
+          {renderMessage(state.message)}
         </div>
         {state.detail && (
           <div style={{
@@ -81,7 +83,7 @@ export function ConfirmDialogHost() {
             lineHeight: 1.5,
             whiteSpace: 'pre-line',
           }}>
-            {state.detail}
+            {typeof state.detail === 'string' ? state.detail : renderMessage(state.detail)}
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
@@ -104,7 +106,7 @@ export function ConfirmDialogHost() {
                   fontFamily:  'var(--font-ui)',
                 }}
               >
-                {label}
+                {renderMessage(label)}
               </button>
             )
           })}

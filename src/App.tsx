@@ -1,3 +1,5 @@
+import { renderMessage, message as i18nMessage, msg, tr, useI18n } from './utils/i18n'
+import type { Message } from './i18n/core'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import TopBar from './components/Transport/TopBar'
 import PianoRoll from './components/PianoRoll/PianoRoll'
@@ -50,6 +52,7 @@ import { useCountIn } from './hooks/useCountIn'
 import { CountInOverlay } from './components/CountInOverlay'
 
 export default function App() {
+  useI18n()
   // ── Update status + sound-set progress: one listener each for the app's
   // whole life (their off* calls remove every listener on the channel), so
   // they live here, not in the drawer — it unmounts in presentation mode. ──
@@ -93,12 +96,12 @@ export default function App() {
   // either source. Same transient-toast shape as the drop-error message
   // above, just a shorter 1s window since this is informational, not
   // something the user needs to read and act on. ───────────────────────────
-  const [zoomHint, setZoomHint] = useState<string | null>(null)
+  const [zoomHint, setZoomHint] = useState<Message | null>(null)
   const zoomHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     const onZoomChanged = ({ percent, capped }: { percent: number; capped: boolean }) => {
       if (zoomHintTimer.current) clearTimeout(zoomHintTimer.current)
-      setZoomHint(`Zoom ${percent}%${capped ? ' (max)' : ''}`)
+      setZoomHint(i18nMessage(capped ? 'zoom.max' : 'zoom.value', { percent }))
       zoomHintTimer.current = setTimeout(() => setZoomHint(null), 1000)
     }
     window.electronAPI.onZoomChanged(onZoomChanged)
@@ -242,8 +245,8 @@ export default function App() {
       const fileName = filePath.replace(/\\/g, '/').split('/').pop() ?? filePath
       const label    = fileName.length > 40 ? fileName.slice(0, 37) + '…' : fileName
       const choice   = await confirmDialog({
-        message: `Load "${label}"? This will replace the currently open file.`,
-        buttons: ['Load File', 'Cancel'],
+        message: msg`Load "${label}"? This will replace the currently open file.`,
+        buttons: [i18nMessage("Load File"), i18nMessage("Cancel")],
       })
       if (choice === 0) await loadDroppedFilePath(filePath)
     } else {
@@ -275,9 +278,9 @@ export default function App() {
       // 1. Note Editor unsaved changes
       if (NES.dirty) {
         const choice = await confirmDialog({
-          title: 'Unsaved Changes',
-          message: 'You have unsaved changes in the Note Editor.',
-          buttons: ['Save', 'Discard', 'Cancel'],
+          get title() { return i18nMessage("Unsaved Changes") },
+          message: i18nMessage("You have unsaved changes in the Note Editor."),
+          buttons: [i18nMessage("Save"), i18nMessage("Discard"), i18nMessage("Cancel")],
         })
         if (choice === 2) return  // Cancel — leave app open
         if (choice === 0) {
@@ -294,9 +297,9 @@ export default function App() {
           (s.bpm !== s.originalBpm || (s.detectedKey?.transpose ?? 0) !== 0)
         if (tempoKeyDirty) {
           const choice = await confirmDialog({
-            title: 'Unsaved Tempo/Key Changes',
-            message: 'You have unsaved tempo/key changes.',
-            buttons: ['Save', 'Discard', 'Cancel'],
+            get title() { return i18nMessage("Unsaved Tempo/Key Changes") },
+            message: i18nMessage("You have unsaved tempo/key changes."),
+            buttons: [i18nMessage("Save"), i18nMessage("Discard"), i18nMessage("Cancel")],
           })
           if (choice === 2) return  // Cancel — leave app open
           if (choice === 0) {
@@ -312,9 +315,9 @@ export default function App() {
         const libraryFolder = (useStore.getState() as any).libraryFolder as string | null ?? null
         const cachePath = getCachePath(pending.sourcePath, libraryFolder)
         const choice = await confirmDialog({
-          message: `Save imported file "${pending.fileName}" as a MIDI file?`,
-          detail: `The original file is never modified.`,
-          buttons: ['Save as MID', "Don't Save", 'Cancel'],
+          message: msg`Save imported file "${pending.fileName}" as a MIDI file?`,
+          detail: i18nMessage("The original file is never modified."),
+          buttons: [i18nMessage("Save as MID"), i18nMessage("Don't Save"), i18nMessage("Cancel")],
         })
         if (choice === 2) return  // Cancel — leave app open
         if (choice === 0) {
@@ -355,10 +358,10 @@ export default function App() {
     const { noteEditorActive } = useStore.getState()
     if (noteEditorActive && NES.dirty) {
       const choice = await confirmDialog({
-        title: 'Unsaved Changes',
-        message: 'Save note editor changes before entering Presentation Mode?',
-        detail: 'Your edits will be preserved in the file.',
-        buttons: ['Save', 'Discard', 'Cancel'],
+        get title() { return i18nMessage("Unsaved Changes") },
+        message: i18nMessage("Save note editor changes before entering Presentation Mode?"),
+        detail: i18nMessage("Your edits will be preserved in the file."),
+        buttons: [i18nMessage("Save"), i18nMessage("Discard"), i18nMessage("Cancel")],
       })
       if (choice === 2) return
       if (choice === 0) {
@@ -574,7 +577,7 @@ export default function App() {
           were on the file they dropped rather than this bottom-center toast,
           the explanation could otherwise vanish before it's read. ────────── */}
       {dropError && (
-        <Tooltip title="Dismiss" description="Click anywhere on this message to close it.">
+        <Tooltip title={tr("Dismiss")} description={tr("Click anywhere on this message to close it.")}>
         <div
           role="alert"
           onClick={() => {
@@ -589,7 +592,7 @@ export default function App() {
             cursor: 'pointer', zIndex: 9900,
             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
           }}>
-          {dropError}
+          {tr(dropError ?? "")}
         </div>
         </Tooltip>
       )}
@@ -608,7 +611,7 @@ export default function App() {
             pointerEvents: 'none', zIndex: 9900,
             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
           }}>
-          {zoomHint}
+          {zoomHint && renderMessage(zoomHint)}
         </div>
       )}
 

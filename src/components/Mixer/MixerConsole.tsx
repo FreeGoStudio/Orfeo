@@ -1,3 +1,4 @@
+import { message as i18nMessage, msg, tr, useI18n } from '../../utils/i18n'
 import { useRef, useState, useEffect, useMemo, useCallback, type CSSProperties } from 'react'
 import { X } from 'lucide-react'
 import { useStore, DEFAULT_MUTED_GROUPS } from '../../store'
@@ -40,6 +41,7 @@ const MODAL_H_APPROX = 650  // header 40 + body-pad 16*2 + strip 574 + scrollbar
 
 // ── MixerConsole ──────────────────────────────────────────────────────────────
 export default function MixerConsole() {
+  useI18n()
   const mixerOpen       = useStore(s => s.mixerOpen)
   const setMixerOpen    = useStore(s => s.setMixerOpen)
   // ── Lightweight track identity/order signature — NOT the live `tracks`
@@ -99,9 +101,9 @@ export default function MixerConsole() {
 
     const filePath = (midi as any)._filePath ?? ''
     const choice = await confirmDialog({
-      title: 'Save mixer changes?',
-      message: `Volume, pan, reverb, and chorus were changed for ${changed.length} channel(s).`,
-      buttons: ['Save & Reload', 'Discard', 'Cancel'],
+      get title() { return i18nMessage("Save mixer changes?") },
+      message: msg`Volume, pan, reverb, and chorus were changed for ${changed.length} channel(s).`,
+      buttons: [i18nMessage("Save & Reload"), i18nMessage("Discard"), i18nMessage("Cancel")],
     })
     if (choice === 2) return // Cancel — leave mixer open
     if (choice === 1) { setMixerOpen(false); return } // Discard — re-seeded from file next open
@@ -112,7 +114,7 @@ export default function MixerConsole() {
         channels: changed.map(t => ({ index: t.index, volume: t.volume, pan: t.pan, chorus: t.chorus, reverb: t.reverb })),
       })
       if (!result.ok || !result.base64 || !result.fileName || !result.filePath) {
-        await confirmDialog({ title: 'Save failed', message: result.message ?? 'Could not save mixer changes.', buttons: ['OK'] })
+        await confirmDialog({ get title() { return i18nMessage("Save failed") }, message: result.message ?? 'Could not save mixer changes.', buttons: [i18nMessage("OK")] })
         return // leave mixer open so the user can retry
       }
       const binary = atob(result.base64)
@@ -130,7 +132,7 @@ export default function MixerConsole() {
       useStore.getState().notifyLibrarySaved(result.filePath)
       setMixerOpen(false)
     } catch (e: any) {
-      await confirmDialog({ title: 'Save failed', message: e?.message ?? 'Could not save mixer changes.', buttons: ['OK'] })
+      await confirmDialog({ get title() { return i18nMessage("Save failed") }, message: e?.message ?? 'Could not save mixer changes.', buttons: [i18nMessage("OK")] })
     }
   }, [setMixerOpen])
 
@@ -334,7 +336,7 @@ export default function MixerConsole() {
       ref={modalRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Console Mixer"
+      aria-label={tr("Console Mixer")}
       className="orfeo-modal-glow app-no-drag"
       onMouseDown={() => setZIndex(bringToFront())}
       style={{
@@ -383,9 +385,7 @@ export default function MixerConsole() {
           fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
           color: 'var(--text-amber)', letterSpacing: '0.14em', textTransform: 'uppercase',
           flexShrink: 0,
-        }}>
-          Console Mixer
-        </span>
+        }}>{tr("Console Mixer")}</span>
 
         {/* ── Permanent description — centered in whatever space is left between
             the title and the close button, not a hover tooltip (this one's
@@ -409,9 +409,7 @@ export default function MixerConsole() {
               color: 'var(--text-muted)', whiteSpace: 'nowrap',
               ...(headerDescOverflow > 0 ? { '--marquee-distance': `-${headerDescOverflow}px` } as CSSProperties : {}),
             }}
-          >
-            Adjust track levels, apply effects and compress overall loudness
-          </span>
+          >{tr("Adjust track levels, apply effects and compress overall loudness")}</span>
         </div>
 
         {/* ── Close button — bottom-aligned so the dash sits at X level ─────── */}
@@ -421,7 +419,7 @@ export default function MixerConsole() {
         >
           <button
             onClick={requestClose}
-            title="Close"
+            title={tr("Close")}
             style={modalCloseButtonStyle}
             onMouseEnter={e => e.currentTarget.style.color = modalCloseButtonHoverColor}
             onMouseLeave={e => e.currentTarget.style.color = modalCloseButtonIdleColor}
@@ -458,9 +456,7 @@ export default function MixerConsole() {
               height: 574, flex: 1,
               color: 'var(--text-dimmest)', fontSize: 12, fontFamily: 'var(--font-mono)',
               letterSpacing: '0.08em', textTransform: 'uppercase',
-            }}>
-              No tracks — load a MIDI file
-            </div>
+            }}>{tr("No tracks — load a MIDI file")}</div>
           ) : (
             displayTracks.map(t => {
               const locked = KEYBOARD_GROUPS.has(t.group ?? '')

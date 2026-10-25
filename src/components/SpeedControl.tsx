@@ -1,3 +1,4 @@
+import { t as tx, tr, useI18n } from '../utils/i18n'
 // ── SpeedControl ─────────────────────────────────────────────────────────────
 // Three chevron speed buttons (>, >>, >>>) for Slow/Medium/Fast. Simple open
 // angle-bracket strokes (not the rounded teardrop path) so they stay crisp
@@ -55,16 +56,17 @@ const SPEEDS: Array<['slow' | 'med' | 'fast', string]> = [
 
 // ── SpeedControl component ────────────────────────────────────────────────────
 export default function SpeedControl({ value, onChange, size = DEFAULT_H }: SpeedControlProps) {
+  useI18n()
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       {SPEEDS.map(([v, label]) => {
         const active = value === v
         const Icon   = ICONS[v]
         return (
-          <Tooltip key={v} oneLine title={`Plays back at ${label.toLowerCase()} speed.`}>
+          <Tooltip key={v} oneLine title={tx`Plays back at ${tr(label)} speed.`}>
           <button
             onClick={() => onChange(v)}
-            aria-label={label}
+            aria-label={tr(label)}
             aria-pressed={active}
             style={{
               background: 'none',

@@ -1,3 +1,4 @@
+import { tr, useI18n } from '../../utils/i18n'
 // ── StarmapTitleMark ─────────────────────────────────────────────────────────
 // Hand-lettered "Starmap" title (two lines) for the centre of the Scales
 // Explorer's Starmap ring. Paths from the designer's Starmap2-01 artwork;
@@ -33,12 +34,13 @@ const VIEW_W = 342.7
 const VIEW_H = 165.51
 
 export default function StarmapTitleMark({ cx, cy, width, fill }: { cx: number; cy: number; width: number; fill: string }) {
+  useI18n()
   const height = width * VIEW_H / VIEW_W
   return (
     <svg
       x={cx - width / 2} y={cy - height / 2} width={width} height={height}
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} fill={fill}
-      style={{ pointerEvents: 'none' }} aria-label="Starmap" role="img"
+      style={{ pointerEvents: 'none' }} aria-label={tr("Starmap")} role="img"
     >
       {PATHS.map((d, i) => <path key={i} d={d} />)}
     </svg>

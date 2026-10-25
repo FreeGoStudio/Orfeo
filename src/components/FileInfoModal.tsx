@@ -1,3 +1,4 @@
+import { tr, useI18n } from '../utils/i18n'
 // ── File info — metadata table, change log, and version chain for a library
 // file, opened via the Library's right-click context menu. Works on any
 // file, not just the loaded one: reads it fresh over IPC rather than
@@ -45,6 +46,7 @@ interface Props {
 }
 
 export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }: Props) {
+  useI18n()
   const noteNaming   = useStore((s) => s.noteNaming)
   const accidentals  = useStore((s) => s.accidentals)
 
@@ -204,11 +206,11 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
   const currentVersionLabel = currentVersion ? (currentVersion.version === 0 ? 'Original' : `v${currentVersion.version}`) : null
 
   const rows: { label: string; value: string }[] = meta ? [
-    { label: 'Key', value: formatKeyOrDash(meta.key, noteNaming, accidentals) },
+    { get label() { return tr("Key") }, value: formatKeyOrDash(meta.key, noteNaming, accidentals) },
     { label: 'BPM', value: String(meta.bpm) },
-    { label: 'Time', value: meta.timeSignature },
-    { label: 'Tracks', value: String(meta.trackCount) },
-    { label: 'Copyright', value: meta.copyright ?? '—' },
+    { get label() { return tr("Time") }, value: meta.timeSignature },
+    { get label() { return tr("Tracks") }, value: String(meta.trackCount) },
+    { get label() { return tr("Copyright") }, value: meta.copyright ?? '—' },
   ] : []
 
   return createPortal(
@@ -223,7 +225,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="File info"
+        aria-label={tr("File info")}
         className="orfeo-modal-glow app-no-drag"
         style={{
           background: 'var(--bg-modal)', border: '1px solid var(--border2)',
@@ -239,11 +241,9 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
             flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 14,
             color: 'var(--text-amber)', letterSpacing: '0.08em', textTransform: 'uppercase',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }} title={currentName}>
-            File info
-          </span>
+          }} title={currentName}>{tr("File info")}</span>
           <button
-            data-no-drag onClick={onClose} title="Close"
+            data-no-drag onClick={onClose} title={tr("Close")}
             style={modalCloseButtonStyle}
             onMouseEnter={e => e.currentTarget.style.color = modalCloseButtonHoverColor}
             onMouseLeave={e => e.currentTarget.style.color = modalCloseButtonIdleColor}
@@ -258,7 +258,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
             <div ref={versionsRef} style={{ position: 'relative', flexShrink: 0 }}>
               <button
                 onClick={() => setVersionsOpen(o => !o)}
-                title="View a different saved version — navigates this popup only, doesn't load the file"
+                title={tr("View a different saved version — navigates this popup only, doesn't load the file")}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 3, padding: '3px 6px', borderRadius: 4,
                   border: `1px solid ${versionsOpen ? 'var(--accent-amber-strong)' : 'var(--border2)'}`,
@@ -288,7 +288,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
                       onMouseEnter={e => { if (v.path !== currentPath) e.currentTarget.style.background = 'var(--bg-tile)' }}
                       onMouseLeave={e => { if (v.path !== currentPath) e.currentTarget.style.background = 'transparent' }}
                     >
-                      {v.version === 0 ? 'Original' : `v${v.version}`}
+                      {v.version === 0 ? tr("Original") : `v${v.version}`}
                     </button>
                   ))}
                 </div>
@@ -298,11 +298,11 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
         </div>
 
         {error && (
-          <div style={{ fontSize: 11, color: 'var(--status-error-banner-text)', marginBottom: 10 }}>{error}</div>
+          <div style={{ fontSize: 11, color: 'var(--status-error-banner-text)', marginBottom: 10 }}>{tr(error ?? "")}</div>
         )}
 
         {!meta && !error && (
-          <div style={{ fontSize: 11, color: 'var(--text-inactive)', padding: '8px 0' }}>Reading file…</div>
+          <div style={{ fontSize: 11, color: 'var(--text-inactive)', padding: '8px 0' }}>{tr("Reading file…")}</div>
         )}
 
         {meta && (
@@ -311,9 +311,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
                 renaming in the Playback Editor. Staged in local state; a real
                 file rename only happens on Save below, never per keystroke. ── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', minHeight: 24, boxSizing: 'border-box' }}>
-              <span style={{ width: 70, flexShrink: 0, fontSize: 10, lineHeight: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent-amber-icon-dim)' }}>
-                Artist
-              </span>
+              <span style={{ width: 70, flexShrink: 0, fontSize: 10, lineHeight: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent-amber-icon-dim)' }}>{tr("Artist")}</span>
               {editingArtist ? (
                 <input
                   ref={artistInputRef}
@@ -330,7 +328,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
                 />
               ) : (
                 <span
-                  title="Double-click to rename"
+                  title={tr("Double-click to rename")}
                   onDoubleClick={startEditArtist}
                   onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)' }}
                   onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-default)' }}
@@ -345,9 +343,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', minHeight: 24, boxSizing: 'border-box', borderTop: '1px solid var(--border-row)' }}>
-              <span style={{ width: 70, flexShrink: 0, fontSize: 10, lineHeight: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent-amber-icon-dim)' }}>
-                Song
-              </span>
+              <span style={{ width: 70, flexShrink: 0, fontSize: 10, lineHeight: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent-amber-icon-dim)' }}>{tr("Song")}</span>
               {editingSong ? (
                 <input
                   ref={songInputRef}
@@ -364,7 +360,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
                 />
               ) : (
                 <span
-                  title="Double-click to rename"
+                  title={tr("Double-click to rename")}
                   onDoubleClick={startEditSong}
                   onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)' }}
                   onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-default)' }}
@@ -379,7 +375,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
               )}
               <button
                 onClick={swapDrafts}
-                title="Swap Artist and Song"
+                title={tr("Swap Artist and Song")}
                 style={{
                   flexShrink: 0, background: 'none', border: '1px solid var(--border2)', borderRadius: 4,
                   padding: '3px 5px', display: 'flex', alignItems: 'center',
@@ -414,7 +410,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
               <button
                 onClick={handleSaveRename}
                 disabled={!dirty || saving}
-                title={dirty ? 'Save — renames the file on disk' : 'No changes to save'}
+                title={dirty ? tr("Save — renames the file on disk") : tr("No changes to save")}
                 style={{
                   flex: 1, padding: '6px 0', borderRadius: 'var(--radius-md)',
                   background: dirty ? 'var(--text-amber)' : 'var(--bg-tile)',
@@ -423,11 +419,11 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 }}
               >
-                <Save size={13} /> {saving ? 'Saving…' : 'Save changes'}
+                <Save size={13} /> {saving ? tr("Saving…") : tr("Save changes")}
               </button>
               <button
                 onClick={() => window.electronAPI.showItemInFolder(currentPath)}
-                title="Opens Windows Explorer with this file highlighted"
+                title={tr("Opens Windows Explorer with this file highlighted")}
                 style={{
                   flex: 1, padding: '6px 0', borderRadius: 'var(--radius-md)',
                   background: 'transparent', border: '1px solid var(--border2)', color: 'var(--text-muted)',
@@ -437,8 +433,7 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
                 onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--accent-amber-strong)' }}
                 onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
               >
-                <FolderOpen size={13} /> Show in folder
-              </button>
+                <FolderOpen size={13} />{tr(" Show in folder")}</button>
             </div>
           </div>
         )}
@@ -453,14 +448,12 @@ export default function FileInfoModal({ filePath, fileName, onClose, onRenamed }
             entries scroll inside it instead. ── */}
         {meta && (
           <div style={{ marginTop: 12, borderTop: '1px solid var(--border-row)', paddingTop: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-amber-icon-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-              Orfeo History
-            </div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-amber-icon-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{tr("Orfeo History")}</div>
             <div style={{ height: 52, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {log === null ? (
-                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-inactive)' }}>Loading…</div>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-inactive)' }}>{tr("Loading…")}</div>
               ) : log.length === 0 ? (
-                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-inactive)' }}>No recorded changes yet.</div>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-inactive)' }}>{tr("No recorded changes yet.")}</div>
               ) : (
                 [...log].reverse().map((ev, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10, fontFamily: 'var(--font-mono)', flexShrink: 0 }}>

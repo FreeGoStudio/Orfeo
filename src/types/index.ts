@@ -1,3 +1,4 @@
+import type { LocalePreference, LocaleState, Message } from '../i18n/core'
 // L = left hand, R = right hand. Canonical location for this type — the hand
 // engine (utils/handAssignment.ts) and metadata round-trip (utils/handMetadata.ts)
 // both import it from here rather than declaring their own.
@@ -180,6 +181,9 @@ export interface TranscriptEntry {
 declare global {
   interface Window {
     electronAPI: {
+      getLocale: () => Promise<LocaleState>
+      setLocale: (preference: LocalePreference) => Promise<LocaleState>
+      onLocaleChanged: (listener: (state: LocaleState) => void) => () => void
       openMidiFile:        () => Promise<MidiFileResult | null>
       getPrefs:            () => Promise<Record<string, any>>
       setPrefs:            (data: Record<string, any>) => Promise<void>
@@ -274,7 +278,7 @@ export interface TapSession {
   taps: number[]             // heard song time of each tap
   segment: import('../utils/tempoCorrection').TempoSegment | null  // the preview segment
   prevMetronome: boolean     // metronome on/off before the session, restored at the end
-  message: string | null     // e.g. "Need at least 4 taps"
+  message: string | Message | null     // e.g. "Need at least 4 taps"
   lastTapAt: number          // performance.now() of the last tap
   editIndex?: number | null  // adjusting an already-kept tempo (index into the song's segments)
   listenMetronome?: boolean  // metronome on while listening back (panel switch)

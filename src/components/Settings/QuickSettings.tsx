@@ -1,9 +1,9 @@
+import { tr, useI18n, t } from '../../utils/i18n'
 import { ArrowUpRight } from 'lucide-react'
 import { useStore } from '../../store'
-import { t } from '../../utils/i18n'
 import Tooltip from '../Tooltip'
 import OrfeoMark from '../OrfeoMark'
-import { GROUPS, QUICK_LAYOUT } from './catalog'
+import { getGroups, QUICK_LAYOUT } from './catalog'
 import { GROUP_ICONS } from './groupIcons'
 import { CollapsibleSection } from './controls'
 import { QuickRow } from './QuickRow'
@@ -12,11 +12,12 @@ import { QuickRow } from './QuickRow'
 // grouped as in the Settings window; the gear on each group opens that
 // group in the full window. ───────────────────────────────────────────────
 export default function QuickSettings() {
+  useI18n()
   const collapsed = useStore(s => s.settingsGroupsCollapsed)
   const setCollapsed = useStore(s => s.setSettingsGroupCollapsed)
   return (
     <>
-      {GROUPS.filter(g => QUICK_LAYOUT[g.id].length > 0).map(g => {
+      {getGroups().filter(g => QUICK_LAYOUT[g.id].length > 0).map(g => {
         const Icon = GROUP_ICONS[g.id]
         return (
           <CollapsibleSection key={g.id} icon={<Icon size={11} />} label={g.name}
@@ -42,14 +43,14 @@ export default function QuickSettings() {
       })}
       {/* ── About — unchanged from the old drawer bottom ── */}
       <div style={{ padding: '14px 14px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Tooltip title="Open Orfeo on GitHub" oneLine>
+        <Tooltip title={tr("Open Orfeo on GitHub")} oneLine>
           <button onClick={() => window.electronAPI.openExternal('https://github.com/Squarebow/Orfeo')}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             <OrfeoMark height={16} />
-            <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>Orfeo · v{__APP_VERSION__}</span>
+            <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{tr("Orfeo · v")}{__APP_VERSION__}</span>
           </button>
         </Tooltip>
-        <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>· © SquareBow</span>
+        <span style={{ color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{tr("· © SquareBow")}</span>
       </div>
     </>
   )

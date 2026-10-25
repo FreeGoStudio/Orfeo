@@ -1,3 +1,4 @@
+import { t as tx, tr, useI18n } from '../../utils/i18n'
 import { useState, useRef, useLayoutEffect, useEffect, useCallback, useMemo } from 'react'
 import { Eye, VolumeX, Volume2 } from 'lucide-react'
 import { useStore, DEFAULT_MUTED_GROUPS } from '../../store'
@@ -117,6 +118,7 @@ function CompressorPresetKnob({ presetIndex, onChange, disabled, interactive }: 
   disabled?: boolean
   interactive: boolean
 }) {
+  useI18n()
   const wrapRef = useRef<HTMLDivElement>(null)
   const [hoverPreset, setHoverPreset] = useState<number | null>(null)
 
@@ -148,7 +150,7 @@ function CompressorPresetKnob({ presetIndex, onChange, disabled, interactive }: 
   // the same "switch engines" explanation instead of its own preset info —
   // there's nothing preset-specific to say if you can't select any of them.
   const content = hoverPreset === null ? null
-    : disabled ? { title: 'Compressor', description: 'Switch to the Studio or Native engine to use the Compressor.' }
+    : disabled ? { get title() { return tr("Compressor") }, get description() { return tr("Switch to the Studio or Native engine to use the Compressor.") } }
     : hovered ? { title: hovered.label, description: `${hovered.ratio}:1 ratio, ${hovered.threshold} dB threshold` }
     : null
 
@@ -280,6 +282,7 @@ function drawWave(
 
 // ── MasterStrip — 160×574 ─────────────────────────────────────────────────────
 export default function MasterStrip() {
+  useI18n()
 
   // ── Store reads ───────────────────────────────────────────────────────────
   const audioEngine         = useStore(s => s.audioEngine)
@@ -507,9 +510,7 @@ export default function MasterStrip() {
         <span style={{
           fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
           textTransform: 'uppercase', color: 'var(--text-amber)', fontWeight: 700,
-        }}>
-          Master
-        </span>
+        }}>{tr("Master")}</span>
       </div>
 
       {/* ── 2. VU section (flex:1.3, ~127px) ─────────────────────────────── */}
@@ -545,11 +546,11 @@ export default function MasterStrip() {
           color: 'var(--text-amber)', whiteSpace: 'nowrap',
           textTransform: 'uppercase', fontWeight: 700,
         }}>
-          {vuDisplayMode === 'wave' ? 'Wave' : 'Bars/FFT'}
+          {vuDisplayMode === 'wave' ? tr("Wave") : tr("Bars/FFT")}
         </span>
         <Tooltip
-          title={vuDisplayMode === 'wave' ? 'Switch to Bars/FFT' : 'Switch to Wave'}
-          description="Changes how the meter above shows the overall output level"
+          title={vuDisplayMode === 'wave' ? tr("Switch to Bars/FFT") : tr("Switch to Wave")}
+          description={tr("Changes how the meter above shows the overall output level")}
         >
         <div
           onClick={() => setVuDisplayMode(vuDisplayMode === 'bars' ? 'wave' : 'bars')}
@@ -588,8 +589,8 @@ export default function MasterStrip() {
           <IBtn
             onClick={handleMuteAll}
             active={allMuted}
-            title={allMuted ? 'Unmute all tracks' : 'Mute all tracks'}
-            description={allMuted ? 'Restore every track to its own mute state' : 'Silence every track at once'}
+            title={allMuted ? tr("Unmute all tracks") : tr("Mute all tracks")}
+            description={allMuted ? tr("Restore every track to its own mute state") : tr("Silence every track at once")}
             activeColor="var(--status-error)"
           >
             {allMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
@@ -597,8 +598,8 @@ export default function MasterStrip() {
           <IBtn
             onClick={handleVisibleAll}
             active={!allVisible}
-            title={allVisible ? 'Hide all on the piano roll' : 'Show all on the piano roll'}
-            description={allVisible ? 'Hide every track’s falling notes on the Piano Roll' : 'Show every track’s falling notes on the Piano Roll'}
+            title={allVisible ? tr("Hide all on the piano roll") : tr("Show all on the piano roll")}
+            description={allVisible ? tr("Hide every track’s falling notes on the Piano Roll") : tr("Show every track’s falling notes on the Piano Roll")}
             activeColor="var(--status-error-hover)"
           >
             {allVisible ? <Eye size={13} /> : <EyeClosed size={13} />}
@@ -606,8 +607,8 @@ export default function MasterStrip() {
           <IBtn
             onClick={handleKeyboardAll}
             active={allOnKeyboard}
-            title={allOnKeyboard ? 'Hide all on keyboard' : 'Show all on keyboard'}
-            description={allOnKeyboard ? 'Stop every track lighting up the on-screen keyboard' : 'Every track lights up the on-screen keyboard'}
+            title={allOnKeyboard ? tr("Hide all on keyboard") : tr("Show all on keyboard")}
+            description={allOnKeyboard ? tr("Stop every track lighting up the on-screen keyboard") : tr("Every track lights up the on-screen keyboard")}
             activeColor="var(--text-amber)"
           >
             <PianoKeysIcon />
@@ -615,8 +616,8 @@ export default function MasterStrip() {
         </div>
         {autoMuteNonKeyboard && (
           <Tooltip
-            title={isCurrentlyFiltered ? 'Piano, bass & drums only' : 'Playing All Tracks'}
-            description={isCurrentlyFiltered ? 'Playing keyboards, bass & drums only. Click to play all tracks.' : 'Click to mute everything except piano, bass & drums — good for practising'}
+            title={isCurrentlyFiltered ? tr("Piano, bass & drums only") : tr("Playing All Tracks")}
+            description={isCurrentlyFiltered ? tr("Playing keyboards, bass & drums only. Click to play all tracks.") : tr("Click to mute everything except piano, bass & drums — good for practising")}
           >
           <button
             onClick={() => setTrackMuteFilter(!isCurrentlyFiltered)}
@@ -641,7 +642,7 @@ export default function MasterStrip() {
             <svg width="6" height="7" viewBox="0 0 6 7" style={{ marginRight: 3, flexShrink: 0 }}>
               <polygon points="0,0 6,3.5 0,7" fill="currentColor"/>
             </svg>
-            {isCurrentlyFiltered ? 'Focus ON' : 'Focus OFF'}
+            {isCurrentlyFiltered ? tr("Focus ON") : tr("Focus OFF")}
           </button>
           </Tooltip>
         )}
@@ -662,15 +663,15 @@ export default function MasterStrip() {
         <MixerKnob
           value={chorus} onChange={handleChorus}
           accentColor="var(--knob-chorus)" size={52}
-          disabled={knobsDisabled} label="Chorus" labelOffset={-10}
-          title="Chorus" description="Thickens the overall mix by layering slightly detuned copies of it"
+          disabled={knobsDisabled} label={tr("Chorus")} labelOffset={-10}
+          title={tr("Chorus")} description={tr("Thickens the overall mix by layering slightly detuned copies of it")}
           disabledHint="Switch to the Studio or Native engine to use Chorus."
         />
         <MixerKnob
           value={reverb} onChange={handleReverb}
           accentColor="var(--knob-reverb)" size={52}
-          disabled={knobsDisabled} label="Reverb" labelOffset={-10}
-          title="Reverb" description="Adds room/space ambience to the mix"
+          disabled={knobsDisabled} label={tr("Reverb")} labelOffset={-10}
+          title={tr("Reverb")} description={tr("Adds room/space ambience to the mix")}
           disabledHint="Switch to the Studio or Native engine to use Reverb."
         />
       </div>
@@ -705,7 +706,7 @@ export default function MasterStrip() {
             value={tone} onChange={handleTone}
             accentColor="var(--knob-tone)" size={52}
             disabled={knobsDisabled} bipolar
-            title="Tone" description="Tilts the overall EQ darker or brighter"
+            title={tr("Tone")} description={tr("Tilts the overall EQ darker or brighter")}
             disabledHint="Switch to the Studio or Native engine to use Tone."
           />
           <span style={{
@@ -713,9 +714,7 @@ export default function MasterStrip() {
             marginTop: -3, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
             textTransform: 'uppercase', color: 'var(--text-dimmest)',
             userSelect: 'none', lineHeight: 1, whiteSpace: 'nowrap',
-          }}>
-            Tone
-          </span>
+          }}>{tr("Tone")}</span>
         </div>
 
         {/* On/off toggle — bare icon, no button chrome (per feedback: no dark
@@ -723,10 +722,10 @@ export default function MasterStrip() {
             from the usual dark/amber IBtn pattern since this needs to read
             clearly against the knob's own pink even at a glance. */}
         <Tooltip
-          title={knobsDisabled ? 'Compressor' : masterCompEnabled ? 'Compressor on' : 'Compressor off'}
+          title={knobsDisabled ? tr("Compressor") : masterCompEnabled ? tr("Compressor on") : tr("Compressor off")}
           description={knobsDisabled
-            ? 'Switch to the Studio or Native engine to use the Compressor.'
-            : 'Automatically pulls down the loudest peaks so playback stays clear of digital clipping, without a blanket volume cut. Click to toggle.'}
+            ? tr("Switch to the Studio or Native engine to use the Compressor.")
+            : tr("Automatically pulls down the loudest peaks so playback stays clear of digital clipping, without a blanket volume cut. Click to toggle.")}
         >
         <button
           onClick={handleCompToggle}
@@ -765,9 +764,7 @@ export default function MasterStrip() {
             marginTop: -3, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
             textTransform: 'uppercase', color: 'var(--text-dimmest)',
             userSelect: 'none', lineHeight: 1, whiteSpace: 'nowrap',
-          }}>
-            Compressor
-          </span>
+          }}>{tr("Compressor")}</span>
         </div>
       </div>
 
@@ -806,7 +803,7 @@ export default function MasterStrip() {
           />
           <TooltipBox
             anchorRect={(volumeHover || volumeDragging) ? volumeKnobWrapRef.current?.getBoundingClientRect() ?? null : null}
-            content={{ title: 'Master Volume', description: `${Math.round(masterVolume * 100)}%` }}
+            content={{ get title() { return tr("Master Volume") }, description: `${Math.round(masterVolume * 100)}%` }}
             placement="left"
             visible={volumeHover || volumeDragging}
             readout={volumeDragging}
@@ -820,7 +817,7 @@ export default function MasterStrip() {
           marginTop: 2,
         }}>
           <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-dimmest)' }}>
-            {masterVolume === 0 ? '−∞ dB' : `${(20 * Math.log10(masterVolume)).toFixed(1)} dB`}
+            {masterVolume === 0 ? tr("−∞ dB") : tx`${(20 * Math.log10(masterVolume)).toFixed(1)} dB`}
           </span>
         </div>
         {/* ── "Volume" label — wrapped in the exact same 26px centered row as
@@ -834,9 +831,7 @@ export default function MasterStrip() {
           <span style={{
             fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em',
             textTransform: 'uppercase', color: 'var(--text-dimmest)',
-          }}>
-            Volume
-          </span>
+          }}>{tr("Volume")}</span>
         </div>
       </div>
 

@@ -1,3 +1,4 @@
+import { useI18n, t } from '../../utils/i18n'
 // ── StarmapRing ──────────────────────────────────────────────────────────────
 // The Scales Explorer's Starmap view — drawn in place of the Circle of Fifths,
 // in the same SVG space and footprint. 12 notes on a ring, C at the top,
@@ -16,7 +17,6 @@ import { getNoteName } from '../../utils/noteNames'
 import { PITCH_CLASS_COLORS } from '../../utils/colors'
 import { pcPoint, ringOrder, starShape, shapePoints, ringPosition, type RingLayout } from '../../utils/starmap'
 import { useStarmapMorph } from '../../hooks/useStarmapMorph'
-import { t } from '../../utils/i18n'
 import type { NoteNaming, Accidentals } from '../../types'
 import StarmapTitleMark from './StarmapTitleMark'
 
@@ -53,6 +53,7 @@ export default function StarmapRing({
   morphMs: number
   onPickNote: (pc: number) => void
 }) {
+  useI18n()
   const [hoverPc, setHoverPc] = useState<number | null>(null)
   // sectors move when the ring order switches — drop a stale highlight
   useEffect(() => setHoverPc(null), [layout])

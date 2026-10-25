@@ -1,3 +1,4 @@
+import { tr, useI18n } from '../utils/i18n'
 import { useMidiFile } from '../hooks/useMidiFile'
 import { useAppZoomPercent } from '../hooks/useAppZoomPercent'
 import OrfeoMark from './OrfeoMark'
@@ -21,6 +22,7 @@ import FaceTheMusicMark from './FaceTheMusicMark'
 // this keeps rendering at exactly its 100%-zoom size and position no
 // matter what the current app zoom is. ──────────────────────────────────
 export default function EmptyState() {
+  useI18n()
   const { openFile } = useMidiFile()
   const zoomPercent = useAppZoomPercent()
   const counterScale = 100 / zoomPercent
@@ -58,10 +60,7 @@ export default function EmptyState() {
         }}>
           {/* Hand-lettered title, amber */}
           <div style={{ marginBottom: 8 }}><FaceTheMusicMark width={300} fill="var(--text-amber)" /></div>
-          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-            Orfeo supports MIDI, Karaoke, MusicXML, Guitar Pro, and Capella file formats.<br />
-            Drag any supported file here, or click Open a file to begin.
-          </span>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{tr("Orfeo supports MIDI, Karaoke, MusicXML, Guitar Pro, and Capella file formats.")}<br />{tr("Drag any supported file here, or click Open a file to begin.")}</span>
 
           <button
             onClick={openFile}
@@ -82,11 +81,9 @@ export default function EmptyState() {
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            </svg>
-            Open a file
-          </button>
+            </svg>{tr("Open a file")}</button>
 
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', marginTop: 2 }}>Ctrl+O</span>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', marginTop: 2 }}>{tr("Ctrl+O")}</span>
         </div>
 
       </div>

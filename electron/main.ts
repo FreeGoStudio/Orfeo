@@ -1,3 +1,4 @@
+import { createTranslator, normalizePreference, resolveLocale, translate, type LocaleState } from '../src/i18n/core'
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu, utilityProcess, MessageChannelMain, type UtilityProcess } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join, basename, dirname, extname } from 'path'
@@ -175,6 +176,23 @@ function loadPrefs(): Record<string, any> {
 function savePrefs(data: Record<string, any>) {
   try { writeFileSync(getPrefsPath(), JSON.stringify({ ...loadPrefs(), ...data }, null, 2)) } catch {}
 }
+const mainI18n = createTranslator()
+function localeState(): LocaleState {
+  const preference = normalizePreference(loadPrefs().localePreference)
+  return { preference, locale: resolveLocale(preference, app.getLocale()) }
+}
+function mainText(key: string): string { return translate(mainI18n, key) }
+ipcMain.handle('locale:get', () => localeState())
+ipcMain.handle('locale:set', async (_event, value: unknown) => {
+  const preference = normalizePreference(value)
+  // Unlike best-effort preferences, report a failed language write to the caller.
+  writeFileSync(getPrefsPath(), JSON.stringify({ ...loadPrefs(), localePreference: preference }, null, 2))
+  const state = localeState()
+  await mainI18n.changeLanguage(state.locale)
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('locale:changed', state)
+  return state
+})
+
 ipcMain.handle('prefs:get', async () => loadPrefs())
 
 // File pickers open where you last were for that kind of file (Electron opens
@@ -487,7 +505,7 @@ ipcMain.handle('soundfont:read', (_e, id: string) => {
 // the user cancelled the picker. ───────────────────────────────────────────────
 ipcMain.handle('soundfont:import', async () => {
   const result = await dialog.showOpenDialog({
-    title: 'Import SoundFont',
+    title: mainText('Import SoundFont'),
     defaultPath: dialogDir('soundfont'),
     filters: [{ name: 'SoundFont', extensions: ['sf2', 'sf3'] }],
     properties: ['openFile'],
@@ -556,10 +574,10 @@ ipcMain.handle('soundfont:download', (e, id: string) => {
 })
 ipcMain.handle('dialog:openMidi', async () => {
   const result = await dialog.showOpenDialog({
-    title: 'Open MIDI File',
+    title: mainText('Open MIDI File'),
     defaultPath: dialogDir('midi'),
     filters: [
-      { name: 'MIDI & Score Files', extensions: ['mid', 'midi', 'kar', 'musicxml', 'xml', 'mxl', 'gp', 'gp3', 'gp4', 'gp5', 'gpx', 'cap'] },
+      { name: mainText('MIDI & Score Files'), extensions: ['mid', 'midi', 'kar', 'musicxml', 'xml', 'mxl', 'gp', 'gp3', 'gp4', 'gp5', 'gpx', 'cap'] },
     ],
     properties: ['openFile'],
   })
@@ -573,7 +591,7 @@ ipcMain.handle('dialog:openMidi', async () => {
 // ── Library folder ─────────────────────────────────────────────────────────
 ipcMain.handle('dialog:openFolder', async () => {
   const result = await dialog.showOpenDialog({
-    title: 'Select MIDI Library Folder', defaultPath: loadPrefs().libraryFolder, properties: ['openDirectory'],
+    title: mainText('Select MIDI Library Folder'), defaultPath: loadPrefs().libraryFolder, properties: ['openDirectory'],
   })
   if (result.canceled || !result.filePaths[0]) return null
   const folderPath = result.filePaths[0]
@@ -818,7 +836,7 @@ ipcMain.handle('fs:moveLibraryFiles', async (
 })
 
 ipcMain.handle('dialog:saveFile', async (_e, opts: { defaultPath: string; filters: any[] }) => {
-  const result = await dialog.showSaveDialog({ defaultPath: opts.defaultPath, filters: opts.filters })
+  const result = await dialog.showSaveDialog({ defaultPath: opts.defaultPath, filters: opts.filters.map(filter => ({ ...filter, name: mainText(filter.name) })) })
   return result.canceled ? null : result.filePath
 })
 
@@ -1782,7 +1800,7 @@ ipcMain.handle('dialog:messageBox', async (_e, opts: {
 }) => {
   const win = mainWin
   if (!win) return { response: opts.cancelId ?? opts.buttons.length - 1 }
-  return dialog.showMessageBox(win, opts as any)
+  return dialog.showMessageBox(win, { ...opts, message: mainText(opts.message), detail: opts.detail ? mainText(opts.detail) : undefined, buttons: opts.buttons.map(mainText) } as any)
 })
 
 // ── App confirm-close — renderer calls this after resolving all pending state ─
@@ -1891,6 +1909,7 @@ if (process.env.PORTABLE_EXECUTABLE_DIR) {
 
 // ── Launch: copy demo files on first run, then open main window ───────────────
 app.whenReady().then(async () => {
+  await mainI18n.changeLanguage(localeState().locale)
   try { await ensureDemoFolder() } catch (e) { console.error('[Orfeo] ensureDemoFolder failed:', e) }
   // ── No default menu — this app has its own custom title bar and no menu
   // bar is ever shown, but Electron's built-in default menu (auto-created

@@ -1,7 +1,7 @@
+import { useI18n, t } from '../../utils/i18n'
 import { useCallback, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
-import { t } from '../../utils/i18n'
 import Tooltip from '../Tooltip'
 import { useMenuDismiss } from '../ContextMenu'
 import { warningVisible } from '../../utils/tempoWarningRules'
@@ -26,6 +26,7 @@ export function warningText(r: TrustResult, tapped = false): string {
 }
 
 export function TempoWarning({ anchor }: { anchor: 'pad' | 'key' }) {
+  useI18n()
   const padOn = useStore((s) => s.tapTempoPadEnabled)
   const trust = useStore((s) => s.currentTrust)
   const key = useStore((s) => s.songKey)
@@ -108,6 +109,7 @@ export function TempoWarning({ anchor }: { anchor: 'pad' | 'key' }) {
 
 // ── Library row mark — same verdict, read from the background scan's cache ──
 export function TempoWarningDot({ path, onHoverChange }: { path: string; onHoverChange?: (hovering: boolean) => void }) {
+  useI18n()
   const show = useStore((s) => warningVisible(s, s.libraryTrustIndex[path]?.songKey))
   if (!show) return null
   return (

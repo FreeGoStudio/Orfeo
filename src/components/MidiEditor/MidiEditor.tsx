@@ -1,3 +1,4 @@
+import { message as i18nMessage, msg, t as tx, tr, useI18n } from '../../utils/i18n'
 /**
  * MIDI Playback Editor — floating modal (same architecture as ChordExplorer / MixerConsole)
  *
@@ -72,84 +73,84 @@ const GM_FAMILY_ICONS: Record<string, React.ReactNode> = {
 }
 
 const GM_FAMILIES: { key: string; label: string; programs: { num: number; name: string }[] }[] = [
-  { key: 'piano', label: 'Piano', programs: [
+  { key: 'piano', get label() { return tr("Piano") }, programs: [
     {num:0,name:'Acoustic Grand Piano'},{num:1,name:'Bright Acoustic Piano'},
     {num:2,name:'Electric Grand Piano'},{num:3,name:'Honky-tonk Piano'},
     {num:4,name:'Electric Piano 1'},{num:5,name:'Electric Piano 2'},
     {num:6,name:'Harpsichord'},{num:7,name:'Clavinet'},
   ]},
-  { key: 'chromatic', label: 'Chromatic Perc', programs: [
+  { key: 'chromatic', get label() { return tr("Chromatic Perc") }, programs: [
     {num:8,name:'Celesta'},{num:9,name:'Glockenspiel'},{num:10,name:'Music Box'},
     {num:11,name:'Vibraphone'},{num:12,name:'Marimba'},{num:13,name:'Xylophone'},
     {num:14,name:'Tubular Bells'},{num:15,name:'Dulcimer'},
   ]},
-  { key: 'organ', label: 'Organ', programs: [
+  { key: 'organ', get label() { return tr("Organ") }, programs: [
     {num:16,name:'Drawbar Organ'},{num:17,name:'Percussive Organ'},{num:18,name:'Rock Organ'},
     {num:19,name:'Church Organ'},{num:20,name:'Reed Organ'},{num:21,name:'Accordion'},
     {num:22,name:'Harmonica'},{num:23,name:'Tango Accordion'},
   ]},
-  { key: 'guitar', label: 'Guitar', programs: [
+  { key: 'guitar', get label() { return tr("Guitar") }, programs: [
     {num:24,name:'Nylon Guitar'},{num:25,name:'Steel Guitar'},{num:26,name:'Jazz Guitar'},
     {num:27,name:'Clean Guitar'},{num:28,name:'Muted Guitar'},{num:29,name:'Overdriven Guitar'},
     {num:30,name:'Distortion Guitar'},{num:31,name:'Guitar Harmonics'},
   ]},
-  { key: 'bass', label: 'Bass', programs: [
+  { key: 'bass', get label() { return tr("Bass") }, programs: [
     {num:32,name:'Acoustic Bass'},{num:33,name:'Finger Bass'},{num:34,name:'Pick Bass'},
     {num:35,name:'Fretless Bass'},{num:36,name:'Slap Bass 1'},{num:37,name:'Slap Bass 2'},
     {num:38,name:'Synth Bass 1'},{num:39,name:'Synth Bass 2'},
   ]},
-  { key: 'strings', label: 'Strings', programs: [
+  { key: 'strings', get label() { return tr("Strings") }, programs: [
     {num:40,name:'Violin'},{num:41,name:'Viola'},{num:42,name:'Cello'},{num:43,name:'Contrabass'},
     {num:44,name:'Tremolo Strings'},{num:45,name:'Pizzicato Strings'},
     {num:46,name:'Orchestral Harp'},{num:47,name:'Timpani'},
   ]},
-  { key: 'ensemble', label: 'Ensemble', programs: [
+  { key: 'ensemble', get label() { return tr("Ensemble") }, programs: [
     {num:48,name:'String Ensemble 1'},{num:49,name:'String Ensemble 2'},
     {num:50,name:'Synth Strings 1'},{num:51,name:'Synth Strings 2'},
     {num:52,name:'Choir Aahs'},{num:53,name:'Voice Oohs'},
     {num:54,name:'Synth Voice'},{num:55,name:'Orchestra Hit'},
   ]},
-  { key: 'brass', label: 'Brass', programs: [
+  { key: 'brass', get label() { return tr("Brass") }, programs: [
     {num:56,name:'Trumpet'},{num:57,name:'Trombone'},{num:58,name:'Tuba'},
     {num:59,name:'Muted Trumpet'},{num:60,name:'French Horn'},{num:61,name:'Brass Section'},
     {num:62,name:'Synth Brass 1'},{num:63,name:'Synth Brass 2'},
   ]},
-  { key: 'reed', label: 'Reed', programs: [
+  { key: 'reed', get label() { return tr("Reed") }, programs: [
     {num:64,name:'Soprano Sax'},{num:65,name:'Alto Sax'},{num:66,name:'Tenor Sax'},
     {num:67,name:'Baritone Sax'},{num:68,name:'Oboe'},{num:69,name:'English Horn'},
     {num:70,name:'Bassoon'},{num:71,name:'Clarinet'},
   ]},
-  { key: 'pipe', label: 'Pipe', programs: [
+  { key: 'pipe', get label() { return tr("Pipe") }, programs: [
     {num:72,name:'Piccolo'},{num:73,name:'Flute'},{num:74,name:'Recorder'},
     {num:75,name:'Pan Flute'},{num:76,name:'Blown Bottle'},{num:77,name:'Shakuhachi'},
     {num:78,name:'Whistle'},{num:79,name:'Ocarina'},
   ]},
-  { key: 'synth_lead', label: 'Synth Lead', programs: [
+  { key: 'synth_lead', get label() { return tr("Synth Lead") }, programs: [
     {num:80,name:'Square Lead'},{num:81,name:'Sawtooth Lead'},{num:82,name:'Calliope Lead'},
     {num:83,name:'Chiff Lead'},{num:84,name:'Charang Lead'},{num:85,name:'Voice Lead'},
     {num:86,name:'Fifths Lead'},{num:87,name:'Bass+Lead'},
   ]},
-  { key: 'synth_pad', label: 'Synth Pad', programs: [
+  { key: 'synth_pad', get label() { return tr("Synth Pad") }, programs: [
     {num:88,name:'New Age Pad'},{num:89,name:'Warm Pad'},{num:90,name:'Polysynth Pad'},
     {num:91,name:'Choir Pad'},{num:92,name:'Bowed Pad'},{num:93,name:'Metallic Pad'},
     {num:94,name:'Halo Pad'},{num:95,name:'Sweep Pad'},
   ]},
-  { key: 'synth_fx', label: 'Synth FX', programs: [
+  { key: 'synth_fx', get label() { return tr("Synth FX") }, programs: [
     {num:96,name:'Rain FX'},{num:97,name:'Soundtrack FX'},{num:98,name:'Crystal FX'},
     {num:99,name:'Atmosphere FX'},{num:100,name:'Brightness FX'},{num:101,name:'Goblins FX'},
     {num:102,name:'Echoes FX'},{num:103,name:'Sci-fi FX'},
   ]},
-  { key: 'ethnic', label: 'Ethnic', programs: [
+  { key: 'ethnic', get label() { return tr("Ethnic") }, programs: [
     {num:104,name:'Sitar'},{num:105,name:'Banjo'},{num:106,name:'Shamisen'},
     {num:107,name:'Koto'},{num:108,name:'Kalimba'},{num:109,name:'Bag Pipe'},
     {num:110,name:'Fiddle'},{num:111,name:'Shanai'},
   ]},
-  { key: 'percussive', label: 'Percussive', programs: [
+  { key: 'percussive', get label() { return tr("Percussive") }, programs: [
     {num:112,name:'Tinkle Bell'},{num:113,name:'Agogo'},{num:114,name:'Steel Drums'},
     {num:115,name:'Woodblock'},{num:116,name:'Taiko Drum'},{num:117,name:'Melodic Tom'},
     {num:118,name:'Synth Drum'},{num:119,name:'Reverse Cymbal'},
   ]},
-  { key: 'sound_fx', label: 'Sound FX', programs: [
+  { key: 'sound_fx', get label() { return tr("Sound FX") }, programs: [
     {num:120,name:'Guitar Fret Noise'},{num:121,name:'Breath Noise'},{num:122,name:'Seashore'},
     {num:123,name:'Bird Tweet'},{num:124,name:'Telephone Ring'},{num:125,name:'Helicopter'},
     {num:126,name:'Applause'},{num:127,name:'Gunshot'},
@@ -205,6 +206,7 @@ function baseName(p: string) { return p.split(/[\\/]/).pop() ?? p }
 function InstrumentPicker({ program, isDrum, onChange, disabled }: {
   program: number; isDrum: boolean; onChange: (p: number) => void; disabled?: boolean
 }) {
+  useI18n()
   const [open, setOpen] = useState(false)
   const [expandedFamily, setExpandedFamily] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -220,15 +222,13 @@ function InstrumentPicker({ program, isDrum, onChange, disabled }: {
   }, [open])
 
   if (isDrum) return (
-    <div style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border2)', background: 'var(--bg-modal-header)', fontSize: 10, color: 'var(--text-inactive)' }}>
-      🥁 Standard Drums
-    </div>
+    <div style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border2)', background: 'var(--bg-modal-header)', fontSize: 10, color: 'var(--text-inactive)' }}>{tr("🥁 Standard Drums")}</div>
   )
 
   const currentName = GM_FAMILIES.flatMap(f => f.programs).find(p => p.num === program)?.name ?? `Program ${program}`
   const searchLower = search.toLowerCase()
   const filteredFamilies = search
-    ? GM_FAMILIES.map(f => ({ ...f, programs: f.programs.filter(p => p.name.toLowerCase().includes(searchLower)) })).filter(f => f.programs.length > 0)
+    ? GM_FAMILIES.map(f => ({ ...f, programs: f.programs.filter(p => (p.name.toLowerCase().includes(searchLower) || tr(p.name).toLowerCase().includes(searchLower))) })).filter(f => f.programs.length > 0)
     : GM_FAMILIES
 
   return (
@@ -240,7 +240,7 @@ function InstrumentPicker({ program, isDrum, onChange, disabled }: {
         color: 'var(--text-muted)', fontSize: 10,
         display: 'flex', alignItems: 'center', gap: 'var(--space-1)', cursor: disabled ? 'default' : 'pointer', textAlign: 'left',
       }}>
-        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentName}</span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tr(currentName)}</span>
         <ChevronDown size={10} style={{ flexShrink: 0, color: 'var(--text-inactive)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
       </button>
 
@@ -266,7 +266,7 @@ function InstrumentPicker({ program, isDrum, onChange, disabled }: {
           <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg-field)', border: '1px solid var(--border2)', borderRadius: 4, padding: '3px 6px' }}>
               <Search size={10} style={{ color: 'var(--text-inactive)', flexShrink: 0 }} />
-              <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
+              <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder={tr("Search…")}
                 style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text-muted)', fontSize: 10, width: '100%', fontFamily: 'var(--font-ui)' }} />
             </div>
           </div>
@@ -288,7 +288,7 @@ function InstrumentPicker({ program, isDrum, onChange, disabled }: {
                       style={{ padding: '5px 10px 5px 28px', fontSize: 10, color: p.num === program ? 'var(--text-amber)' : 'var(--text-dimmest)', background: p.num === program ? 'var(--accent-amber-subtle)' : 'transparent', cursor: 'pointer', borderLeft: p.num === program ? '2px solid var(--text-amber)' : '2px solid transparent', transition: 'background 0.1s, color 0.1s' }}
                       onMouseEnter={e => { if (p.num !== program) { e.currentTarget.style.background = 'var(--accent-amber-subtle)'; e.currentTarget.style.color = 'var(--text-amber)' } }}
                       onMouseLeave={e => { if (p.num !== program) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dimmest)' } }}>
-                      {p.name}
+                      {tr(p.name)}
                     </div>
                   ))}
                 </div>
@@ -431,6 +431,7 @@ function ColorPopover({ trackIndex, trackColor, anchor, onApplyColor, onClose }:
   onApplyColor: (trackIndex: number, color: string, source: 'palette' | 'custom') => void
   onClose: () => void
 }) {
+  useI18n()
   const [hexInput, setHexInput]   = useState(trackColor)
   const [hexError, setHexError]   = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -523,7 +524,7 @@ function ColorPopover({ trackIndex, trackColor, anchor, onApplyColor, onClose }:
           <input
             value={hexInput}
             onChange={e => handleHexChange(e.target.value)}
-            placeholder="#rrggbb"
+            placeholder={tr("#rrggbb")}
             spellCheck={false}
             style={{
               flex: 1, background: 'var(--bg-field)',
@@ -536,7 +537,7 @@ function ColorPopover({ trackIndex, trackColor, anchor, onApplyColor, onClose }:
           />
         </div>
         {hexError && (
-          <div style={{ fontSize: 9, color: 'var(--color-input-error)', marginTop: 3 }}>Enter a valid hex (#rrggbb)</div>
+          <div style={{ fontSize: 9, color: 'var(--color-input-error)', marginTop: 3 }}>{tr("Enter a valid hex (#rrggbb)")}</div>
         )}
       </div>
     </div>,
@@ -566,6 +567,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
   // with ITS OWN track instead of reading as belonging to the next one.
   showBottomBorder?: boolean
 }) {
+  useI18n()
   // ── Inline rename state ──────────────────────────────────────────────────────
   const [editingName, setEditingName] = useState(false)
   const [editValue, setEditValue]     = useState('')
@@ -599,7 +601,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
     }}>
 
       {/* ── Col 1: Include ───────────────────────────────────────────────────── */}
-      <Tooltip title="Select track to keep it in the saved file, deselect to drop it" oneLine>
+      <Tooltip title={tr("Select track to keep it in the saved file, deselect to drop it")} oneLine>
       <button onClick={onToggleIncluded} style={{
         width: 24, height: 24, borderRadius: 4,
         border: `1.5px solid ${track.included ? 'var(--track-included-border)' : 'var(--track-excluded)'}`,
@@ -614,7 +616,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
 
       {/* ── Col 2: Track name + meta ──────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-        <Tooltip title="Open the color picker" oneLine wrapperStyle={{ flexShrink: 0 }}>
+        <Tooltip title={tr("Open the color picker")} oneLine wrapperStyle={{ flexShrink: 0 }}>
         <div
           onClick={rowDisabled ? undefined : e => onPickColor(track.index, e.currentTarget.getBoundingClientRect())}
           style={{ width: 4, height: 32, background: track.color, borderRadius: 2, flexShrink: 0, cursor: rowDisabled ? 'default' : 'pointer' }}
@@ -638,7 +640,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
                 }}
               />
             ) : (
-              <Tooltip title="Double-click to rename" oneLine wrapperStyle={{ minWidth: 0, overflow: 'hidden' }}>
+              <Tooltip title={tr("Double-click to rename")} oneLine wrapperStyle={{ minWidth: 0, overflow: 'hidden' }}>
               <span
                 onDoubleClick={rowDisabled ? undefined : startEdit}
                 onMouseEnter={e => { if (!rowDisabled) e.currentTarget.style.color = 'var(--text-amber)' }}
@@ -650,8 +652,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
               </Tooltip>
             )}
             {track.isMerged && (
-              <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 'var(--radius-sm)', background: 'var(--merge-badge-bg)', color: 'var(--merge-badge-text)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
-                ⊞ merged {track.mergedFromIndices?.length}
+              <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 'var(--radius-sm)', background: 'var(--merge-badge-bg)', color: 'var(--merge-badge-text)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{tr("⊞ merged ")}{track.mergedFromIndices?.length}
               </span>
             )}
           </div>
@@ -662,12 +663,12 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
               </span>
             ) : (
               <>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>ch {track.channel + 1}</span>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{track.noteCount} notes</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{tr("ch")}{track.channel + 1}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{track.noteCount}{tr(" notes")}</span>
                 {!track.isDrum && track.newProgram !== track.program && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <span style={{ fontSize: 9, color: 'var(--text-amber)', fontFamily: 'var(--font-mono)' }}>✎ reassigned</span>
-                    <Tooltip title={`Back to the original assignment — ${track.gmName}.`} oneLine>
+                    <span style={{ fontSize: 9, color: 'var(--text-amber)', fontFamily: 'var(--font-mono)' }}>{tr("✎ reassigned")}</span>
+                    <Tooltip title={tx`Back to the original assignment — ${track.gmName}.`} oneLine>
                     <button
                       onClick={() => onChangeProgram(track.program)}
                       disabled={rowDisabled}
@@ -688,7 +689,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
 
       {/* ── Col 3: Merge / Unmerge ───────────────────────────────────────────── */}
       {track.isMerged ? (
-        <Tooltip title="Splits this merged group back into its separate original tracks." oneLine wrapperStyle={{ justifySelf: 'start' }}>
+        <Tooltip title={tr("Splits this merged group back into its separate original tracks.")} oneLine wrapperStyle={{ justifySelf: 'start' }}>
         <button onClick={onUnmerge} disabled={rowDisabled} style={{
           width: 24, height: 24, borderRadius: 4,
           border: '1.5px solid var(--unmerge-border)', background: 'var(--unmerge-bg)',
@@ -699,7 +700,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
         </button>
         </Tooltip>
       ) : track.splitHand ? (
-        <Tooltip title="Freshly split tracks can't be merged again in the same session — save first." oneLine wrapperStyle={{ justifySelf: 'start' }}>
+        <Tooltip title={tr("Freshly split tracks can't be merged again in the same session — save first.")} oneLine wrapperStyle={{ justifySelf: 'start' }}>
         <div style={{
           width: 24, height: 24, borderRadius: 4,
           border: '1.5px solid var(--border2)', opacity: 0.3,
@@ -709,7 +710,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
         </div>
         </Tooltip>
       ) : (
-        <Tooltip title="Select two or more tracks to merge" oneLine wrapperStyle={{ justifySelf: 'start' }}>
+        <Tooltip title={tr("Select two or more tracks to merge")} oneLine wrapperStyle={{ justifySelf: 'start' }}>
         <button
           onClick={onToggleMerge}
           disabled={rowDisabled}
@@ -734,7 +735,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
 
       {/* ── Col 4: Split — only for splittable tracks ─────────────────────────── */}
       {onSplit && !track.isMerged ? (
-        <Tooltip title="Split into Left/Right Hand tracks" oneLine wrapperStyle={{ justifySelf: 'start' }}>
+        <Tooltip title={tr("Split into Left/Right Hand tracks")} oneLine wrapperStyle={{ justifySelf: 'start' }}>
         <button
           onClick={onSplit}
           disabled={rowDisabled}
@@ -756,7 +757,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
       )}
 
       {/* ── Col 5: Color picker trigger ──────────────────────────────────────── */}
-      <Tooltip title="Open color picker" oneLine wrapperStyle={{ justifySelf: 'start' }}>
+      <Tooltip title={tr("Open color picker")} oneLine wrapperStyle={{ justifySelf: 'start' }}>
       <button
         onClick={e => onPickColor(track.index, e.currentTarget.getBoundingClientRect())}
         disabled={rowDisabled}
@@ -777,7 +778,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
       {/* ── Col 6: Piano roll visibility — persists into the file on save, unlike
           the TrackPanel's matching icon which is session/playback-only. ────── */}
       <Tooltip
-        title="Keep or remove track from showing on the piano roll in the saved file"
+        title={tr("Keep or remove track from showing on the piano roll in the saved file")}
         oneLine
         wrapperStyle={{ justifySelf: 'start' }}
       >
@@ -798,7 +799,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
 
       {/* ── Col 7: Keyboard-lit — same persistence distinction as roll visibility ── */}
       <Tooltip
-        title="Keep or remove track from showing on the keyboard in the saved file"
+        title={tr("Keep or remove track from showing on the keyboard in the saved file")}
         oneLine
         wrapperStyle={{ justifySelf: 'start' }}
       >
@@ -820,7 +821,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
 
       {/* ── Col 8: Assign Instrument ──────────────────────────────────────────── */}
       {track.isDrum ? (
-        <Tooltip title="Not assignable — GM channel 10 is always drums." oneLine>
+        <Tooltip title={tr("Not assignable — GM channel 10 is always drums.")} oneLine>
         <div
           style={{
             padding: '4px 8px', borderRadius: 4,
@@ -828,9 +829,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
             color: 'var(--text-inactive)', fontSize: 10, fontFamily: 'var(--font-ui)',
             cursor: 'default',
           }}
-        >
-          Standard Drums
-        </div>
+        >{tr("Standard Drums")}</div>
         </Tooltip>
       ) : (
         <InstrumentPicker program={track.newProgram} isDrum={false} onChange={onChangeProgram} disabled={rowDisabled} />
@@ -844,6 +843,7 @@ function TrackRow({ track, onToggleIncluded, onToggleMerge, onChangeProgram, onU
 let _mergeIdCounter = 1000
 
 export default function MidiEditor() {
+  useI18n()
   // ── Store reads ──────────────────────────────────────────────────────────────
   const midi             = useStore((s) => s.midi)
   // ── Display-relevant signature, not the live `tracks` array — same root
@@ -1172,10 +1172,10 @@ export default function MidiEditor() {
     const excludedRows = state.rows.filter(r => !r.included)
     if (excludedRows.length > 0) {
       const choice = await confirmDialog({
-        title: 'Delete tracks?',
-        message: `You're about to delete ${excludedRows.length} track${excludedRows.length === 1 ? '' : 's'} in the saved version.`,
+        get title() { return i18nMessage("Delete tracks?") },
+        message: i18nMessage('tracks.delete', { count: excludedRows.length }),
         detail: excludedRows.map(r => r.trackName).join(', '),
-        buttons: ['Delete & Save', 'Cancel'],
+        buttons: [i18nMessage("Delete & Save"), i18nMessage("Cancel")],
         destructiveIndex: 0,
       })
       if (choice !== 0) return
@@ -1251,9 +1251,9 @@ export default function MidiEditor() {
     const summary = buildSaveSummary()
     if (summary) {
       const choice = await confirmDialog({
-        title: 'Save changes before editing?',
-        message: `This session ${summary}. Save before opening the Note Editor?`,
-        buttons: ['Save', 'Discard', 'Cancel'],
+        get title() { return i18nMessage("Save changes before editing?") },
+        message: msg`This session ${summary}. Save before opening the Note Editor?`,
+        buttons: [i18nMessage("Save"), i18nMessage("Discard"), i18nMessage("Cancel")],
       })
       if (choice === 2) return // Cancel — stay in Playback Editor
       if (choice === 0) {
@@ -1349,7 +1349,7 @@ export default function MidiEditor() {
       ref={panelRef}
       role="dialog"
       aria-modal="true"
-      aria-label="MIDI Playback Editor"
+      aria-label={tr("MIDI Playback Editor")}
       className="orfeo-modal-glow app-no-drag"
       onMouseDown={() => setZIndex(bringToFront())}
       style={{
@@ -1386,9 +1386,7 @@ export default function MidiEditor() {
           <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
             <OrfeoMark height={22} />
           </div>
-          <span style={{ color: 'var(--text-amber)', fontSize: 14, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-            MIDI PLAYBACK EDITOR
-          </span>
+          <span style={{ color: 'var(--text-amber)', fontSize: 14, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{tr("MIDI PLAYBACK EDITOR")}</span>
         </div>
         <div
           ref={fileNameWrapRef}
@@ -1426,14 +1424,14 @@ export default function MidiEditor() {
       {/* ── Column headers ───────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: ROW_COLS, alignItems: 'center', padding: `6px ${14 + SCROLLBAR_W}px 6px 14px`, borderBottom: '1px solid var(--bg-tile)', background: 'var(--bg-modal-header)', flexShrink: 0, gap: 6 }}>
         {[
-          { label: 'Include', title: 'Include or exclude track in saved file' },
-          { label: 'Track', title: 'Track name — double-click to rename' },
-          { label: 'Merge', title: 'Select two or more tracks to merge them into one unified track' },
-          { label: 'Split', title: 'Split a keyboard track into separate Left Hand / Right Hand tracks' },
-          { label: 'Color', title: 'Change the track color in the piano roll and on the keyboard' },
-          { label: 'Piano roll', title: 'Show or hide this track in the piano roll — saves with the file' },
-          { label: 'Keyboard', title: "Light this track's notes on the keyboard — saves with the file" },
-          { label: 'Assign Instrument', title: "Reassign track's MIDI instrument" },
+          { get label() { return tr("Include") }, get title() { return tr("Include or exclude track in saved file") } },
+          { get label() { return tr("Track") }, get title() { return tr("Track name — double-click to rename") } },
+          { get label() { return tr("Merge") }, get title() { return tr("Select two or more tracks to merge them into one unified track") } },
+          { get label() { return tr("Split") }, get title() { return tr("Split a keyboard track into separate Left Hand / Right Hand tracks") } },
+          { get label() { return tr("Color") }, get title() { return tr("Change the track color in the piano roll and on the keyboard") } },
+          { get label() { return tr("Piano roll") }, get title() { return tr("Show or hide this track in the piano roll — saves with the file") } },
+          { get label() { return tr("Keyboard") }, get title() { return tr("Light this track's notes on the keyboard — saves with the file") } },
+          { get label() { return tr("Assign Instrument") }, get title() { return tr("Reassign track's MIDI instrument") } },
         ].map((h, i) => (
           // Explicit justifySelf: a bare <span> grid item is auto-width and
           // stretch-eligible by default, while the icon buttons below have a
@@ -1539,7 +1537,7 @@ export default function MidiEditor() {
                   <div />{/* empty Col-1 cell — keeps Col-2 content aligned under Track column */}
                   <div style={{ gridColumn: '2 / -1', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>
                     <Tooltip
-                      title="Hand-split timeline preview"
+                      title={tr("Hand-split timeline preview")}
                       oneLine
                     >
                     <button
@@ -1555,22 +1553,22 @@ export default function MidiEditor() {
                     </Tooltip>
                     <span style={{ lineHeight: '11px' }}>
                       {infoStats.confidenceUnknown ? (
-                        'Hand split shown is automatic.'
+                        tr("Hand split shown is automatic.")
                       ) : infoStats.lowConfidenceCount > 0 ? (
                         // Bright red (matches the closed-eye "hidden" icon) so this
                         // collapsed-row flag reads as an alert at a glance — kept
                         // distinct from the legend/overlay's muted LOW_CONF red below,
                         // which is deliberately quieter since it's always-on chrome.
-                        <><span style={{ color: 'var(--status-error-hover)', fontFamily: 'var(--font-ui)' }}>{Math.round(infoStats.lowConfidenceRatio * 100)}% flagged low-confidence</span> — for a perfectly accurate split, edit in Note Editor</>
+                        <><span style={{ color: 'var(--status-error-hover)', fontFamily: 'var(--font-ui)' }}>{Math.round(infoStats.lowConfidenceRatio * 100)}{tr("% flagged low-confidence")}</span>{tr(" — for a perfectly accurate split, edit in Note Editor")}</>
                       ) : (
-                        'Hand split looks accurate — edit in Note Editor to fine-tune'
+                        tr("Hand split looks accurate — edit in Note Editor to fine-tune")
                       )}
                     </span>
                     <Tooltip
-                      title={noteEditorEnabled ? 'Open in Note Editor' : 'Note Editor disabled'}
+                      title={noteEditorEnabled ? tr("Open in Note Editor") : tr("Note Editor disabled")}
                       description={noteEditorEnabled
-                        ? "Opens this track in the Note Editor, solo'd and editable."
-                        : 'Turn on MIDI Note Editor in Settings'}
+                        ? tr("Opens this track in the Note Editor, solo'd and editable.")
+                        : tr("Turn on MIDI Note Editor in Settings")}
                     >
                       <button
                         onClick={() => { if (noteEditorEnabled) handleOpenInNoteEditor(track.index) }}
@@ -1614,25 +1612,25 @@ export default function MidiEditor() {
                       </svg>
                     )}
                     <div style={{ display: 'flex', gap: 6, fontSize: 10, lineHeight: '10px', color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: SLATE, display: 'inline-block' }} />Left hand</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: AMBER, display: 'inline-block' }} />Right hand</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: SLATE, display: 'inline-block' }} />{tr("Left hand")}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: AMBER, display: 'inline-block' }} />{tr("Right hand")}</span>
                       {infoStats.lowConfidenceCount > 0 && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: LOW_CONF, opacity: 0.6, display: 'inline-block' }} />Low-confidence passage</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: LOW_CONF, opacity: 0.6, display: 'inline-block' }} />{tr("Low-confidence passage")}</span>
                       )}
                     </div>
                     {/* ── Same tech-info + disclaimer pair as the Split preview
                         below — info only here, no button row. ── */}
                     <div style={{ fontSize: 10, lineHeight: '11px', color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>
-                      {infoStats.taggedNotes} notes tagged — {infoStats.leftCount} left, {infoStats.rightCount} right by hand.{' '}
+                      {infoStats.taggedNotes}{tr(" notes tagged —")}{infoStats.leftCount}{tr(" left,")}{infoStats.rightCount}{tr(" right by hand.")}{' '}
                       {infoStats.confidenceUnknown
-                        ? 'Tags restored from a prior split — confidence not re-evaluated.'
+                        ? tr("Tags restored from a prior split — confidence not re-evaluated.")
                         : infoStats.lowConfidenceCount > 0
-                          ? `${Math.round(infoStats.lowConfidenceRatio * 100)}% fall in a low-confidence passage — check those first.`
-                          : 'No passages flagged — split looks reliable.'}
+                          ? tx`${Math.round(infoStats.lowConfidenceRatio * 100)}% fall in a low-confidence passage — check those first.`
+                          : tr("No passages flagged — split looks reliable.")}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', lineHeight: '12.6px' }}>
                       <AlertCircle size={11} style={{ flexShrink: 0, color: 'var(--text-inactive)' }} />
-                      <span>Hand assignment is automated — a guideline, not a verified transcription. Use your ear, especially on flagged passages.</span>
+                      <span>{tr("Hand assignment is automated — a guideline, not a verified transcription. Use your ear, especially on flagged passages.")}</span>
                     </div>
                   </div>
                 )}
@@ -1664,15 +1662,14 @@ export default function MidiEditor() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Split size={13} style={{ color: 'var(--text-amber)', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Hand-split preview — <span style={{ color: track.color }}>"{trackName}"</span></div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{tr("Hand-split preview —")}<span style={{ color: track.color }}>"{trackName}"</span></div>
                     <div style={{ fontSize: 9, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-                      {stats.taggedNotes} notes · {stats.leftCount} left / {stats.rightCount} right
-                      {stats.confidenceUnknown ? (
-                        <span style={{ color: 'var(--text-inactive)' }}> · tags restored from a prior split — confidence not re-evaluated</span>
+                      {stats.taggedNotes}{tr(" notes ·")}{stats.leftCount}{tr(" left /")}{stats.rightCount}{tr(" right")}{stats.confidenceUnknown ? (
+                        <span style={{ color: 'var(--text-inactive)' }}>{tr(" · tags restored from a prior split — confidence not re-evaluated")}</span>
                       ) : stats.lowConfidenceCount > 0 ? (
-                        <span style={{ color: LOW_CONF }}> · {passages.length} low-confidence passage{passages.length === 1 ? '' : 's'} flagged ({Math.round(stats.lowConfidenceRatio * 100)}% of notes)</span>
+                        <span style={{ color: LOW_CONF }}> · {passages.length}{tr(" low-confidence passage")}{passages.length === 1 ? '' : 's'}{tr(" flagged (")}{Math.round(stats.lowConfidenceRatio * 100)}{tr("% of notes)")}</span>
                       ) : (
-                        <span style={{ color: 'var(--text-inactive)' }}> · no low-confidence passages flagged</span>
+                        <span style={{ color: 'var(--text-inactive)' }}>{tr(" · no low-confidence passages flagged")}</span>
                       )}
                     </div>
                   </div>
@@ -1698,10 +1695,10 @@ export default function MidiEditor() {
                   </svg>
                 )}
                 <div style={{ display: 'flex', gap: 6, fontSize: 10, lineHeight: '10px', color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: SLATE, display: 'inline-block' }} />Left hand</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: AMBER, display: 'inline-block' }} />Right hand</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: SLATE, display: 'inline-block' }} />{tr("Left hand")}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: AMBER, display: 'inline-block' }} />{tr("Right hand")}</span>
                   {stats.lowConfidenceCount > 0 && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: LOW_CONF, opacity: 0.6, display: 'inline-block' }} />Low-confidence passage</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: LOW_CONF, opacity: 0.6, display: 'inline-block' }} />{tr("Low-confidence passage")}</span>
                   )}
                 </div>
 
@@ -1711,12 +1708,12 @@ export default function MidiEditor() {
                     under the new logic. ─────────────────────────────────────── */}
                 <div style={{ display: 'flex', gap: 12 }}>
                   <div style={{ flex: 2, fontSize: 10, lineHeight: '11px', color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>
-                    {stats.taggedNotes} notes tagged — {stats.leftCount} left, {stats.rightCount} right by hand.{' '}
+                    {stats.taggedNotes}{tr(" notes tagged —")}{stats.leftCount}{tr(" left,")}{stats.rightCount}{tr(" right by hand.")}{' '}
                     {stats.confidenceUnknown
-                      ? 'Tags restored from a prior split — confidence not re-evaluated.'
+                      ? tr("Tags restored from a prior split — confidence not re-evaluated.")
                       : stats.lowConfidenceCount > 0
-                        ? `${Math.round(stats.lowConfidenceRatio * 100)}% fall in a low-confidence passage — check those first.`
-                        : 'No passages flagged — split looks reliable.'}
+                        ? tx`${Math.round(stats.lowConfidenceRatio * 100)}% fall in a low-confidence passage — check those first.`
+                        : tr("No passages flagged — split looks reliable.")}
                   </div>
                   <div style={{ flex: 1, display: 'flex', gap: 6 }}>
                     <button
@@ -1724,11 +1721,9 @@ export default function MidiEditor() {
                       style={{ flex: 1, padding: '6px 10px', borderRadius: 4, border: '1px solid var(--text-inactive)', background: 'transparent', color: 'var(--text-default)', fontSize: 'var(--text-xs)', cursor: 'pointer', fontWeight: 600, transition: 'color 0.12s, border-color 0.12s' }}
                       onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--accent-amber-strong)' }}
                       onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-default)'; e.currentTarget.style.borderColor = 'var(--text-inactive)' }}
-                    >
-                      Don't split
-                    </button>
+                    >{tr("Don't split")}</button>
                     <Tooltip
-                      title="Stages left-hand notes to one track and right-hand notes to another — applies with Save & Reload below, doesn't touch disk yet."
+                      title={tr("Stages left-hand notes to one track and right-hand notes to another — applies with Save & Reload below, doesn't touch disk yet.")}
                       oneLine
                       wrapperStyle={{ flex: 1 }}
                     >
@@ -1736,8 +1731,7 @@ export default function MidiEditor() {
                       onClick={handleSplitConfirm}
                       style={{ flex: 1, padding: '6px 10px', borderRadius: 4, border: '1px solid var(--accent-amber-strong)', background: 'var(--accent-amber-medium)', color: 'var(--text-amber)', fontSize: 'var(--text-xs)', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
                     >
-                      <Split size={11} /> Split into two tracks
-                    </button>
+                      <Split size={11} />{tr(" Split into two tracks")}</button>
                     </Tooltip>
                   </div>
                 </div>
@@ -1747,7 +1741,7 @@ export default function MidiEditor() {
                     heuristics, never ground truth. ── */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-ui)', lineHeight: '12.6px' }}>
                   <AlertCircle size={11} style={{ flexShrink: 0, color: 'var(--text-inactive)' }} />
-                  <span>Hand assignment is automated — a guideline, not a verified transcription. Use your ear, especially on flagged passages.</span>
+                  <span>{tr("Hand assignment is automated — a guideline, not a verified transcription. Use your ear, especially on flagged passages.")}</span>
                 </div>
               </div>
             )
@@ -1761,32 +1755,29 @@ export default function MidiEditor() {
         <div style={{ padding: '8px 14px', background: 'var(--bg-modal)', borderTop: '1px solid var(--border2)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <Merge size={13} style={{ color: 'var(--text-amber)', flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>{mergeCount} tracks selected for merge</div>
-            <div style={{ fontSize: 9, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)', marginTop: 2, lineHeight: 1.4 }}>
-              Combines selected tracks into one — all their notes play together on the keyboard.
-            </div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>{mergeCount}{tr(" tracks selected for merge")}</div>
+            <div style={{ fontSize: 9, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)', marginTop: 2, lineHeight: 1.4 }}>{tr("Combines selected tracks into one — all their notes play together on the keyboard.")}</div>
           </div>
           <button onClick={handleMerge} style={{
             padding: '4px 14px', borderRadius: 4, flexShrink: 0,
             border: '1px solid var(--accent-amber-strong)', background: 'var(--accent-amber-medium)',
             color: 'var(--text-amber)', fontSize: 'var(--text-xs)', cursor: 'pointer', fontWeight: 600,
-          }}>
-            Merge ({mergeCount})
+          }}>{tr("Merge (")}{mergeCount})
           </button>
         </div>
       )}
 
       {/* ── Select all / Clear all / count / Save Tempo & Key toggle ─────────── */}
       <div style={{ padding: '6px 14px', borderTop: '1px solid var(--bg-tile)', background: 'var(--bg-modal-header)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <TBtn onClick={() => setState(s => s && ({ ...s, rows: s.rows.map(t => ({ ...t, included: true })) }))}>Select all</TBtn>
-        <TBtn onClick={() => setState(s => s && ({ ...s, rows: s.rows.map(t => ({ ...t, included: false })) }))}>Clear all</TBtn>
-        <span style={{ fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>{includedCount}/{state.rows.length} included</span>
+        <TBtn onClick={() => setState(s => s && ({ ...s, rows: s.rows.map(t => ({ ...t, included: true })) }))}>{tr("Select all")}</TBtn>
+        <TBtn onClick={() => setState(s => s && ({ ...s, rows: s.rows.map(t => ({ ...t, included: false })) }))}>{tr("Clear all")}</TBtn>
+        <span style={{ fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)' }}>{includedCount}/{state.rows.length}{tr(" included")}</span>
         {/* ── Save Tempo & Key changes — off by default; when on, folds the
             session's BPM/transpose changes into this same Save & Reload
             write instead of needing a separate save (see performSave). A
             hover tooltip carries the explanation — an always-visible two-line
             description here read as a layout bug rather than an aside. ──── */}
-        <Tooltip title="Folds the session's tempo/key changes into the next Save & Reload" oneLine wrapperStyle={{ marginLeft: 'auto' }}>
+        <Tooltip title={tr("Folds the session's tempo/key changes into the next Save & Reload")} oneLine wrapperStyle={{ marginLeft: 'auto' }}>
         <button
           onClick={() => useStore.getState().setSaveTempoKeyChangesEnabled(!saveTempoKeyChangesEnabled)}
           className="app-no-drag"
@@ -1795,9 +1786,7 @@ export default function MidiEditor() {
             background: 'none', border: 'none', cursor: 'pointer', padding: 2,
           }}
         >
-          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Save Tempo & Key changes
-          </span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tr("Save Tempo & Key changes")}</span>
           <span style={{ display: 'flex', color: saveTempoKeyChangesEnabled ? 'var(--text-amber)' : 'var(--text-inactive)', flexShrink: 0 }}>
             {saveTempoKeyChangesEnabled
               ? <ToggleRight size={16} strokeWidth={1.5} />
@@ -1821,7 +1810,7 @@ export default function MidiEditor() {
 
       {/* ── Save footer ──────────────────────────────────────────────────────── */}
       <div style={{ padding: '10px 14px 12px', borderTop: '1px solid var(--border)', background: 'var(--bg-modal-header)', flexShrink: 0 }}>
-        <div style={{ fontSize: 10, lineHeight: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Save as</div>
+        <div style={{ fontSize: 10, lineHeight: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tr("Save as")}</div>
         {/* ── Path field + Browse/Show-in-folder — one row. Browse only makes sense
             before a save has landed; once it has, the field shows the real saved
             path (not just the preview name) with a green accent, and Show in
@@ -1840,7 +1829,7 @@ export default function MidiEditor() {
           </div>
           {saveResult?.ok && saveResult.filePath ? (
             <Tooltip
-              title="Opens Windows Explorer with this exact saved file highlighted — settles any doubt about where it landed."
+              title={tr("Opens Windows Explorer with this exact saved file highlighted — settles any doubt about where it landed.")}
               oneLine
               wrapperStyle={{ width: SHOW_IN_FOLDER_W, flexShrink: 0 }}
             >
@@ -1850,8 +1839,7 @@ export default function MidiEditor() {
               onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--accent-amber-strong)' }}
               onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
             >
-              <FolderOpen size={11} /> Show in folder
-            </button>
+              <FolderOpen size={11} />{tr(" Show in folder")}</button>
             </Tooltip>
           ) : (
             <button onClick={async () => {
@@ -1861,19 +1849,17 @@ export default function MidiEditor() {
               onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--accent-amber-strong)' }}
               onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
             >
-              <FolderOpen size={11} /> Browse
-            </button>
+              <FolderOpen size={11} />{tr(" Browse")}</button>
           )}
         </div>
         {splitResult && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 4, marginBottom: 8, background: splitResult.ok ? 'var(--status-success-bg)' : 'var(--status-error-banner-bg)', border: `1px solid ${splitResult.ok ? 'var(--status-success-border)' : 'var(--status-error-banner-border)'}` }}>
             <span style={{ flex: 1, fontSize: 10, color: splitResult.ok ? 'var(--status-success-text)' : 'var(--status-error-banner-text)', fontFamily: 'var(--font-mono)' }}>
-              {splitResult.ok ? '✓ ' : '✗ '}{splitResult.msg}
+              {splitResult.ok ? '✓ ' : '✗ '}{tr(splitResult.msg)}
             </span>
             {splitResult.ok && preSplitRows && (
               <button onClick={handleUndoSplit} style={{ padding: '3px 10px', borderRadius: 4, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text-amber)', fontSize: 10, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <Undo2 size={10} /> Undo split
-              </button>
+                <Undo2 size={10} />{tr(" Undo split")}</button>
             )}
           </div>
         )}
@@ -1881,7 +1867,7 @@ export default function MidiEditor() {
             above instead of a second banner repeating the same information. */}
         {saveResult && !saveResult.ok && (
           <div style={{ padding: '5px 8px', borderRadius: 4, marginBottom: 8, background: 'var(--status-error-banner-bg)', border: '1px solid var(--status-error-banner-border)', fontSize: 10, color: 'var(--status-error-banner-text)', fontFamily: 'var(--font-mono)' }}>
-            ✗ {saveResult.msg}
+            ✗ {tr(saveResult.msg)}
           </div>
         )}
         {/* ── Info + action buttons — one row, info wraps left, buttons sit right
@@ -1889,15 +1875,14 @@ export default function MidiEditor() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', gap: 5, minWidth: 0 }}>
             <AlertCircle size={10} style={{ color: 'var(--text-inactive)', flexShrink: 0, marginTop: 1 }} />
-            <span style={{ fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)', lineHeight: '13.5px' }}>Original file is never modified! Saves as a new _ORFEO_vX copy in "Orfeo" folder next to it, auto-loads on save. Only shows up in your Library list if that folder is inside your registered Library Folder. Refresh Library to see it immediately.</span>
+            <span style={{ fontSize: 10, color: 'var(--text-inactive)', fontFamily: 'var(--font-mono)', lineHeight: '13.5px' }}>{tr("Original file is never modified! Saves as a new _ORFEO_vX copy in \"Orfeo\" folder next to it, auto-loads on save. Only shows up in your Library list if that folder is inside your registered Library Folder. Refresh Library to see it immediately.")}</span>
           </div>
           {saveResult?.ok ? (
             <button
               onClick={() => setMidiEditorOpen(false)}
               style={{ width: SHOW_IN_FOLDER_W, padding: '6px 0', borderRadius: 'var(--radius-md)', background: 'var(--text-amber)', border: 'none', color: 'var(--text-near-black)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 0 }}
             >
-              <ThumbsUp size={13} /> OK
-            </button>
+              <ThumbsUp size={13} />{tr(" OK")}</button>
           ) : (
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               <button
@@ -1905,15 +1890,13 @@ export default function MidiEditor() {
                 style={{ width: FOOTER_BTN_W, padding: '6px 0', borderRadius: 'var(--radius-md)', background: 'transparent', border: '1px solid var(--border2)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'all 0.12s' }}
                 onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-amber)'; e.currentTarget.style.borderColor = 'var(--accent-amber-strong)' }}
                 onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
-              >
-                Cancel
-              </button>
+              >{tr("Cancel")}</button>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 style={{ width: FOOTER_BTN_W, padding: '6px 0', borderRadius: 'var(--radius-md)', background: saving ? 'var(--bg-tile)' : 'var(--text-amber)', border: 'none', color: saving ? 'var(--text-inactive)' : 'var(--text-near-black)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: saving ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap' }}
               >
-                <Save size={13} /> {saving ? 'Saving…' : 'Save & Reload'}
+                <Save size={13} /> {saving ? tr("Saving…") : tr("Save & Reload")}
               </button>
             </div>
           )}

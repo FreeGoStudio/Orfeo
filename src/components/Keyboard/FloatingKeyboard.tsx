@@ -1,3 +1,4 @@
+import { tr, useI18n } from '../../utils/i18n'
 /**
  * FloatingKeyboard — horizontally resizable, draggable panel.
  * Height auto-fits to keyboard content — no fixed height, no empty space.
@@ -20,6 +21,7 @@ const MAX_W = 1200
 const HANDLE_PX = 8
 
 export default function FloatingKeyboard() {
+  useI18n()
   const setKeyboardMode = useStore((s) => s.setKeyboardMode)
 
   // ── Default position: horizontally centered on the piano roll, bottom
@@ -107,7 +109,7 @@ export default function FloatingKeyboard() {
     <div
       ref={panelRef}
       role="region"
-      aria-label="Floating virtual keyboard"
+      aria-label={tr("Floating virtual keyboard")}
       className="orfeo-modal-glow app-no-drag"
       style={{
         position: 'fixed',
@@ -148,12 +150,10 @@ export default function FloatingKeyboard() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <OrfeoMark height={22} />
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 9, fontWeight: 700, color: 'var(--text-amber)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-            Keyboard
-          </span>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 9, fontWeight: 700, color: 'var(--text-amber)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>{tr("Keyboard")}</span>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-1)' }} data-no-drag="true">
-          <Tooltip title="Dock keyboard" description="Reattaches the keyboard to the bottom of the window.">
+          <Tooltip title={tr("Dock keyboard")} description={tr("Reattaches the keyboard to the bottom of the window.")}>
           <button
             onClick={() => setKeyboardMode('docked')}
             data-no-drag="true"
@@ -164,7 +164,7 @@ export default function FloatingKeyboard() {
             <Pin size={10} strokeWidth={1.8} />
           </button>
           </Tooltip>
-          <Tooltip title="Close" description="Docks the keyboard back to the bottom of the window.">
+          <Tooltip title={tr("Close")} description={tr("Docks the keyboard back to the bottom of the window.")}>
           <button
             onClick={() => setKeyboardMode('docked')}
             data-no-drag="true"

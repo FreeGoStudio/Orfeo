@@ -1,5 +1,5 @@
 import { useStore } from '../store'
-import { t } from './i18n'
+import { t, msg } from './i18n'
 import { fitTaps, MIN_TAPS } from './tapTempoFit'
 import { refineToNotes, matchFileBeat } from './tapRefine'
 import { applyTempoCorrection, buildSegment, upsertSegment, shiftDownbeat, nudgeSegment, fileGridOf, sigAt, type TempoSegment } from './tempoCorrection'
@@ -132,8 +132,8 @@ export function finishTapping() {
   const beatsPerBar = perBar ? Math.max(1, sigAt(fileGridOf(s.midi).timeSigMap, ses.start).num) : 1
   const fit = fitTaps(ses.taps, perBar ? { minBpm: 20 / beatsPerBar } : {})
   if (!fit) {
-    if (ses.taps.length < MIN_TAPS) update({ phase: 'armed', message: t`Need at least 4 taps`, lastTapAt: 0 })
-    else update({ phase: 'armed', taps: [], message: t`Couldn't find a steady beat — try again`, lastTapAt: 0 })
+    if (ses.taps.length < MIN_TAPS) update({ phase: 'armed', message: msg`Need at least 4 taps`, lastTapAt: 0 })
+    else update({ phase: 'armed', taps: [], message: msg`Couldn't find a steady beat — try again`, lastTapAt: 0 })
     return
   }
   // Snap onto the song's own notes over the next 30 s (or up to the next

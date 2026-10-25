@@ -1,3 +1,4 @@
+import { message as i18nMessage, msg } from './i18n'
 import { useStore } from '../store'
 import { parseMidiBuffer } from './midiParser'
 import { detectKeyFromTracks, parseKeySignature, formatKey } from './keyDetection'
@@ -62,7 +63,7 @@ export async function saveTempoKeyChanges(): Promise<boolean> {
       summary: payload.summary, finalKey: payload.finalKey,
     })
     if (!result.ok) {
-      await confirmDialog({ title: 'Save Failed', message: result.message ?? 'Could not save tempo/key changes.', buttons: ['OK'] })
+      await confirmDialog({ title: i18nMessage("Save Failed"), message: result.message ?? 'Could not save tempo/key changes.', buttons: [i18nMessage("OK")] })
       return false
     }
 
@@ -87,7 +88,7 @@ export async function saveTempoKeyChanges(): Promise<boolean> {
     return true
   } catch (err) {
     console.error('[Orfeo] saveTempoKeyChanges failed:', err)
-    await confirmDialog({ title: 'Save Failed', message: 'Could not save tempo/key changes.', detail: String(err), buttons: ['OK'] })
+    await confirmDialog({ title: i18nMessage("Save Failed"), message: i18nMessage("Could not save tempo/key changes."), detail: String(err), buttons: [i18nMessage("OK")] })
     return false
   }
 }
@@ -103,10 +104,10 @@ export async function confirmDiscardDirtyTempoKey(message: string): Promise<bool
   if (!dirty) return true
 
   const choice = await confirmDialog({
-    title: 'Unsaved Tempo/Key Changes',
+    title: i18nMessage("Unsaved Tempo/Key Changes"),
     message,
-    detail: 'Your tempo and/or key changes will be lost if you discard.',
-    buttons: ['Save', 'Discard', 'Cancel'],
+    detail: i18nMessage("Your tempo and/or key changes will be lost if you discard."),
+    buttons: [i18nMessage("Save"), i18nMessage("Discard"), i18nMessage("Cancel")],
   })
   if (choice === 2) return false // Cancel
   if (choice === 0) {            // Save

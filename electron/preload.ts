@@ -1,3 +1,4 @@
+import type { LocalePreference, LocaleState } from '../src/i18n/core'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // ── zoom:changed needs more than one live listener at once — App.tsx (the
@@ -15,6 +16,13 @@ const zoomListeners = new Map<(data: any) => void, (e: unknown, data: any) => vo
 ipcRenderer.on('audio:port', (e) => { window.postMessage('orfeo-audio-port', '*', e.ports) })
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  getLocale: () => ipcRenderer.invoke('locale:get') as Promise<LocaleState>,
+  setLocale: (preference: LocalePreference) => ipcRenderer.invoke('locale:set', preference) as Promise<LocaleState>,
+  onLocaleChanged: (listener: (state: LocaleState) => void) => {
+    const wrapped = (_event: unknown, state: LocaleState) => listener(state)
+    ipcRenderer.on('locale:changed', wrapped)
+    return () => { ipcRenderer.removeListener('locale:changed', wrapped) }
+  },
   // Native audio engine (beta)
   connectNativeAudio:     () => ipcRenderer.invoke('audio:connect'),
   nativeSoundfontPaths:   (extraId: string | null) => ipcRenderer.invoke('audio:soundfontPaths', extraId),

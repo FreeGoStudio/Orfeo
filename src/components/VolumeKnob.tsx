@@ -1,3 +1,4 @@
+import { tr, useI18n } from '../utils/i18n'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { TooltipBox } from './Tooltip'
@@ -19,6 +20,7 @@ const TRACK_W   = BAR_COUNT * BAR_W + (BAR_COUNT - 1) * BAR_GAP
 // redrawn to fit the row: first a filled pill, now ascending bars per the
 // requested signal-strength look.)
 export default function VolumeKnob() {
+  useI18n()
   const masterVolume    = useStore((s) => s.masterVolume)
   const setMasterVolume = useStore((s) => s.setMasterVolume)
   const draggingRef     = useRef(false)
@@ -89,7 +91,7 @@ export default function VolumeKnob() {
       >
         <TooltipBox
           anchorRect={(hover || isDragging) ? trackRef.current?.getBoundingClientRect() ?? null : null}
-          content={{ title: 'Volume', description: `${pct}%` }}
+          content={{ get title() { return tr("Volume") }, description: `${pct}%` }}
           placement="left"
           visible={hover || isDragging}
           readout={isDragging}
@@ -109,9 +111,7 @@ export default function VolumeKnob() {
         color: 'var(--text-muted)', fontSize: 9, fontFamily: 'var(--font-mono)',
         textTransform: 'uppercase', letterSpacing: '0.1em', lineHeight: 1,
         marginTop: 6, whiteSpace: 'nowrap', pointerEvents: 'none',
-      }}>
-        Volume
-      </span>
+      }}>{tr("Volume")}</span>
     </div>
   )
 }

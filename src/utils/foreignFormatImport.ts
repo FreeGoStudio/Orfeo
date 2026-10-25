@@ -1,3 +1,4 @@
+import { message as i18nMessage, msg } from './i18n'
 // ── Foreign Format Import ─────────────────────────────────────────────────
 // Converts MusicXML, Guitar Pro, and Capella files to Standard MIDI File
 // bytes using alphaTab's importer + midi namespaces only (no renderer, no
@@ -179,9 +180,9 @@ export async function resolveAndTrackImport(
 
   const cachePath = getCachePath(filePath, libraryFolder);
   const choice = await confirmDialog({
-    message: `Save "${fileName}" as a MIDI file?`,
-    detail: `This saves a copy at:\n${cachePath}\n\nThe original ${fileName} is never modified. You can save it later too — via the Library refresh icon.`,
-    buttons: ['Save as MID', "Don't Save"],
+    message: msg`Save "${fileName}" as a MIDI file?`,
+    detail: msg`This saves a copy at:\n${cachePath}\n\nThe original ${fileName} is never modified. You can save it later too — via the Library refresh icon.`,
+    buttons: [i18nMessage("Save as MID"), i18nMessage("Don't Save")],
   });
   if (choice === 0) {
     await (window.electronAPI as any).writeCachedImport(cachePath, resolved.base64);
@@ -215,9 +216,9 @@ export async function confirmPendingImportBeforeSwitch(
   const cachePath = getCachePath(pendingImportedFile.sourcePath, libraryFolder);
 
   const choice = await confirmDialog({
-    message: `Save imported file "${pendingImportedFile.fileName}" as a MIDI file?`,
-    detail: `This saves a copy at:\n${cachePath}\n\nThe original ${pendingImportedFile.fileName} is never modified.`,
-    buttons: ['Save as MID', "Don't Save", 'Cancel'],
+    message: msg`Save imported file "${pendingImportedFile.fileName}" as a MIDI file?`,
+    detail: msg`This saves a copy at:\n${cachePath}\n\nThe original ${pendingImportedFile.fileName} is never modified.`,
+    buttons: [i18nMessage("Save as MID"), i18nMessage("Don't Save"), i18nMessage("Cancel")],
   });
 
   if (choice === 2) return false; // Cancel
@@ -250,9 +251,9 @@ export async function confirmPendingImportBeforeEdit(): Promise<boolean> {
   const cachePath = getCachePath(pendingImportedFile.sourcePath, libraryFolder);
 
   const choice = await confirmDialog({
-    message: `Save "${pendingImportedFile.fileName}" as a MIDI file before editing?`,
-    detail: `Orfeo's editing tools only work on real .mid files. This saves a copy at:\n${cachePath}\n\nThe original ${pendingImportedFile.fileName} is never modified.`,
-    buttons: ['Save as MID', 'Cancel'],
+    message: msg`Save "${pendingImportedFile.fileName}" as a MIDI file before editing?`,
+    detail: msg`Orfeo's editing tools only work on real .mid files. This saves a copy at:\n${cachePath}\n\nThe original ${pendingImportedFile.fileName} is never modified.`,
+    buttons: [i18nMessage("Save as MID"), i18nMessage("Cancel")],
   });
 
   if (choice !== 0) return false; // Cancel

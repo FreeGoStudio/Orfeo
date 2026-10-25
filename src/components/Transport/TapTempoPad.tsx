@@ -1,8 +1,8 @@
+import { renderMessage, message as i18nMessage, msg, useI18n, t } from '../../utils/i18n'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useStore } from '../../store'
-import { t } from '../../utils/i18n'
 import Tooltip from '../Tooltip'
 import { ContextMenu, ContextMenuItem, ContextMenuDivider, useMenuDismiss } from '../ContextMenu'
 import { confirmDialog } from '../../utils/confirmController'
@@ -32,6 +32,7 @@ const keepFocus = (e: React.MouseEvent) => e.preventDefault()
 // this song has saved tapped tempos; right-click lists them (each removable)
 // and offers a full reset. ───────────────────────────────────────────────
 export function TapTempoPad() {
+  useI18n()
   useTapTempo()
   const enabled = useStore((s) => s.tapTempoPadEnabled)
   const mode = useStore((s) => s.tapTempoMode)
@@ -83,10 +84,10 @@ export function TapTempoPad() {
   const onReset = async () => {
     setMenu(null)
     const choice = await confirmDialog({
-      title: t`Reset tempo`,
-      message: t`Go back to this song's own tempo and bar lines?`,
-      detail: t`All tapped tempos saved for this song will be removed.`,
-      buttons: [t`Reset`, t`Cancel`],
+      get title() { return msg`Reset tempo` },
+      get message() { return msg`Go back to this song's own tempo and bar lines?` },
+      get detail() { return msg`All tapped tempos saved for this song will be removed.` },
+      buttons: [msg`Reset`, msg`Cancel`],
     })
     if (choice === 0) resetSongTempo()
   }
@@ -174,7 +175,7 @@ export function TapTempoPad() {
                 {t`Space or any MIDI key. Start on a 1, whenever you're ready.`}
               </span>
               <span style={{ fontFamily: 'var(--font-mono)' }}>
-                {ses.message ?? t`Taps: ${ses.taps.length}`}
+                {ses.message ? renderMessage(ses.message) : t`Taps: ${ses.taps.length}`}
               </span>
               <span style={hint}>{t`Click TAP again when you're done · Esc cancels`}</span>
             </>
